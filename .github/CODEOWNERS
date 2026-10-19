@@ -1,0 +1,5 @@
+# Default owner for all repository files
+* @august0362
+
+# Protect repository governance configurations
+/.github/ @august0362

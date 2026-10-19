@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ["feature/**", "fix/**", "chore/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-required:
+    name: ci-required
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # ---- Repository checks (always run) ----
+      - name: Check CODEOWNERS exists
+        run: test -f .github/CODEOWNERS || { echo "::error::.github/CODEOWNERS is missing"; exit 1; }
+
+      - name: Check for merge conflict markers
+        run: |
+          if git grep -nE '^(<<<<<<< |>>>>>>> |=======$)' -- ':!*.md'; then
+            echo "::error::Merge conflict markers found"
+            exit 1
+          fi
+
+      # ---- Node.js (runs only when package.json exists) ----
+      - name: Set up Node.js
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+
+      - name: Install Node dependencies
+        if: hashFiles('package.json') != ''
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Node lint / build / test
+        if: hashFiles('package.json') != ''
+        run: |
+          npm run lint --if-present
+          npm run build --if-present
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            npm test
+          else
+            echo "::warning::package.json has no test script"
+          fi
+
+      # ---- Python (runs only when Python project files exist) ----
+      - name: Set up Python
+        if: hashFiles('requirements*.txt', 'pyproject.toml', 'setup.py', '**/*.py') != ''
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies and test
+        if: hashFiles('requirements*.txt', 'pyproject.toml', 'setup.py', '**/*.py') != ''
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f pyproject.toml ] || [ -f setup.py ]; then pip install -e .; fi
+          if find . -path ./.git -prune -o \( -name 'test_*.py' -o -name '*_test.py' \) -print | grep -q .; then
+            pip install pytest
+            pytest
+          else
+            echo "::warning::No Python tests found (test_*.py / *_test.py)"
+            python -m compileall -q .
+          fi
+
+      # ---- Docker (runs only when a Dockerfile exists) ----
+      - name: Docker build
+        if: hashFiles('Dockerfile') != ''
+        run: docker build -t btl-cloud-ci .
+
+      - name: Report detected stack
+        if: hashFiles('package.json', 'requirements*.txt', 'pyproject.toml', 'setup.py', '**/*.py', 'Dockerfile') == ''
+        run: echo "::warning::No application stack detected yet - only repository checks ran"
