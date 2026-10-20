@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/context";
-import { APP_NAME } from "../lib/constants";
 import { Button } from "./ui";
+import { ThemePicker } from "./ThemePicker";
 import styles from "./AppLayout.module.css";
 
 export function AppHeader() {
@@ -19,18 +19,21 @@ export function AppHeader() {
     <header className={styles.header}>
       <div className={styles.headerInner}>
         <Link className="brand" to="/">
-          {APP_NAME}
+          <span className="brand-mark" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
+              <path d="M5 4.5h10l4 4V20H5zM15 4.5V9h4M8 12h8M8 15.5h6" />
+            </svg>
+          </span>
+          <span className="brand-label">
+            <span>Kho Tài Liệu</span> <span>Học Tập</span>
+          </span>
         </Link>
-        <button
-          type="button"
-          className="menu-toggle button button--secondary"
-          aria-label={menuOpen ? "Đóng menu" : "Mở menu"}
-          aria-expanded={menuOpen}
-          aria-controls="main-navigation"
-          onClick={() => setMenuOpen((value) => !value)}
-        >
-          ☰
-        </button>
         <nav
           id="main-navigation"
           className={menuOpen ? "navigation navigation--open" : "navigation"}
@@ -67,6 +70,19 @@ export function AppHeader() {
             </>
           )}
         </nav>
+        <div className={styles.headerActions}>
+          <ThemePicker />
+          <button
+            type="button"
+            className="menu-toggle button button--secondary"
+            aria-label={menuOpen ? "Đóng menu" : "Mở menu"}
+            aria-expanded={menuOpen}
+            aria-controls="main-navigation"
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            ☰
+          </button>
+        </div>
       </div>
     </header>
   );
