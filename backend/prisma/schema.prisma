@@ -1,0 +1,88 @@
+// Schema theo ARCHITECTURE §A4.3. Tên bảng/cột snake_case qua @@map/@map.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum FileType {
+  PDF
+  DOCX
+  PPTX
+}
+
+enum CleanupReason {
+  UPLOAD_GUARD
+  REPLACED
+  DELETED
+}
+
+model User {
+  id           String     @id @db.Char(36)
+  email        String     @unique(map: "uq_users_email") @db.VarChar(254)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  displayName  String     @map("display_name") @db.VarChar(100)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  sessions     Session[]
+  documents    Document[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @db.Char(64)
+  userId    String   @map("user_id") @db.Char(36)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  expiresAt DateTime @map("expires_at") @db.DateTime(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_sessions_user_id")
+  @@index([expiresAt], map: "idx_sessions_expires_at")
+  @@map("sessions")
+}
+
+model Document {
+  id               String     @id @db.Char(36)
+  ownerId          String     @map("owner_id") @db.Char(36)
+  title            String     @db.VarChar(200)
+  description      String?    @db.VarChar(2000)
+  visibility       Visibility
+  fileType         FileType   @map("file_type")
+  mimeType         String     @map("mime_type") @db.VarChar(100)
+  originalFilename String     @map("original_filename") @db.VarChar(255)
+  sizeBytes        Int        @map("size_bytes") @db.UnsignedInt
+  storageKey       String     @unique(map: "uq_documents_storage_key") @map("storage_key") @db.VarChar(512)
+  fileVersion      Int        @default(1) @map("file_version") @db.UnsignedInt
+  createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  fileUpdatedAt    DateTime   @map("file_updated_at") @db.DateTime(3)
+  owner            User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([visibility, createdAt], map: "idx_documents_visibility_created")
+  @@index([ownerId, createdAt], map: "idx_documents_owner_created")
+  @@map("documents")
+}
+
+model StorageCleanupTask {
+  id            BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  storageKey    String        @unique(map: "uq_cleanup_storage_key") @map("storage_key") @db.VarChar(512)
+  reason        CleanupReason
+  documentId    String?       @map("document_id") @db.Char(36)
+  attempts      Int           @default(0) @db.UnsignedInt
+  nextAttemptAt DateTime      @map("next_attempt_at") @db.DateTime(3)
+  lastError     String?       @map("last_error") @db.VarChar(1000)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([nextAttemptAt], map: "idx_cleanup_next_attempt")
+  @@map("storage_cleanup_tasks")
+}
