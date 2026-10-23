@@ -261,7 +261,7 @@ Luồng chi tiết từng bước có trong sơ đồ SEQ tương ứng (§A9).
 
 **UC-12 Xoá vĩnh viễn** · Owner · FR-09 · API-14 · P-04, P-05, P-07 · SEQ-09
 - Trigger/Input · Tiền điều kiện: bấm Xoá, xác nhận CD-01; `id` · đã đăng nhập, là owner.
-- Luồng chính: transaction (DELETE có điều kiện `file_version` + INSERT task xoá object) → thử xoá object ngay → 204.
+- Luồng chính: DELETE documents theo id → thử xoá object theo key của dòng vừa xoá → 204.
 - Lỗi: 403/404; storage lỗi khi xoá object → vẫn 204, WARN storage.orphan.
 - Kết quả: tài liệu không còn (404 ở mọi endpoint); object được thử xoá ngay; lỗi xoá ghi storage.orphan.
 
