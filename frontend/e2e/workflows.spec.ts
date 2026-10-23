@@ -111,7 +111,7 @@ test("E2E-03 · FR-02/03/06 · Private của A không lộ cho Guest hoặc B", 
     ).toHaveCount(0);
     await otherPage.goto(`/documents/${document.id}`);
     await expect(
-      otherPage.getByRole("heading", { name: "Không tìm thấy tài liệu" }),
+      otherPage.getByRole("heading", { name: "Không tìm thấy tài liệu", exact: true }),
     ).toBeVisible();
     expect(
       (
