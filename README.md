@@ -33,6 +33,8 @@ Production-like: `npm run build`, đặt biến **của process** `SERVE_FRONTEN
 
 ## Kiểm thử
 
+Trên Windows, chạy `run.bat stop` trước `npm ci` để tránh khoá Prisma DLL; không cài lại dependency khi app/test còn chạy. Sau chuỗi lint/build/unit, bật lại hạ tầng để chạy integration/E2E; dừng backend dev trước khi dùng backend production-like.
+
 ```sh
 npm ci
 npm run lint

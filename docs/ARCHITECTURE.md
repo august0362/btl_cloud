@@ -1495,18 +1495,19 @@ Có skip link "Bỏ qua tới nội dung chính"; toast ở góc dưới phải 
 
 ### A8.4 Design token (`styles/tokens.css`)
 
-| Nhóm | Token = giá trị |
-|---|---|
-| Nền / viền | `--color-bg` `#F8FAFC` · `--color-surface` `#FFFFFF` · `--color-surface-muted` `#F1F5F9` · `--color-border` `#CBD5E1` |
-| Chữ | `--color-text` `#0F172A` · `--color-text-muted` `#475569` |
-| Chính | `--color-primary` `#1D4ED8` · `--color-primary-hover` `#1E40AF` · `--color-on-primary` `#FFFFFF` |
-| Trạng thái | `--color-danger` `#B91C1C` (hover `#991B1B`) · `--color-success` `#15803D` · `--color-warning` `#B45309` · `--color-info` `#1D4ED8` · `--color-focus` `#2563EB` (outline 2 px, offset 2 px) |
-| Nhãn | Công khai `#DCFCE7`/`#166534` · Riêng tư `#E2E8F0`/`#334155` · PDF `#B91C1C` · DOCX `#1D4ED8` · PPTX `#C2410C` (chữ trên nền `--color-surface-muted`) |
-| Chữ | `--font-sans`: `system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif` · cỡ `--text-sm/base/lg/xl/2xl` = `0.875/1/1.125/1.5/1.875rem` · đậm `400/600/700` · dòng `1.5` |
-| Khoảng cách | `--space-1/2/3/4/6/8/12` = `4/8/12/16/24/32/48px` |
-| Khác | `--radius-sm/md` `6/10px` · `--shadow-card` `0 1px 3px rgba(15,23,42,.08)` · `--container-max` `1120px` · `--touch-min` `44px` · breakpoint `640px` / `1024px` |
+Một bảng màu xanh duy nhất, sáng/tối tự theo `prefers-color-scheme` (`color-scheme: light dark` và `light-dark()`). Không ThemeProvider, ThemePicker, PNG palette hay localStorage. Token màu và kích thước nằm trong `styles/tokens.css`; component dùng CSS thuần/CSS Modules.
 
-Cặp màu chữ/nền kiểm tra qua UI suite (M3-12). Một bảng màu duy nhất; sáng/tối tự theo prefers-color-scheme, không bộ chọn và không localStorage. Giá trị cụ thể ở styles/tokens.css.
+| Nhóm | Giá trị |
+|---|---|
+| Palette | Paper #e3f2fd, accent #2196f3, primary #0d47a1; dark bg #091540, dark accent #abd2fa |
+| Chữ | Light #152b40 / muted #50667b; dark #eef2fc / muted #b7c5d9 |
+| Trạng thái | Danger #b91c1c / dark #fda4af; success #166534 / dark #86efac; warning #92400e / dark #fcd34d |
+| Bề mặt / viền | Trộn palette với trắng hoặc dark bg; định nghĩa cụ thể trong tokens.css |
+| Chữ | Segoe UI, system-ui, sans-serif; cỡ 0.875/1/1.125/1.5/1.875rem |
+| Khoảng cách | 4/8/12/16/24/32/48px |
+| Khác | Radius 10/18px; container 1240px; touch 44px; breakpoint 640/1024px |
+
+Tương phản và thao tác bàn phím kiểm bằng UI suite (M3-12); xem bằng chứng chạy lại ở M4.
 
 ### A8.5 Component dùng chung
 

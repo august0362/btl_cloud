@@ -16,7 +16,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M0 | Thiết kế | Owner đã duyệt |
 | M1–M2 | Backend, DB, storage | Đã triển khai; xác minh lại ở M4 |
 | M3 | Frontend | Đã ghép lịch sử |
-| M4 | Local prototype | Đang kiểm thử; M4-07/08 hoãn CR-005 |
+| M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
 
 ---
@@ -259,38 +259,39 @@ OWNER_APPROVED_M0: YES
 ## M4 — Full-Stack Integration & Verification
 
 
-- [ ] **M4-01** Ghép M1–M3 trên `chore/integration-m4` (từ `main` mới nhất), chạy full stack dev (§A10.5)
-  - In: §A10.5 · Out: stack chạy ở `:5173` + `:3000` · Dep: M2-15, M3-13 · Verify: trên trình duyệt: đăng ký → tải lên → thấy ở P-05 → tìm thấy ở P-01
-  - Bằng chứng: —
-- [ ] **M4-02** Chế độ production-like cùng origin ở `:3000`
-  - In: §A3.7 · Out: SPA do backend phục vụ · Dep: M4-01 · Verify: tải lại `/me/documents` vẫn ra SPA; asset `immutable`; đăng nhập/tải lên chạy được; request ghi có `X-CSRF-Protection`
-  - Bằng chứng: —
-- [ ] **M4-03** Kiểm tra tương thích API: chạy M2-15 + M3-04; thử từng dòng F-01…F-18 trên backend thật
-  - In: §A7, §A8.12 · Out: bảng kết quả F-01…F-18 · Dep: M4-02 · Verify: 18/18 khớp hoặc đã có bug ID
-  - Bằng chứng: —
-- [ ] **M4-04** Chạy E2E (M3-13) FR-01…FR-09 ở `:3000`, ánh xạ theo AC
-  - In: CONTEXT §C4 · Out: kết quả theo AC · Dep: M4-02 · Verify: `npm --prefix frontend run test:e2e` → số pass/fail; AC không tự động hoá được thì kiểm thủ công và ghi rõ
-  - Bằng chứng: —
-- [ ] **M4-05** Script ma trận phân quyền (Guest, User A, User B) gọi API trực tiếp, phủ mọi ô CONTEXT §C3.2
-  - In: §C3.2, §A5.5 · Out: script/kịch bản `curl` + bảng kết quả · Dep: M4-02 · Verify: mọi ô đúng mã HTTP
-  - Bằng chứng: —
-- [ ] **M4-06** Upload/download: 3 định dạng, biên 52 428 800 / +1, tệp giả, tệp rỗng, tên tiếng Việt, SHA-256
-  - In: FR-03, FR-04, §A6.4 · Out: bảng kết quả · Dep: M4-02 · Verify: đúng mã lỗi §A7.3; checksum khớp
-  - Bằng chứng: —
-- [ ] **M4-07** DEFERRED (CR-005)
-  - In: §A6.9, SEQ-03/08/09 · Out: bảng kết quả + `mc ls` · Dep: M4-02 · Verify: hành vi khớp §A6.9
-  - Bằng chứng: —
-- [ ] **M4-08** DEFERRED (CR-005)
-  - Bằng chứng: —
-- [ ] **M4-09** Chạy toàn bộ kiểm tra tự động: root CI, backend integration, frontend test, E2E
-  - In: §A10.6 · Out: bảng lệnh → kết quả · Dep: M4-03…M4-08 · Verify: tất cả thoát 0 hoặc lỗi đã có bug ID
-  - Bằng chứng: —
-- [ ] **M4-10** Cập nhật mục Lỗi tồn đọng (mức độ + người phụ trách)
-  - In: M4-03…M4-09 · Out: mục Lỗi tồn đọng · Dep: M4-09 · Verify: không còn lỗi `CRITICAL` mở
-  - Bằng chứng: —
-- [ ] **M4-11** Tái lập: clone mới vào thư mục trống, làm theo `README.md` (cập nhật runbook ngắn trỏ tới §A10.5)
-  - In: §A10.5 · Out: `README.md` + vấn đề gặp phải · Dep: M4-09 · Verify: từ clone tới đăng nhập ở `:5173` không cần bước ngoài README
-  - Bằng chứng: —
+- [x] **M4-01** Ghép M1–M3 và chạy dev
+  - Bằng chứng: run.bat exit 0; health/ready 200; Chromium :5173 đăng ký → upload → My documents → Explore PASS.
+
+- [x] **M4-02** Production-like cùng origin
+  - Bằng chứng: Build BE/FE PASS; process SERVE_FRONTEND=true; contract-flows.spec.ts: SPA reload, asset immutable, CSRF writes PASS.
+
+- [x] **M4-03** Tương thích API F-01…F-18
+  - Bằng chứng: Contract API-01…14 trong 74 integration tests; client tests trong 61 frontend tests; bảng F-xx bên dưới.
+
+- [x] **M4-04** E2E FR-01…FR-09
+  - Bằng chứng: playwright install chromium exit 0; test:e2e 9/9 PASS trên :3000, không mock backend; bảng FR bên dưới.
+
+- [x] **M4-05** Ma trận phân quyền Guest/A/B
+  - Bằng chứng: node scripts/verify/authz-matrix.mjs → 82/82 PASS; bao phủ mọi ô CONTEXT §C3.2.
+
+- [x] **M4-06** Ma trận upload/download
+  - Bằng chứng: node scripts/verify/upload-matrix.mjs → 42/42 PASS; PDF/DOCX/PPTX, 50 MiB/+1, fake/empty/UTF-8, SHA-256.
+
+- [ ] **M4-07** Lỗi storage thực khi dừng dịch vụ
+  - Bằng chứng: DEFERRED (CR-005); không tick.
+
+- [ ] **M4-08** Nhiều instance
+  - Bằng chứng: DEFERRED (CR-005); không tick.
+
+- [x] **M4-09** Kiểm tra tự động
+  - Bằng chứng: Lượt cuối Node 24.19.0, Vitest 5.0.5: root CI exit 0, integration 74, frontend 61, E2E 9 PASS; bảng lệnh bên dưới.
+
+- [x] **M4-10** Sổ lỗi và sửa lỗi
+  - Bằng chứng: BUG-001/TEST-001/SEC-001 đã sửa; không còn CRITICAL mở; SEC-002 advisory HIGH Prisma CLI còn mở.
+
+- [x] **M4-11** README và clone sạch
+  - Bằng chứng: Clone local ở C:	mptl-clone, run.bat, đăng ký/đăng xuất/đăng nhập :5173 PASS; stop xong; xoá clone BLOCKED bởi policy công cụ.
+
 - [ ] **M4-12** [OWNER] Diễn tập demo local (phần 2–5 phút trong kịch bản S2)
   - In: kịch bản demo S2 · Out: nhận xét · Dep: M4-11 · Verify: đăng nhập → tải lên → tìm kiếm → kiểm tra Public/Private
   - Bằng chứng: —
@@ -299,6 +300,69 @@ OWNER_APPROVED_M0: YES
   - Bằng chứng: —
 
 ---
+
+### M4 — Lệnh → kết quả (2026-10-23, Windows, Node 24.19.0)
+
+| Lệnh | Kết quả lượt cuối |
+|---|---|
+| npm ci && npm run lint && npm run build && npm test (gốc repo) | PASS, exit 0; 66 backend + 61 frontend tests |
+| npm --prefix backend run test:integration | PASS, exit 0; 74 tests, Vitest 5.0.5, DB btl_cloud_test |
+| npm --prefix frontend test | PASS, exit 0; 61 tests |
+| npm --prefix frontend run test:e2e | PASS, exit 0; 9 tests, Chromium headless, :3000 |
+| node scripts/verify/authz-matrix.mjs | PASS; 82 checks |
+| node scripts/verify/upload-matrix.mjs | PASS; 42 checks |
+| npm --prefix backend audit | 0 CRITICAL; 3 HIGH packages cùng chuỗi Prisma CLI → deepmerge-ts (SEC-002) |
+| npm --prefix frontend audit | 0 vulnerabilities |
+
+Các lượt setup lỗi không tính PASS: thiếu S3 trước khi infra sẵn sàng; npm ci gặp DLL lock khi app/test đang chạy (đã dừng process, cài và chạy lại tuần tự); E2E-03 selector đã sửa BUG-001. Không có Prisma reset bị chặn ở các lượt integration này; chỉ DB test bị reset, không reset DB dev.
+
+### M4-03 — F-01…F-18 với backend thật
+
+| F | Bằng chứng PASS |
+|---|---|
+| F-01 | Nạp phiên/reload: E2E-01 + M4-02 |
+| F-02 | Register: E2E-01 và các fixture register |
+| F-03 | Login: E2E-01/02 |
+| F-04 | Logout: E2E-01, test phiên bị thu hồi |
+| F-05 | Explore/search: E2E-02; lọc/sort/page API qua documents-search.integration |
+| F-06 | Chi tiết Public/Private: E2E-03/05 |
+| F-07 | Download/preflight/SHA-256: E2E-02 |
+| F-08 | Guest → login redirect → download: E2E-02 |
+| F-09 | My documents/reload: E2E-01; lọc/kho riêng API qua documents-search.integration |
+| F-10 | Upload PDF: E2E-01; DOCX/PPTX qua upload matrix |
+| F-11 | Huỷ upload và replace trên kết nối được làm chậm, không mock: contract-flows |
+| F-12 | Nạp form: E2E-04 |
+| F-13 | Lưu metadata: E2E-04 |
+| F-14 | Private → Public + dialog: E2E-04 |
+| F-15 | Replace, version tăng, visibility giữ nguyên: E2E-04/06 |
+| F-16 | Cancel/delete/404: E2E-05 |
+| F-17 | Thu hồi session thật rồi write → 401, toast và login redirect: contract-flows |
+| F-18 | Hiện mật khẩu, menu mobile, chọn tệp, radio chưa chọn, dialog/URL: contract-flows + workflows |
+
+### M4-04 — Ánh xạ FR
+
+| FR | E2E và kiểm chứng |
+|---|---|
+| FR-01 | E2E-01: register/login/logout, HttpOnly, không token localStorage |
+| FR-02 | E2E-02/03: tìm Public, ẩn Private; integration search kiểm pagination, ký tự %, dấu tiếng Việt |
+| FR-03 | E2E-02/03: Guest 401, Private người khác 404, download UTF-8/SHA-256 |
+| FR-04 | E2E-01/06 + upload matrix: 3 loại, 50 MiB/+1, giả/rỗng, không tài liệu ma |
+| FR-05 | E2E-01/04/06: visibility bắt buộc, private/public, đổi chế độ |
+| FR-06 | E2E-01/03: kho riêng, reload, cách ly A/B |
+| FR-07 | E2E-04: PATCH metadata/chế độ, giữ tệp |
+| FR-08 | E2E-04/06: replace/checksum/giữ visibility; integration fault injection 503 giữ tệp cũ |
+| FR-09 | E2E-05: cancel không xoá, confirm 204 rồi 404; integration delete lỗi storage vẫn 204 + log |
+
+Đây là bằng chứng tự động, không thay FINAL OWNER ACCEPTANCE. Dừng dịch vụ storage thật/nhiều instance chưa kiểm trong M4 reduced (CR-005).
+
+### M4 — Lịch sử tích hợp và bàn giao
+
+- Baseline c0bc6bb; backend/infra 23384ca; merge frontend M3; theme 6e06cdf; DB/storage 2d0d0af; docs 208240e.
+- Sửa selector 175f58f; scripts matrix 083a70e; E2E bổ sung 4618510; sửa focus c448915; Vitest dd8fad9 (owner duyệt nâng 2026-10-23).
+- Main GitHub đã khởi tạo chỉ bằng governance 841adba. PR/CI: đang tạo; cập nhật ở commit bằng chứng cuối.
+- README clone dùng portable services đã có trên máy (cài dependency mới, không copy .env/node_modules từ worktree); Docker không có trên máy nên nhánh Docker README chưa chạy.
+- Clone đã stop nhưng thư mục C:\tmp\btl-clone còn lại: BLOCKED bởi automatic approval review từ chối Remove-Item; owner có thể xoá thủ công.
+
 
 ## M5 — AWS Deployment Preparation
 
@@ -360,6 +424,7 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
 | Bug ID | Phát hiện ở | Mô tả | Tham chiếu | Mức độ | Phụ trách | Trạng thái |
 |---|---|---|---|---|---|---|
 | BUG-001 | M4-04 | E2E-03 locator heading khớp h1 và h2; thêm exact: true | FR-06 | MINOR | Nhóm | FIXED; E2E 6/6 và 3/3 bổ sung đạt |
+| ENV-002 | M4-09 | Windows khoá Prisma DLL nếu npm ci chạy cùng backend/test; README yêu cầu dừng trước khi cài | Local verification | MINOR | Nhóm | WORKAROUND DOCUMENTED |
 | ENV-001 | M4-01 | DEBUG=release từ môi trường agent làm SeaweedFS không lên; README chỉ cách bỏ DEBUG | Local launcher | MINOR | Nhóm | WORKAROUND DOCUMENTED |
 | SEC-001 | M4-09 | Vitest 3/tinypool có 2 advisory CRITICAL; owner duyệt nâng Vitest 5.0.5 (2026-10-23) | Dependency test | CRITICAL | Nhóm | FIXED; Vitest 5.0.5, backend lint + 66 unit test PASS; audit 0 CRITICAL |
 | SEC-002 | M4-09 | Prisma CLI → deepmerge-ts advisory HIGH; npm audit đề nghị Prisma major 7 | Dependency CLI | MAJOR | Nhóm | OPEN; cần kế hoạch nâng major riêng |
@@ -381,7 +446,7 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
   - Làm: so cấu trúc repo với §A1.3; chạy `git grep -n "@prisma/client" -- backend/src/modules/*/*.controller.ts` và `git grep -n "@aws-sdk" -- backend/src ":!backend/src/storage/s3-object-storage.ts"` → Mong đợi: cấu trúc khớp; hai lệnh không có kết quả
   - Bằng chứng agent: —
 - [ ] **ACC-04** Cơ sở dữ liệu · ARCHITECTURE §A4.3
-  - Làm: `docker compose exec mysql mysql -ubtl -pbtl_dev_password btl_cloud -e "SHOW CREATE TABLE users; SHOW CREATE TABLE sessions; SHOW CREATE TABLE documents; SHOW CREATE TABLE storage_cleanup_tasks;"` → Mong đợi: PK, FK (CASCADE/RESTRICT), UNIQUE, index, kiểu cột, nullability đúng; `visibility` không có mặc định
+  - Làm: `docker compose exec mysql mysql -ubtl -pbtl_dev_password btl_cloud -e "SHOW CREATE TABLE users; SHOW CREATE TABLE sessions; SHOW CREATE TABLE documents;"` → Mong đợi: PK, FK (CASCADE/RESTRICT), UNIQUE, index, kiểu cột, nullability đúng; `visibility` không có mặc định
   - Bằng chứng agent: —
 - [ ] **ACC-05** API và frontend tương thích · ARCHITECTURE §A7, §A8.12; M4-03
   - Làm: DevTools › Network khi tìm kiếm, tải lên, sửa, xoá; so với §A7.7 → Mong đợi: tên trường, mã trạng thái, envelope khớp; 18/18 dòng F-xx đạt
@@ -396,13 +461,13 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
   - Làm: tải lên mỗi loại PDF/DOCX/PPTX; thử tệp > 50 MB, `.txt` đổi tên `.pdf`, gửi khi chưa chọn chế độ → Mong đợi: 3 tệp hợp lệ thành công; 3 trường hợp sau bị từ chối với thông báo tiếng Việt rõ ràng
   - Bằng chứng agent: —
 - [ ] **ACC-09** Upload thất bại · BR-06, ARCHITECTURE §A6.3, SEQ-03
-  - Làm: `docker compose stop minio` → thử tải lên → `docker compose start minio` → sau ~2 phút xem P-01, P-05 và MinIO console `http://localhost:9001` → Mong đợi: upload báo lỗi; không có tài liệu mới; bucket không có object mồ côi
+  - Làm: `docker compose stop minio` → thử tải lên → `docker compose start minio` → sau ~2 phút xem P-01, P-05 và MinIO console `http://localhost:9001` → Mong đợi: upload báo lỗi; không có tài liệu mới; object mới được xoá best-effort; lỗi xoá có WARN storage.orphan; có thể còn object mồ côi theo CR-007
   - Bằng chứng agent: —
 - [ ] **ACC-10** Thay thế an toàn · FR-08, BR-07, ARCHITECTURE §A6.6
-  - Làm: (1) thay tệp một tài liệu Public rồi tải xuống; (2) `stop minio` → thử thay → `start minio` → tải xuống; (3) sau (1) chờ > 2 phút, xem MinIO console → Mong đợi: (1) nội dung mới, nhãn vẫn "Công khai"; (2) báo lỗi, vẫn ra tệp **cũ**; (3) chỉ còn object mới
+  - Làm: (1) thay tệp một tài liệu Public rồi tải xuống; (2) `stop minio` → thử thay → `start minio` → tải xuống; (3) sau (1) kiểm tra storage → Mong đợi: (1) nội dung mới, nhãn vẫn "Công khai"; (2) báo lỗi, vẫn ra tệp **cũ**; (3) chỉ còn object mới
   - Bằng chứng agent: —
 - [ ] **ACC-11** Xoá vĩnh viễn · FR-09, BR-08, ARCHITECTURE §A6.7, SEQ-09
-  - Làm: (1) xoá một tài liệu, mở lại link chi tiết và URL tải; (2) `stop minio` → xoá tài liệu khác → `start minio` → chờ vài phút → MinIO console → Mong đợi: (1) 404 ở mọi nơi, object mất; (2) xoá báo thành công, object mất sau khi storage hoạt động lại
+  - Làm: (1) xoá một tài liệu, mở lại link chi tiết và URL tải; (2) `stop minio` → xoá tài liệu khác → `start minio` → chờ vài phút → MinIO console → Mong đợi: (1) 404 ở mọi nơi, object mất; (2) xoá báo thành công, nếu DeleteObject lỗi thì object có thể còn và log storage.orphan cho phép tra cứu (CR-007)
   - Bằng chứng agent: —
 - [ ] **ACC-12** Frontend dễ dùng · ARCHITECTURE §A8, NFR-USA-01/02
   - Làm: chạy toàn bộ luồng trên desktop và giả lập 360 px; một lần tải lên chỉ dùng bàn phím; xem trạng thái rỗng (tài khoản mới) và lỗi (dừng backend) → Mong đợi: nhãn tiếng Việt nhất quán, không cuộn ngang, có tiến độ upload, lỗi dễ hiểu
