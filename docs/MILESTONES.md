@@ -313,6 +313,7 @@ OWNER_APPROVED_M0: YES
 | node scripts/verify/upload-matrix.mjs | PASS; 42 checks |
 | npm --prefix backend audit | 0 CRITICAL; 3 HIGH packages cùng chuỗi Prisma CLI → deepmerge-ts (SEC-002) |
 | npm --prefix frontend audit | 0 vulnerabilities |
+| npm --prefix frontend run test:ui | PASS; 7 tests, 8 route × 360/768/1280, axe và bàn phím (mock API, không tính E2E) |
 
 Các lượt setup lỗi không tính PASS: thiếu S3 trước khi infra sẵn sàng; npm ci gặp DLL lock khi app/test đang chạy (đã dừng process, cài và chạy lại tuần tự); E2E-03 selector đã sửa BUG-001. Không có Prisma reset bị chặn ở các lượt integration này; chỉ DB test bị reset, không reset DB dev.
 
@@ -357,9 +358,10 @@ Các lượt setup lỗi không tính PASS: thiếu S3 trước khi infra sẵn 
 
 ### M4 — Lịch sử tích hợp và bàn giao
 
+- Thống kê so với trước rút gọn (merge M3): xoá 1.738 dòng source/test/schema/tooling, thêm 444 (gồm script mới), giảm ròng 1.294 dòng; loại docs/JSON/lockfile; xoá 22 PNG thực có trong src/theme.
 - Baseline c0bc6bb; backend/infra 23384ca; merge frontend M3; theme 6e06cdf; DB/storage 2d0d0af; docs 208240e.
 - Sửa selector 175f58f; scripts matrix 083a70e; E2E bổ sung 4618510; sửa focus c448915; Vitest dd8fad9 (owner duyệt nâng 2026-10-23).
-- Main GitHub đã khởi tạo chỉ bằng governance 841adba. PR/CI: đang tạo; cập nhật ở commit bằng chứng cuối.
+- Main GitHub chỉ có governance 841adba. PR: https://github.com/august0362/btl_cloud/pull/1 (OPEN, chưa merge). CI ci-required của 5922964 PASS: https://github.com/august0362/btl_cloud/actions/runs/39898331031; kiểm tra lại sau commit bằng chứng này.
 - README clone dùng portable services đã có trên máy (cài dependency mới, không copy .env/node_modules từ worktree); Docker không có trên máy nên nhánh Docker README chưa chạy.
 - Clone đã stop nhưng thư mục C:\tmp\btl-clone còn lại: BLOCKED bởi automatic approval review từ chối Remove-Item; owner có thể xoá thủ công.
 
