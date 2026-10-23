@@ -2,7 +2,7 @@
   "name": "btl-cloud-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "REST API, cleanup worker and SPA host for the learning document storage system",
+  "description": "REST API and SPA host for the learning document storage system",
   "type": "module",
   "engines": {
     "node": ">=24"

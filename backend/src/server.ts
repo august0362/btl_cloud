@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { createApp } from './app.js';
-import { CleanupWorker } from './cleanup/cleanup.worker.js';
+import { sweepTmpDir } from './cleanup/tmp-sweeper.js';
 import { ConfigError, loadConfig, type Config } from './config/env.js';
 import { createServices } from './container.js';
 import { createPrismaClient } from './db/prisma.js';
@@ -37,6 +37,12 @@ async function main(): Promise<void> {
   }
   const storage = new S3ObjectStorage(config.s3);
   const services = createServices({ config, logger, prisma, storage });
+  await sweepTmpDir(config.upload.tmpDir, Number.NEGATIVE_INFINITY);
+  try {
+    while (await services.sessions.deleteExpired(services.clock.now(), 1000) === 1000) { /* next batch */ }
+  } catch (error) {
+    logger.warn({ err: error, event: 'sessions.startup_cleanup_failed' }, 'Chưa xoá được phiên hết hạn');
+  }
   const app = createApp({ config, logger, prisma, storage, services });
 
   const server = app.listen(config.port, () => {
@@ -47,15 +53,8 @@ async function main(): Promise<void> {
   server.keepAliveTimeout = 125_000;
   server.headersTimeout = 126_000;
 
-  const worker = new CleanupWorker(services.cleanup, services.sessions, services.clock, logger, {
-    intervalSeconds: config.cleanup.intervalSeconds,
-    tmpDir: config.upload.tmpDir,
-  });
-  if (config.cleanup.workerEnabled) worker.start();
-
   const shutdown = createShutdown({
     logger,
-    stopWorker: () => worker.stop(),
     closeServer: () => new Promise<void>((resolve) => server.close(() => resolve())),
     disconnectDatabase: () => prisma.$disconnect(),
     destroyStorage: () => storage.destroy(),

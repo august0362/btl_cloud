@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { backoffMs } from '../../src/cleanup/cleanup.service.js';
 import { AppError } from '../../src/http/errors.js';
 import { escapeLike } from '../../src/modules/documents/document.repository.js';
 import { asciiFallbackFilename, attachmentDisposition } from '../../src/modules/files/content-disposition.js';
@@ -78,7 +77,7 @@ describe('Content-Disposition (API-13)', () => {
   });
 });
 
-describe('storage key, LIKE escape, backoff', () => {
+describe('storage key, LIKE escape', () => {
   it('key bất biến dạng documents/{id}/{uuid}.{ext}, mỗi lần một key mới (D-06)', () => {
     const a = newObjectKey('3f2b6c1e-8a4d-4f7e-9c2a-1b5d7e9f0a12', 'pdf');
     const b = newObjectKey('3f2b6c1e-8a4d-4f7e-9c2a-1b5d7e9f0a12', 'pdf');
@@ -87,8 +86,5 @@ describe('storage key, LIKE escape, backoff', () => {
   });
   it('escape %, _ và ký tự escape "!"', () => {
     expect(escapeLike('50%_off!')).toBe('50!%!_off!!');
-  });
-  it('backoff min(2^(n-1), 60) phút', () => {
-    expect([1, 2, 3, 6, 7, 20].map((n) => backoffMs(n) / 60_000)).toEqual([1, 2, 4, 32, 60, 60]);
   });
 });

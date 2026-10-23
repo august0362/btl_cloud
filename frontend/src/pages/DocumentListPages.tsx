@@ -165,19 +165,6 @@ function DocumentListPage({ mine }: { mine: boolean }) {
         tone="danger"
         loading={deletion.busy}
         error={deletion.error}
-        errorAction={
-          deletion.conflict ? (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                deletion.cancel();
-                reload();
-              }}
-            >
-              Tải lại
-            </Button>
-          ) : undefined
-        }
         onCancel={deletion.cancel}
         onConfirm={() => void deletion.confirm()}
       />

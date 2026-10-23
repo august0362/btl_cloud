@@ -33,7 +33,7 @@ beforeEach(async () => {
 });
 
 async function counts() {
-  return { documents: await ctx.prisma.document.count(), tasks: await ctx.prisma.storageCleanupTask.count() };
+  return { documents: await ctx.prisma.document.count() };
 }
 
 async function tmpFiles(): Promise<string[]> {
@@ -57,7 +57,6 @@ describe('API-10 tải lên thành công (FR-04, FR-05, SEQ-02)', () => {
       expect(row.storageKey).toMatch(new RegExp(`^documents/${dto.id}/[0-9a-f-]{36}\\.${c.filename.split('.')[1]}$`));
       expect(sha256(await readObject(ctx.s3, row.storageKey))).toBe(sha256(c.file));
     }
-    expect((await counts()).tasks).toBe(0);
     expect(await tmpFiles()).toEqual([]);
   });
 
@@ -93,7 +92,7 @@ describe('API-10 từ chối đầu vào (BR-04, BR-05)', () => {
   it('AC-05.2: thiếu visibility → 400, không có bản ghi, không có object/task', async () => {
     const res = await uploadRequest(user, { title: 'Thiếu chế độ' });
     expect(expectError(res, 400, 'VALIDATION_ERROR').map((d) => `${d.field}:${d.issue}`)).toEqual(['visibility:REQUIRED']);
-    expect(await counts()).toEqual({ documents: 0, tasks: 0 });
+    expect(await counts()).toEqual({ documents: 0 });
     expect(ctx.storage.putKeys).toEqual([]);
     expect(await tmpFiles()).toEqual([]);
   });
@@ -110,14 +109,14 @@ describe('API-10 từ chối đầu vào (BR-04, BR-05)', () => {
     expectError(await uploadRequest(user, { title: 'A', visibility: 'PUBLIC', file: await plainZipBuffer(), filename: 'gia.docx' }), 415, 'UNSUPPORTED_FILE_TYPE');
     const empty = await uploadRequest(user, { title: 'A', visibility: 'PUBLIC', file: Buffer.alloc(0), filename: 'rong.pdf' });
     expect(expectError(empty, 400, 'VALIDATION_ERROR').map((d) => d.issue)).toEqual(['EMPTY_FILE']);
-    expect(await counts()).toEqual({ documents: 0, tasks: 0 });
+    expect(await counts()).toEqual({ documents: 0 });
     expect(await tmpFiles()).toEqual([]);
   });
 
   it('AC-04.2: 52 428 801 byte → 413 FILE_TOO_LARGE, không lưu gì', async () => {
     const res = await uploadRequest(user, { title: 'Quá lớn', visibility: 'PUBLIC', file: pdfOfSize(MAX_UPLOAD_BYTES + 1), filename: 'big.pdf' });
     expectError(res, 413, 'FILE_TOO_LARGE');
-    expect(await counts()).toEqual({ documents: 0, tasks: 0 });
+    expect(await counts()).toEqual({ documents: 0 });
     expect(ctx.storage.putKeys).toEqual([]);
     expect(await tmpFiles()).toEqual([]);
   });
@@ -141,11 +140,11 @@ describe('API-10 từ chối đầu vào (BR-04, BR-05)', () => {
 });
 
 describe('API-10 lỗi hạ tầng không bao giờ tạo tài liệu "ma" (BR-06, SEQ-03, AC-04.4)', () => {
-  it('PutObject lỗi → 503 STORAGE_UNAVAILABLE, không bản ghi, guard đã được dọn', async () => {
+  it('PutObject lỗi → 503 STORAGE_UNAVAILABLE, không bản ghi, không có tài liệu mới', async () => {
     ctx.storage.failPut = 1;
     const res = await uploadRequest(user, { title: 'Storage chết', visibility: 'PUBLIC' });
     expectError(res, 503, 'STORAGE_UNAVAILABLE');
-    expect(await counts()).toEqual({ documents: 0, tasks: 0 });
+    expect(await counts()).toEqual({ documents: 0 });
     const search = await request(ctx.app).get('/api/documents');
     expect(search.body.data.totalItems).toBe(0);
     expect(await tmpFiles()).toEqual([]);
@@ -161,34 +160,7 @@ describe('API-10 lỗi hạ tầng không bao giờ tạo tài liệu "ma" (BR-0
     const key = ctx.storage.putKeys[0] as string;
     expect(key).toBeDefined();
     expect(await objectExists(ctx.s3, key)).toBe(false);
-    expect(await counts()).toEqual({ documents: 0, tasks: 0 });
+    expect(await counts()).toEqual({ documents: 0 });
   });
 
-  it('guard bị worker claim trước COMMIT (upload quá chậm) → 500, không bản ghi; worker xoá object sau (INV-C3)', async () => {
-    ctx.storage.afterPut = async (key) => {
-      await ctx.prisma.$executeRaw`UPDATE storage_cleanup_tasks SET attempts = 1 WHERE storage_key = ${key}`;
-    };
-    const res = await uploadRequest(user, { title: 'Guard mất', visibility: 'PUBLIC' });
-    expectError(res, 500, 'INTERNAL_ERROR');
-    const key = ctx.storage.putKeys[0] as string;
-    expect(await ctx.prisma.document.count()).toBe(0);
-    expect(await objectExists(ctx.s3, key)).toBe(true);
-    await ctx.prisma.storageCleanupTask.updateMany({ data: { nextAttemptAt: new Date(Date.now() - 1000) } });
-    expect(await ctx.services.cleanup.runDueTasks(20)).toBe(1);
-    expect(await objectExists(ctx.s3, key)).toBe(false);
-    expect(await ctx.prisma.storageCleanupTask.count()).toBe(0);
-  });
-
-  it('crash giữa guard và COMMIT: guard còn lại, chưa đến hạn thì worker không chạm; đến hạn thì object bị xoá', async () => {
-    // Mô phỏng crash: guard + object tồn tại nhưng không có bản ghi documents.
-    const key = 'documents/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002.pdf';
-    await ctx.services.cleanup.createGuard(key, '00000000-0000-4000-8000-000000000001');
-    const { writeTempFile } = await import('../helpers/fixtures.js');
-    await ctx.s3.putObject({ key, filePath: await writeTempFile('x.pdf', pdfBuffer()), contentType: 'application/pdf', contentLength: 10 });
-    expect(await ctx.services.cleanup.runDueTasks(20)).toBe(0);
-    expect(await objectExists(ctx.s3, key)).toBe(true);
-    await ctx.prisma.storageCleanupTask.updateMany({ data: { nextAttemptAt: new Date(Date.now() - 1000) } });
-    expect(await ctx.services.cleanup.runDueTasks(20)).toBe(1);
-    expect(await objectExists(ctx.s3, key)).toBe(false);
-  });
 });

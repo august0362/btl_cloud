@@ -32,10 +32,8 @@ import {
 
 function EditDocumentForm({
   initial,
-  reload,
 }: {
   initial: DocumentDto;
-  reload: () => void;
 }) {
   usePageTitle("Chỉnh sửa tài liệu");
   const [document, setDocument] = useState(initial);
@@ -46,7 +44,6 @@ function EditDocumentForm({
   const [errors, setErrors] = useState<FormErrors>({});
   const [metadataError, setMetadataError] = useState("");
   const [replacementError, setReplacementError] = useState("");
-  const [conflict, setConflict] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialog, setDialog] = useState<"public" | "replace" | null>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -71,7 +68,6 @@ function EditDocumentForm({
     lock.current = true;
     setSaving(true);
     setMetadataError("");
-    setConflict(false);
     setDialog(null);
     try {
       const updated = await documentsApi.update(document.id, patch);
@@ -84,8 +80,6 @@ function EditDocumentForm({
       const fields = fieldErrors(failure);
       setErrors(fields);
       if (!hasErrors(fields)) setMetadataError(errorMessage(failure));
-      if (failure instanceof ApiError && failure.code === "CONFLICT")
-        setConflict(true);
       focusFirstError(form.current);
     } finally {
       lock.current = false;
@@ -109,7 +103,6 @@ function EditDocumentForm({
     replacementLock.current = true;
     setDialog(null);
     setReplacementError("");
-    setConflict(false);
     try {
       const updated = await upload.run((options) =>
         documentsApi.replaceFile(document.id, file, options),
@@ -127,8 +120,6 @@ function EditDocumentForm({
             ? "Không thể thay thế tệp lúc này. Tệp hiện tại vẫn được giữ nguyên."
             : errorMessage(failure),
         );
-      if (failure instanceof ApiError && failure.code === "CONFLICT")
-        setConflict(true);
     } finally {
       replacementLock.current = false;
     }
@@ -137,14 +128,6 @@ function EditDocumentForm({
     <>
       <Link to={`/documents/${document.id}`}>← Quay lại tài liệu</Link>
       <h1 tabIndex={-1}>Chỉnh sửa tài liệu</h1>
-      {conflict && (
-        <Alert>
-          <p>Tài liệu vừa được thay đổi. Tải lại dữ liệu trước khi tiếp tục.</p>
-          <Button variant="secondary" onClick={reload}>
-            Tải lại
-          </Button>
-        </Alert>
-      )}
       <section className="panel">
         <h2>Thông tin tài liệu</h2>
         {metadataError && <Alert>{metadataError}</Alert>}
@@ -287,19 +270,6 @@ function EditDocumentForm({
         confirmLabel="Xoá vĩnh viễn"
         tone="danger"
         error={deletion.error}
-        errorAction={
-          deletion.conflict ? (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                deletion.cancel();
-                reload();
-              }}
-            >
-              Tải lại
-            </Button>
-          ) : undefined
-        }
         loading={deletion.busy}
         onCancel={deletion.cancel}
         onConfirm={() => void deletion.confirm()}
@@ -359,7 +329,7 @@ export function EditDocumentPage() {
       <EditDocumentForm
         key={`${data.id}:${data.updatedAt}:${data.fileVersion}`}
         initial={data}
-        reload={reload}
+       
       />
     </div>
   );

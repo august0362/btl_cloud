@@ -117,19 +117,6 @@ export function DocumentDetailPage() {
         confirmLabel="Xoá vĩnh viễn"
         tone="danger"
         error={deletion.error}
-        errorAction={
-          deletion.conflict ? (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                deletion.cancel();
-                reload();
-              }}
-            >
-              Tải lại
-            </Button>
-          ) : undefined
-        }
         loading={deletion.busy}
         onCancel={deletion.cancel}
         onConfirm={() => void deletion.confirm()}

@@ -2,7 +2,6 @@ import type { Logger } from './lib/logger.js';
 
 export interface ShutdownDeps {
   logger: Logger;
-  stopWorker: () => Promise<void>;
   closeServer: () => Promise<void>;
   disconnectDatabase: () => Promise<void>;
   destroyStorage: () => void;
@@ -11,7 +10,7 @@ export interface ShutdownDeps {
 }
 
 /**
- * Tắt êm (§A10.5): dừng worker → ngừng nhận kết nối và chờ request đang chạy → đóng DB → thoát 0.
+ * Tắt êm (§A10.5): ngừng nhận kết nối và chờ request đang chạy → đóng DB → thoát 0.
  * Quá timeoutMs thì buộc thoát 1. Gọi nhiều lần (SIGTERM rồi SIGINT) chỉ chạy một lần.
  */
 export function createShutdown(deps: ShutdownDeps): (signal: string) => Promise<void> {
@@ -26,7 +25,6 @@ export function createShutdown(deps: ShutdownDeps): (signal: string) => Promise<
     }, deps.timeoutMs);
     timer.unref();
     try {
-      await deps.stopWorker();
       await deps.closeServer();
       await deps.disconnectDatabase();
       deps.destroyStorage();

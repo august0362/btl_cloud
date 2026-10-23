@@ -7,8 +7,6 @@ const messages: Record<string, string> = {
   CSRF_REJECTED: "Yêu cầu bị từ chối vì lý do bảo mật. Vui lòng tải lại trang.",
   FORBIDDEN: "Bạn không có quyền thực hiện thao tác này.",
   DOCUMENT_NOT_FOUND: "Không tìm thấy tài liệu hoặc bạn không có quyền xem.",
-  CONFLICT:
-    "Tài liệu vừa được thay đổi bởi thao tác khác. Vui lòng tải lại trang và thử lại.",
   STORAGE_UNAVAILABLE:
     "Kho lưu trữ tệp tạm thời không khả dụng. Vui lòng thử lại sau.",
   NETWORK_ERROR: "Không thể kết nối máy chủ. Kiểm tra mạng và thử lại.",

@@ -19,8 +19,6 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     ...TEST_ENV,
     ALLOWED_ORIGINS: 'http://localhost:5173',
     UPLOAD_TMP_DIR: path.join(os.tmpdir(), 'btl-cloud-test-uploads'),
-    CLEANUP_WORKER_ENABLED: 'false',
-    CLEANUP_GRACE_SECONDS: '0',
     AUTH_RATE_LIMIT_MAX: '1000',
     LOG_LEVEL: 'silent',
     INSTANCE_ID: 'test-instance',

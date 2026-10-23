@@ -9,7 +9,6 @@ export type ErrorCode =
   | 'ROUTE_NOT_FOUND'
   | 'DOCUMENT_NOT_FOUND'
   | 'EMAIL_ALREADY_EXISTS'
-  | 'CONFLICT'
   | 'PAYLOAD_TOO_LARGE'
   | 'FILE_TOO_LARGE'
   | 'UNSUPPORTED_FILE_TYPE'
@@ -48,7 +47,6 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   ROUTE_NOT_FOUND: 404,
   DOCUMENT_NOT_FOUND: 404,
   EMAIL_ALREADY_EXISTS: 409,
-  CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
   FILE_TOO_LARGE: 413,
   UNSUPPORTED_FILE_TYPE: 415,
@@ -68,7 +66,6 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   ROUTE_NOT_FOUND: 'Không tìm thấy đường dẫn API.',
   DOCUMENT_NOT_FOUND: 'Không tìm thấy tài liệu.',
   EMAIL_ALREADY_EXISTS: 'Email đã được sử dụng.',
-  CONFLICT: 'Tài liệu vừa được thay đổi bởi thao tác khác. Vui lòng tải lại trang và thử lại.',
   PAYLOAD_TOO_LARGE: 'Dữ liệu gửi lên quá lớn.',
   FILE_TOO_LARGE: 'Tệp vượt quá dung lượng tối đa 50 MB.',
   UNSUPPORTED_FILE_TYPE: 'Chỉ hỗ trợ tệp PDF, DOCX, PPTX.',

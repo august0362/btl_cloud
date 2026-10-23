@@ -19,12 +19,6 @@ enum FileType {
   PPTX
 }
 
-enum CleanupReason {
-  UPLOAD_GUARD
-  REPLACED
-  DELETED
-}
-
 model User {
   id           String     @id @db.Char(36)
   email        String     @unique(map: "uq_users_email") @db.VarChar(254)
@@ -72,17 +66,3 @@ model Document {
   @@map("documents")
 }
 
-model StorageCleanupTask {
-  id            BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
-  storageKey    String        @unique(map: "uq_cleanup_storage_key") @map("storage_key") @db.VarChar(512)
-  reason        CleanupReason
-  documentId    String?       @map("document_id") @db.Char(36)
-  attempts      Int           @default(0) @db.UnsignedInt
-  nextAttemptAt DateTime      @map("next_attempt_at") @db.DateTime(3)
-  lastError     String?       @map("last_error") @db.VarChar(1000)
-  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
-
-  @@index([nextAttemptAt], map: "idx_cleanup_next_attempt")
-  @@map("storage_cleanup_tasks")
-}

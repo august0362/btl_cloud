@@ -8,7 +8,6 @@ function deps(overrides: Partial<Parameters<typeof createShutdown>[0]> = {}) {
   const calls: string[] = [];
   const base = {
     logger,
-    stopWorker: vi.fn(async () => void calls.push('stopWorker')),
     closeServer: vi.fn(async () => void calls.push('closeServer')),
     disconnectDatabase: vi.fn(async () => void calls.push('disconnectDatabase')),
     destroyStorage: vi.fn(() => void calls.push('destroyStorage')),
@@ -21,17 +20,17 @@ function deps(overrides: Partial<Parameters<typeof createShutdown>[0]> = {}) {
 
 /** Graceful shutdown (M1-07, M2-13, §A10.5) — logic được gọi bởi handler SIGTERM/SIGINT trong server.ts. */
 describe('createShutdown', () => {
-  it('dừng worker → đóng server (chờ request) → ngắt DB → huỷ storage client → thoát 0', async () => {
+  it('đóng server (chờ request) → ngắt DB → huỷ storage client → thoát 0', async () => {
     const { base, calls } = deps();
     await createShutdown(base)('SIGTERM');
-    expect(calls).toEqual(['stopWorker', 'closeServer', 'disconnectDatabase', 'destroyStorage', 'exit:0']);
+    expect(calls).toEqual(['closeServer', 'disconnectDatabase', 'destroyStorage', 'exit:0']);
   });
 
   it('nhận tín hiệu lần hai (SIGINT sau SIGTERM) không chạy lại', async () => {
     const { base, calls } = deps();
     const shutdown = createShutdown(base);
     await Promise.all([shutdown('SIGTERM'), shutdown('SIGINT')]);
-    expect(calls.filter((c) => c === 'stopWorker')).toHaveLength(1);
+    expect(calls.filter((c) => c === 'closeServer')).toHaveLength(1);
     expect(base.exit).toHaveBeenCalledTimes(1);
   });
 

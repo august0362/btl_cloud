@@ -1,6 +1,4 @@
 import type { PrismaClient } from '@prisma/client';
-import { CleanupTaskRepository } from './cleanup/cleanup.repository.js';
-import { CleanupService } from './cleanup/cleanup.service.js';
 import type { Config } from './config/env.js';
 import { createTransactionRunner } from './db/prisma.js';
 import { systemClock, type Clock } from './lib/clock.js';
@@ -16,9 +14,7 @@ export interface Services {
   users: UserRepository;
   sessions: SessionRepository;
   documents: DocumentRepository;
-  cleanupTasks: CleanupTaskRepository;
   auth: AuthService;
-  cleanup: CleanupService;
   documentService: DocumentService;
   clock: Clock;
 }
@@ -36,17 +32,12 @@ export function createServices(deps: {
   const users = new UserRepository(deps.prisma);
   const sessions = new SessionRepository(deps.prisma);
   const documents = new DocumentRepository(deps.prisma);
-  const cleanupTasks = new CleanupTaskRepository(deps.prisma);
   const auth = new AuthService(runInTransaction, users, sessions, clock, deps.config.session.ttlHours);
-  const cleanup = new CleanupService(cleanupTasks, documents, deps.storage, clock, deps.logger, deps.config.upload.guardMinutes);
   const documentService = new DocumentService(
-    runInTransaction,
     documents,
-    cleanup,
     deps.storage,
     clock,
     deps.logger,
-    deps.config.cleanup.graceSeconds,
   );
-  return { users, sessions, documents, cleanupTasks, auth, cleanup, documentService, clock };
+  return { users, sessions, documents, auth, documentService, clock };
 }

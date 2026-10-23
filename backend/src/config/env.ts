@@ -26,10 +26,6 @@ const envSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
   TRUST_PROXY: z.string().default('false'),
   UPLOAD_TMP_DIR: z.string().min(1).default('./tmp/uploads'),
-  UPLOAD_GUARD_MINUTES: z.coerce.number().int().positive().default(30),
-  CLEANUP_WORKER_ENABLED: booleanString.default('true'),
-  CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(60),
-  CLEANUP_GRACE_SECONDS: z.coerce.number().int().min(0).default(120),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   SERVE_FRONTEND: booleanString.default('false'),
@@ -49,8 +45,7 @@ export interface Config {
   cookieSecure: boolean;
   hstsEnabled: boolean;
   trustProxy: boolean | number | string;
-  upload: { tmpDir: string; guardMinutes: number };
-  cleanup: { workerEnabled: boolean; intervalSeconds: number; graceSeconds: number };
+  upload: { tmpDir: string };
   authRateLimitMax: number;
   logLevel: LogLevel;
   serveFrontend: boolean;
@@ -103,12 +98,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cookieSecure: e.COOKIE_SECURE,
     hstsEnabled: e.HSTS_ENABLED,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
-    upload: { tmpDir: e.UPLOAD_TMP_DIR, guardMinutes: e.UPLOAD_GUARD_MINUTES },
-    cleanup: {
-      workerEnabled: e.CLEANUP_WORKER_ENABLED,
-      intervalSeconds: e.CLEANUP_INTERVAL_SECONDS,
-      graceSeconds: e.CLEANUP_GRACE_SECONDS,
-    },
+    upload: { tmpDir: e.UPLOAD_TMP_DIR },
     authRateLimitMax: e.AUTH_RATE_LIMIT_MAX,
     logLevel: e.LOG_LEVEL,
     serveFrontend: e.SERVE_FRONTEND,

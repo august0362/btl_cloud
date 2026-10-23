@@ -2,10 +2,10 @@
  * Database schema integration tests.
  *
  * Verifies that the Prisma schema matches the approved ERD in §A4.3:
- * - 4 tables: users, sessions, documents, storage_cleanup_tasks
+ * - 3 tables: users, sessions, documents
  * - Correct column types, nullability, defaults
  * - Primary keys, foreign keys, unique constraints, indexes
- * - Enum values for visibility, file_type, reason
+ * - Enum values for visibility, file_type
  * - Relationships and cascading behavior
  *
  * Requires: MySQL running via docker-compose (btl_cloud_test database).
@@ -264,70 +264,8 @@ describe('Table: documents (§A4.3)', () => {
   });
 });
 
-describe('Table: storage_cleanup_tasks (§A4.3)', () => {
-  it('should have the correct columns', async () => {
-    const columns = await prisma.$queryRaw<ColumnInfo[]>`DESCRIBE storage_cleanup_tasks`;
-    const columnMap = new Map(columns.map(c => [c.Field, c]));
-
-    // id - BIGINT UNSIGNED AUTO_INCREMENT PK
-    expect(columnMap.get('id')?.Type).toBe('bigint unsigned');
-    expect(columnMap.get('id')?.Null).toBe('NO');
-    expect(columnMap.get('id')?.Key).toBe('PRI');
-    expect(columnMap.get('id')?.Extra).toContain('auto_increment');
-
-    // storage_key - VARCHAR(512) NOT NULL UNIQUE
-    expect(columnMap.get('storage_key')?.Type).toBe('varchar(512)');
-    expect(columnMap.get('storage_key')?.Null).toBe('NO');
-    expect(columnMap.get('storage_key')?.Key).toBe('UNI');
-
-    // reason - ENUM('UPLOAD_GUARD','REPLACED','DELETED') NOT NULL
-    expect(columnMap.get('reason')?.Type).toContain("enum('UPLOAD_GUARD','REPLACED','DELETED')");
-    expect(columnMap.get('reason')?.Null).toBe('NO');
-
-    // document_id - CHAR(36) YES (nullable, NOT FK)
-    expect(columnMap.get('document_id')?.Type).toBe('char(36)');
-    expect(columnMap.get('document_id')?.Null).toBe('YES');
-
-    // attempts - INT UNSIGNED NOT NULL DEFAULT 0
-    expect(columnMap.get('attempts')?.Type).toBe('int unsigned');
-    expect(columnMap.get('attempts')?.Null).toBe('NO');
-    expect(columnMap.get('attempts')?.Default).toBe('0');
-
-    // next_attempt_at - DATETIME(3) NOT NULL
-    expect(columnMap.get('next_attempt_at')?.Type).toBe('datetime(3)');
-    expect(columnMap.get('next_attempt_at')?.Null).toBe('NO');
-
-    // last_error - VARCHAR(1000) YES (nullable)
-    expect(columnMap.get('last_error')?.Type).toBe('varchar(1000)');
-    expect(columnMap.get('last_error')?.Null).toBe('YES');
-
-    // created_at, updated_at - DATETIME(3) NOT NULL
-    expect(columnMap.get('created_at')?.Type).toBe('datetime(3)');
-    expect(columnMap.get('created_at')?.Null).toBe('NO');
-    expect(columnMap.get('updated_at')?.Type).toBe('datetime(3)');
-    expect(columnMap.get('updated_at')?.Null).toBe('NO');
-  });
-
-  it('should NOT have FK to documents (design decision D-07)', async () => {
-    expect(await foreignKeys('storage_cleanup_tasks')).toEqual([]);
-  });
-
-  it('should have unique constraint on storage_key (uq_cleanup_storage_key)', async () => {
-    const indexes = await prisma.$queryRaw<IndexInfo[]>`SHOW INDEX FROM storage_cleanup_tasks WHERE Key_name = 'uq_cleanup_storage_key'`;
-    expect(indexes.length).toBe(1);
-    expect(indexes[0]?.Column_name).toBe('storage_key');
-    expect(Number(indexes[0]?.Non_unique)).toBe(0);
-  });
-
-  it('should have idx_cleanup_next_attempt index', async () => {
-    const indexes = await prisma.$queryRaw<IndexInfo[]>`SHOW INDEX FROM storage_cleanup_tasks WHERE Key_name = 'idx_cleanup_next_attempt'`;
-    expect(indexes.length).toBe(1);
-    expect(indexes[0]?.Column_name).toBe('next_attempt_at');
-  });
-});
-
 describe('Relationships', () => {
-  it('should have exactly 4 tables', async () => {
+  it('should have exactly 3 tables', async () => {
     const tables = await prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name AS table_name
       FROM information_schema.tables
@@ -338,11 +276,11 @@ describe('Relationships', () => {
     `;
     const tableNames = tables.map(t => t.table_name);
     expect(tableNames).toEqual(
-      expect.arrayContaining(['users', 'sessions', 'documents', 'storage_cleanup_tasks'])
+      expect.arrayContaining(['users', 'sessions', 'documents'])
     );
     // Filter out Prisma internal tables
     const appTables = tableNames.filter(t => !t.startsWith('_prisma'));
-    expect(appTables.length).toBe(4);
+    expect(appTables.length).toBe(3);
   });
 
   it('all tables should use InnoDB engine', async () => {

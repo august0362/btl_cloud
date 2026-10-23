@@ -61,7 +61,6 @@ export async function createTestContext(overrides: Record<string, string> = {}):
 
 /** Xoá dữ liệu giữa các test theo thứ tự FK (§A4.6). */
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe('DELETE FROM storage_cleanup_tasks');
   await prisma.$executeRawUnsafe('DELETE FROM sessions');
   await prisma.$executeRawUnsafe('DELETE FROM documents');
   await prisma.$executeRawUnsafe('DELETE FROM users');

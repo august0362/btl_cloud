@@ -1,5 +1,4 @@
 import { Prisma, type FileType, type PrismaClient, type Visibility } from '@prisma/client';
-import type { Db } from '../../db/prisma.js';
 
 const ownerSelect = { owner: { select: { id: true, displayName: true } } } as const;
 
@@ -84,8 +83,8 @@ export class DocumentRepository {
     return { rows: ids.map((id) => byId.get(id)).filter((row): row is DocumentWithOwner => row !== undefined), total };
   }
 
-  async insert(db: Db, row: NewDocumentRow): Promise<void> {
-    await db.document.create({ data: { ...row, fileVersion: 1 } });
+  async insert(row: NewDocumentRow): Promise<void> {
+    await this.prisma.document.create({ data: { ...row, fileVersion: 1 } });
   }
 
   /** Ném P2025 nếu tài liệu đã bị xoá đồng thời. Không bao giờ chạm cột tệp (INV-D2 chiều ngược). */
@@ -97,21 +96,16 @@ export class DocumentRepository {
     return this.prisma.document.update({ where: { id }, data: { ...patch, updatedAt: now }, include: ownerSelect });
   }
 
-  /** UPDATE có điều kiện `file_version` (D-08). Không có `visibility` trong SET (INV-D2). Trả số dòng bị ảnh hưởng. */
-  async updateFileIfVersion(db: Db, id: string, version: number, file: FileColumns, now: Date): Promise<number> {
-    const result = await db.document.updateMany({
-      where: { id, fileVersion: version },
+  /** Last write wins; không cập nhật visibility. */
+  async updateFile(id: string, file: FileColumns, now: Date): Promise<number> {
+    const result = await this.prisma.document.updateMany({
+      where: { id },
       data: { ...file, fileVersion: { increment: 1 }, fileUpdatedAt: now, updatedAt: now },
     });
     return result.count;
   }
 
-  async deleteIfVersion(db: Db, id: string, version: number): Promise<number> {
-    const result = await db.document.deleteMany({ where: { id, fileVersion: version } });
-    return result.count;
-  }
-
-  async existsByStorageKey(storageKey: string): Promise<boolean> {
-    return (await this.prisma.document.count({ where: { storageKey } })) > 0;
+  delete(id: string): Promise<DocumentWithOwner> {
+    return this.prisma.document.delete({ where: { id }, include: ownerSelect });
   }
 }

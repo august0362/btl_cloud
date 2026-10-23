@@ -9,7 +9,6 @@ export function useDeleteDocument(onDeleted: () => void) {
   const [target, setTarget] = useState<DocumentDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [conflict, setConflict] = useState(false);
   const lock = useRef(false);
   const { show } = useToast();
   const confirm = async () => {
@@ -17,7 +16,6 @@ export function useDeleteDocument(onDeleted: () => void) {
     lock.current = true;
     setBusy(true);
     setError("");
-    setConflict(false);
     try {
       await documentsApi.remove(target.id);
       setTarget(null);
@@ -33,7 +31,6 @@ export function useDeleteDocument(onDeleted: () => void) {
         onDeleted();
       } else {
         setError(errorMessage(failure));
-        setConflict(failure instanceof ApiError && failure.code === "CONFLICT");
       }
     } finally {
       lock.current = false;
@@ -44,11 +41,9 @@ export function useDeleteDocument(onDeleted: () => void) {
     target,
     busy,
     error,
-    conflict,
     confirm,
     open: (item: DocumentDto) => {
       setError("");
-      setConflict(false);
       setTarget(item);
     },
     cancel: () => {

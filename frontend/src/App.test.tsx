@@ -505,52 +505,6 @@ describe("upload and document management", () => {
       screen.queryByRole("button", { name: "Lưu thay đổi" }),
     ).not.toBeInTheDocument();
   });
-  it("offers reload after a conflicting replacement without changing the version", async () => {
-    signedIn();
-    api.replaceFile.mockRejectedValue(new ApiError(409, "CONFLICT", "Changed"));
-    mount(`/documents/${doc.id}/edit`);
-    await screen.findByLabelText("Tiêu đề *");
-    await chooseFile("new.pdf");
-    await userEvent.click(screen.getByRole("button", { name: "Thay thế tệp" }));
-    await userEvent.click(
-      within(
-        await screen.findByRole("dialog", { name: "Thay thế tệp?" }),
-      ).getByRole("button", { name: "Thay thế" }),
-    );
-    expect(
-      await screen.findByRole("button", { name: "Tải lại" }),
-    ).toBeVisible();
-    expect(screen.getByText(/Phiên bản 1/)).toBeVisible();
-    const previousCalls = api.get.mock.calls.length;
-    await userEvent.click(screen.getByRole("button", { name: "Tải lại" }));
-    await waitFor(() =>
-      expect(api.get.mock.calls.length).toBeGreaterThan(previousCalls),
-    );
-  });
-  it("offers reload inside the delete dialog after a conflict", async () => {
-    signedIn();
-    api.remove.mockRejectedValue(new ApiError(409, "CONFLICT", "Changed"));
-    mount(`/documents/${doc.id}`);
-    await screen.findByRole("heading", { name: doc.title });
-    await userEvent.click(screen.getByRole("button", { name: "Xoá" }));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Xoá vĩnh viễn tài liệu?",
-    });
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: "Xoá vĩnh viễn" }),
-    );
-    expect(
-      await within(dialog).findByRole("button", { name: "Tải lại" }),
-    ).toBeVisible();
-    const previousCalls = api.get.mock.calls.length;
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: "Tải lại" }),
-    );
-    await waitFor(() =>
-      expect(api.get.mock.calls.length).toBeGreaterThan(previousCalls),
-    );
-    expect(screen.queryByText("Đã xoá tài liệu")).not.toBeInTheDocument();
-  });
   it("shows a private/not-found document as unavailable", async () => {
     api.get.mockRejectedValue(
       new ApiError(404, "DOCUMENT_NOT_FOUND", "Not found"),
