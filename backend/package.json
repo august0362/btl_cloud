@@ -9,7 +9,7 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "dev":"tsx watch --env-file-if-exists=.env src/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "lint": "eslint . && tsc --noEmit",
@@ -51,7 +51,7 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",
-    "vitest": "3.2.7",
+    "vitest": "5.0.5",
     "yazl": "3.3.1"
   },
   "allowScripts": {

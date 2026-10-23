@@ -41,8 +41,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
   - Bằng chứng: §A1 (stack, D-01…D-18, thư mục, quy tắc phụ thuộc), §A3 (container, module backend/frontend, class diagram, đặc tả module, SPA cùng origin, pipeline).
 
 - [x] **M0-05** Thiết kế cơ sở dữ liệu và vòng đời storage
-  - In: FR-04, 08, 09; BR-06…08 · Out: ARCHITECTURE §A4, §A6 · Dep: M0-04 · Verify: upload lỗi không tạo bản ghi; thay thế lỗi giữ tệp cũ; lỗi dọn dẹp phục hồi được
-  - Bằng chứng: 4 bảng (bảng thứ 4 có lý do ở D-07), INV-D1…D3, INV-C1…C3; đã rà soát tranh chấp guard ↔ worker (điều kiện `attempts = 0`, §A6.8).
+  - Bằng chứng: ARCHITECTURE §A4, §A6; CR-007 thay hàng đợi bằng bù trừ best-effort; 3 bảng hiện hành.
 
 - [x] **M0-06** Xác định xác thực và bảo mật
   - In: yêu cầu phiên opaque + HttpOnly · Out: ARCHITECTURE §A5 · Dep: M0-04 · Verify: đủ đăng nhập/đăng xuất, thời hạn, thu hồi, cookie, CSRF, băm mật khẩu, quyền sở hữu, lỗi, cross-origin, HTTPS, hết phiên
@@ -97,7 +96,7 @@ OWNER_APPROVED_M0: YES
 ## M1 — Backend Foundation
 
 
-> **Môi trường kiểm chứng của CLAUDE_BACKEND (2026-10-20):** máy chưa có Docker (M1-00), nên integration test và chạy thử đều dùng **MySQL 8.4.7 bản zip + SeaweedFS 4.48 bản Windows** (cùng phiên bản với image `mysql:8.4` và `chrislusf/seaweedfs:4.48` trong compose), chạy tạm trong scratchpad của phiên. DB được khởi tạo bằng đúng `docker/mysql/init/01-init.sql`; SeaweedFS dùng đúng `docker/seaweedfs/s3.json`. Riêng **file compose chưa được chạy** (M1-03). Không commit (owner yêu cầu).
+> **Môi trường kiểm chứng lịch sử (2026-10-20):** máy chưa có Docker (M1-00), nên integration test và chạy thử đều dùng **MySQL 8.4.7 bản zip + SeaweedFS 4.48 bản Windows** (cùng phiên bản với image `mysql:8.4` và `chrislusf/seaweedfs:4.48` trong compose), chạy tạm trong scratchpad của phiên. DB được khởi tạo bằng đúng `docker/mysql/init/01-init.sql`; SeaweedFS dùng đúng `docker/seaweedfs/s3.json`. Riêng **file compose chưa được chạy** (M1-03).
 
 - [ ] **M1-00** [OWNER] Cài Docker Desktop (backend WSL2)
   - In: AS-02, OD-14 · Out: Docker chạy được · Dep: — (làm ngay được) · Verify: `docker compose version` in phiên bản; `docker run --rm hello-world` thành công
@@ -159,9 +158,9 @@ OWNER_APPROVED_M0: YES
 - [x] **M2-06** `upload.middleware`, `file-inspector`, `storage-keys`, `content-disposition`
   - In: §A6.3 (U2), §A6.4, API-13 · Out: `modules/files/*` · Dep: M1-10 · Verify: 3 loại hợp lệ → đúng `fileType`/MIME; `.txt`→`.pdf` và ZIP→`.docx` → 415; 0 byte → `EMPTY_FILE`; 52 428 800 qua, +1 → 413; 2 tệp → `TOO_MANY_FILES`; "Đề cương Giải tích 1.pdf" giữ đúng tên; thư mục tạm rỗng sau mỗi case; `Content-Disposition` khớp ví dụ §A7.7
   - Bằng chứng: (lịch sử M0–M3) `src/modules/files/*`. `test/unit/files.test.ts` + `upload-middleware.test.ts` + `documents-upload.test.ts`: đủ mọi điều kiện trên (biên 52 428 800 / 52 428 801 chạy cả ở unit và.
-- [x] **M2-07** API-10 với giao thức guard; `CleanupService` (guard, `processTask`)
-  - In: §A6.3, §A6.8 · Out: `documents.*`, `cleanup.service/repository` · Dep: M2-04, M2-05, M2-06, M1-06 · Verify: thành công → 201, có bản ghi + object, không còn task; storage lỗi (chèn lỗi) → 503, không bản ghi, không object; DB lỗi sau PutObject → 500, không bản ghi, object bị xoá; thiếu `visibility` → 400 (AC-05.2); guard đã bị claim → 500; `Location` đúng
-  - Bằng chứng: (lịch sử M0–M3) `src/modules/documents/documents.service.ts` › `create`, `src/cleanup/*`. `documents-upload.test.ts` (14 pass) phủ đủ điều kiện trên; DB lỗi giả lập bằng cách xoá user ngay sau.
+- [x] **M2-07** API-10 PutObject → INSERT, bù trừ best-effort (CR-007)
+  - Bằng chứng: documents-upload.test.ts: upload/storage/DB lỗi, thiếu visibility; chạy lại ở M4-09.
+
 - [x] **M2-08** API-07 và API-08 (lọc, sắp xếp, phân trang, escape `LIKE`)
   - In: §A7.6 · Out: `searchPublic`, `listMine` · Dep: M2-07 · Verify: Private không bao giờ có ở API-07; API-08 chỉ của mình; `q=%` theo nghĩa đen; "giai tich" thấy "Giải tích"; **ghi lại** kết quả "dai so" vs "Đại số" (RK-08); `totalPages` đúng; trang vượt → `items: []`; tham số sai → 400
   - Bằng chứng: (lịch sử M0–M3) `src/modules/documents/document.repository.ts` › `search` (SQL có `ESCAPE '!'`). `documents-search.test.ts` (8 pass) đủ điều kiện trên, thêm `_` và `!` theo nghĩa đen, owner tìm.
@@ -171,15 +170,15 @@ OWNER_APPROVED_M0: YES
 - [x] **M2-10** API-11 (metadata, chế độ hiển thị)
   - In: §A7.7 · Out: `updateMetadata` · Dep: M2-05 · Verify: sửa một phần; `description: null` xoá mô tả; `{}` → `NO_CHANGES`; `title: null` → `INVALID_TYPE`; non-owner Public 403 / Private 404; đổi sang PRIVATE → biến mất khỏi API-07 ngay; `fileVersion` không đổi
   - Bằng chứng: (lịch sử M0–M3) `documents-access.test.ts` (API-11): đủ điều kiện trên + thiếu CSRF → 403, Guest → 401, `storage_key` không đổi. Hành vi ghi nhận: body chỉ có trường lạ → trả cả `UNKNOWN_FIELD`.
-- [x] **M2-11** API-12 (thay tệp an toàn)
-  - In: §A6.6 · Out: `replaceFile` · Dep: M2-07, M2-09 · Verify: key mới ≠ key cũ, `fileVersion` + 1, visibility/title/description không đổi, có task `REPLACED` cho key cũ (≈ now + grace); storage lỗi → 503 và API-13 trả **byte cũ** (AC-08.2); xung đột giả lập → 409 và object mới bị xoá; bị xoá đồng thời → 404; part khác `file` → 400
-  - Bằng chứng: (lịch sử M0–M3) `documents-replace-delete.test.ts` (API-12, 8 test): đủ điều kiện trên + đổi PDF → DOCX, Private giữ Private, grace 120 s → worker chưa xoá object cũ, grace 0 → worker xoá object.
-- [x] **M2-12** API-14 (xoá, gồm lỗi một phần)
-  - In: §A6.7 · Out: `delete` · Dep: M2-07 · Verify: thành công → 204, mất bản ghi, mất object, không còn task; DeleteObject lỗi → vẫn 204, task còn `attempts = 1` và `next_attempt_at` ở tương lai; non-owner → 403/404; xung đột thử lại 1 lần rồi 409
-  - Bằng chứng: (lịch sử M0–M3) `documents-replace-delete.test.ts` (API-14, 3 test) + ma trận quyền ở `documents-access.test.ts`: đủ điều kiện trên; lỗi một phần → tài liệu đã biến mất khỏi API-07, worker thử.
-- [x] **M2-13** `CleanupWorker` (task đến hạn, phiên hết hạn, tệp tạm), backoff, kiểm tra an toàn
-  - In: §A6.8 · Out: `cleanup.worker.ts`, `tmp-sweeper.ts`, start/stop trong `server.ts` · Dep: M2-07 · Verify: chỉ xử lý task đến hạn; backoff 1, 2, 4… ≤ 60 phút; key còn được tham chiếu → không xoá object; 2 `processTask` đồng thời → chỉ 1 claim; dừng khi SIGTERM; phiên hết hạn và tệp tạm > 60 phút bị xoá
-  - Bằng chứng: (lịch sử M0–M3) `src/cleanup/*`. `cleanup.test.ts` (5 pass): chỉ task đến hạn; 2 lời gọi đồng thời → `['done', 'not_claimed']`; key còn tham chiếu → `skipped_referenced`, object còn; backoff đo.
+- [x] **M2-11** API-12 immutable key, fileVersion +1, last-write-wins (CR-007)
+  - Bằng chứng: documents-replace-delete.test.ts: giữ metadata/visibility, 503 giữ tệp cũ, 404 bù trừ key mới, storage.orphan.
+
+- [x] **M2-12** API-14 DELETE DB → xoá object best-effort (CR-007)
+  - Bằng chứng: documents-replace-delete.test.ts: 204 khi storage lỗi, tài liệu mất khỏi API, log storage.orphan.
+
+- [x] **M2-13** Dọn tệp tạm và phiên hết hạn lúc khởi động (CR-007)
+  - Bằng chứng: server.ts, tmp-sweeper.ts; không worker định kỳ, không bảng cleanup.
+
 - [x] **M2-14** Log: trường requestId, method, path, status, durationMs, userId, instanceId; sự kiện `cleanup.*`, `download.object_missing`; redact
   - In: §A5.8, NFR-OBS-02 · Out: cấu hình logger · Dep: M2-04 · Verify: log khi đăng nhập/upload không chứa mật khẩu, cookie, `Set-Cookie`
   - Bằng chứng: (lịch sử M0–M3) `src/lib/logger.ts`, `src/http/middleware/request-context.ts`. `contract.test.ts`: log JSON của request có `requestId`, `req.method`, `req.url`, `res.statusCode`, `durationMs`,.
@@ -187,7 +186,7 @@ OWNER_APPROVED_M0: YES
   - In: §A7.2–A7.7 · Out: `test/integration/contract.*.test.ts` · Dep: M2-04…M2-12 · Verify: `test:integration` pass, liệt kê 14 endpoint; sai lệch với §A7 ghi vào Nhật ký thay đổi baseline, không sửa lệch hợp đồng
   - Bằng chứng: (lịch sử M0–M3) `test/integration/contract.test.ts` (2 pass) đi hết vòng đời và kiểm **14/14 endpoint** bằng schema `.strict()` (`test/helpers/contract.ts`); mọi test lỗi dùng `expectError` kiểm.
 
-**Ma trận tuân thủ hợp đồng — CLAUDE_BACKEND (2026-10-20)**
+**Ma trận hợp đồng lịch sử (2026-10-20; đã thay thế bởi kiểm chứng M4 bên dưới)**
 
 | Endpoint | Đã làm | Đã test | Khớp §A7 | Ghi chú / còn lại |
 |---|---|---|---|---|
@@ -204,9 +203,9 @@ OWNER_APPROVED_M0: YES
 | API-11 `PATCH /api/documents/{id}` | ✅ | ✅ | ✅ | Chỉ trường lạ → thêm `NO_CHANGES` |
 | API-12 `PUT /api/documents/{id}/file` | ✅ | ✅ | ✅ | Từ chối sớm với body lớn → client thấy kết nối đóng (đã dự liệu ở §A7.7) |
 | API-13 `GET /api/documents/{id}/download` | ✅ | ✅ | ✅ | `HEAD` do Express xử lý bằng handler GET, chưa test |
-| API-14 `DELETE /api/documents/{id}` | ✅ | ✅ | ✅ | Nhánh 409 sau 2 lần xung đột chưa test |
+| API-14 `DELETE /api/documents/{id}` | ✅ | ✅ | ✅ | CR-007: không còn 409 tài liệu |
 
-**Lệnh khởi động local đã chạy thật (CLAUDE_BACKEND):** `npm --prefix backend run prisma:deploy` → `npm --prefix backend run storage:init` → `npm --prefix backend run build` → `PORT=3000 INSTANCE_ID=local-a node --env-file-if-exists=.env dist/server.js` (+ instance `:3001`). Khi có Docker: `docker compose up -d` thay cho MySQL/SeaweedFS bản binary.
+**Lệnh khởi động local đã chạy (lịch sử):** `npm --prefix backend run prisma:deploy` → `npm --prefix backend run storage:init` → `npm --prefix backend run build` → `PORT=3000 INSTANCE_ID=local-a node --env-file-if-exists=.env dist/server.js` (+ instance `:3001`). Khi có Docker: `docker compose up -d` thay cho MySQL/SeaweedFS bản binary.
 
 ---
 
@@ -244,9 +243,9 @@ OWNER_APPROVED_M0: YES
 - [x] **M3-10** P-06 Tải lên
   - In: §A8.7 · Out: `UploadPage` · Dep: M3-03, M3-04 · Verify: không radio nào chọn sẵn (AC-05.1); tự điền tiêu đề; chặn sai đuôi / 0 byte / quá lớn; nút gửi chỉ bật khi hợp lệ; thứ tự part đúng; có tiến độ; huỷ → `abort`; map lỗi 413/415/503
   - Bằng chứng: (lịch sử M0–M3) UploadPage.tsx, hooks/useUploadTask.ts, lib/validation.ts/constants.ts; PDF/DOCX/PPTX, 1…52_428_800 byte, visibility không mặc định, tự điền tiêu đề, tiến độ XHR,.
-- [x] **M3-11** P-07 Chỉnh sửa / thay thế / xoá
-  - In: §A8.7, §A8.10 · Out: `EditDocumentPage` · Dep: M3-08, M3-10 · Verify: chỉ gửi trường đã đổi; nút Lưu khoá khi chưa đổi; CD-03 khi Riêng tư → Công khai; thay qua CD-02 có tiến độ, cập nhật `fileVersion`; `CONFLICT` → Alert + "Tải lại"; `isOwner = false` → không có quyền; xoá → P-05
-  - Bằng chứng: (lịch sử M0–M3) frontend/src/pages/EditDocumentPage.tsx; PATCH chỉ trường thay đổi, description rỗng → null, CD-03 khi Private→Public; CD-02 + tiến độ/huỷ cho thay file, chỉ gửi part file, cập.
+- [x] **M3-11** Chỉnh sửa / thay thế / xoá theo CR-007
+  - Bằng chứng: EditDocumentPage.tsx; bỏ UI CONFLICT; frontend tests và E2E xác minh ở M4.
+
 - [x] **M3-12** Rà soát responsive và accessibility
   - In: §A8.11 · Out: sửa lỗi + checklist trong bằng chứng · Dep: M3-06…M3-11 · Verify: 360/768/1280 px không cuộn ngang; luồng upload chỉ dùng bàn phím; kiểm tương phản bằng công cụ; `axe` nếu khả thi
   - Bằng chứng: (lịch sử M0–M3) `npm --prefix frontend run test:ui` → 7 passed, 0 failed/skipped/flaky (32,6 s ở lượt cuối), Chrome headless trên production build + route mock đúng schema;.
@@ -362,7 +361,9 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
 |---|---|---|---|---|---|---|
 | BUG-001 | M4-04 | E2E-03 locator heading khớp h1 và h2; thêm exact: true | FR-06 | MINOR | Nhóm | FIXED; E2E 6/6 và 3/3 bổ sung đạt |
 | ENV-001 | M4-01 | DEBUG=release từ môi trường agent làm SeaweedFS không lên; README chỉ cách bỏ DEBUG | Local launcher | MINOR | Nhóm | WORKAROUND DOCUMENTED |
-| TEST-001 | M4-09 | Route focus RAF có thể giành focus input/dialog khi render chậm; bỏ focus nếu đang tương tác | Frontend unit | MINOR | Nhóm | FIXED; chờ root CI xác minh |
+| SEC-001 | M4-09 | Vitest 3/tinypool có 2 advisory CRITICAL; owner duyệt nâng Vitest 5.0.5 (2026-10-23) | Dependency test | CRITICAL | Nhóm | FIXED; Vitest 5.0.5, backend lint + 66 unit test PASS; audit 0 CRITICAL |
+| SEC-002 | M4-09 | Prisma CLI → deepmerge-ts advisory HIGH; npm audit đề nghị Prisma major 7 | Dependency CLI | MAJOR | Nhóm | OPEN; cần kế hoạch nâng major riêng |
+| TEST-001 | M4-09 | Route focus RAF có thể giành focus input/dialog khi render chậm; bỏ focus nếu đang tương tác | Frontend unit | MINOR | Nhóm | FIXED; root CI 66 backend + 61 frontend tests PASS |
 
 ---
 

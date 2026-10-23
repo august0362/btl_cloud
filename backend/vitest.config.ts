@@ -19,7 +19,8 @@ export default defineConfig({
           globalSetup: ['test/integration/global-setup.ts'],
           // Một DB test dùng chung → chạy tuần tự trong một fork (ARCHITECTURE §A10.6).
           pool: 'forks',
-          poolOptions: { forks: { singleFork: true } },
+          maxWorkers: 1,
+          fileParallelism: false,
           testTimeout: 120_000,
           hookTimeout: 120_000,
         },
