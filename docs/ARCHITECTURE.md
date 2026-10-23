@@ -39,16 +39,16 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 
 | ID | Quyết định | Lý do · đánh đổi |
 |---|---|---|
-| D-01 | **Modular monolith**: một process Node phục vụ API + SPA + cleanup worker | 4 người hiểu hết; ASG chỉ một loại instance |
+| D-01 | **Modular monolith**: một process Node phục vụ API + SPA | 4 người hiểu hết; ASG chỉ một loại instance |
 | D-02 | **Cùng origin**: production Express phục vụ `frontend/dist`; dev dùng Vite proxy `/api` | Cookie SameSite hoạt động tự nhiên, không cần CORS; FE luôn gọi `/api/...` tương đối |
 | D-03 | **Phiên opaque lưu DB + cookie HttpOnly** | Thu hồi ngay khi đăng xuất; instance stateless · mỗi request tốn 1 truy vấn PK |
 | D-04 | **CSRF** = SameSite=Lax + header bắt buộc `X-CSRF-Protection: 1` + allowlist `Origin` | Không cần endpoint cấp token; custom header không gửi cross-origin được khi không có CORS |
 | D-05 | **Upload/download đi qua backend**: tệp tạm trên đĩa (EBS) → kiểm tra → S3; download stream qua backend; bucket private | Một điểm kiểm quyền và kiểm nội dung · băng thông đi qua EC2 (chấp nhận được ở quy mô demo) |
 | D-06 | **Object key bất biến** mỗi phiên bản tệp: `documents/{documentId}/{objectId}.{ext}` | Thay tệp không ghi đè tệp cũ; key không chứa dữ liệu người dùng |
-| D-07 | **Guard + bảng `storage_cleanup_tasks`** đối soát DB ↔ storage | DB và S3 không có transaction chung (RK-01) · thêm 1 bảng. Loại: ghi S3 không lưu dấu vết (crash = mồ côi), cột `status=PENDING` (quên lọc một chỗ là lộ upload dở) |
-| D-08 | **Optimistic concurrency** bằng `documents.file_version` khi thay/xoá | Thao tác đồng thời không mất dấu object · có thể trả 409 |
-| D-09 | Object cũ sau khi thay bị xoá sau **ân hạn 120 s** (OD-11) | Download đang chạy dở không bị cắt |
-| D-10 | Cleanup worker chạy **trên mọi instance**, phối hợp bằng "claim" nguyên tử trong DB | Không cần scheduler; DeleteObject idempotent |
+| D-07 | **Bù trừ best-effort** sau lỗi DB; mọi lần xoá object thất bại ghi WARN `storage.orphan` cùng `storageKey` | DB và storage không có transaction chung; chấp nhận object mồ côi |
+| D-08 | **Last write wins** khi thay tệp; `file_version` chỉ là bộ đếm hiển thị, tăng 1 bằng SQL | Không khoá lạc quan, không 409 cho tài liệu |
+| D-09 | Thử xoá object cũ **ngay sau UPDATE** thành công | Không có thời gian ân hạn |
+| D-10 | **Không worker định kỳ**; khởi động dọn `UPLOAD_TMP_DIR` và xoá phiên hết hạn | Request vẫn kiểm tra hạn phiên; object lỗi cần xử lý thủ công |
 | D-11 | ID UUID v4 dạng `CHAR(36)` | Không đoán được; sinh trước khi INSERT |
 | D-12 | Tìm kiếm `LIKE '%q%'` trên `title`/`description`, collation `utf8mb4_0900_ai_ci` | Đủ cho quy mô demo · quét bảng; nâng lên FULLTEXT khi cần |
 | D-13 | Phân trang offset (`page`, `pageSize`) | Đơn giản, UI có số trang |
@@ -71,13 +71,13 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 │   ├── package.json, package-lock.json, tsconfig.json, eslint.config.js, vitest.config.ts, .env.example
 │   ├── prisma/schema.prisma, prisma/migrations/
 │   ├── src/
-│   │   ├── server.ts               load config → createApp → listen → start worker → graceful shutdown
+│   │   ├── server.ts               load config → createApp → startup cleanup → listen → graceful shutdown
 │   │   ├── app.ts                  createApp(deps) — dùng trực tiếp trong Supertest
 │   │   ├── config/env.ts
 │   │   ├── http/                   errors.ts, validate.ts, static.ts, middleware/
 │   │   ├── modules/                health/, auth/, users/, documents/, files/   (chi tiết §A3.2)
 │   │   ├── storage/                object-storage.ts, s3-object-storage.ts, in-memory-object-storage.ts
-│   │   ├── cleanup/                cleanup.repository.ts, cleanup.service.ts, cleanup.worker.ts, tmp-sweeper.ts
+│   │   ├── cleanup/                tmp-sweeper.ts
 │   │   ├── db/prisma.ts
 │   │   └── lib/                    logger.ts, clock.ts, ids.ts
 │   └── test/                       unit/ (npm test), integration/ (npm run test:integration), fixtures/
@@ -91,7 +91,7 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 flowchart LR
   root(["Repo BTL_Cloud"])
   root --> docs["docs/<br/>CONTEXT, ARCHITECTURE, MILESTONES"]
-  root --> be["backend/<br/>REST API, cleanup worker, phục vụ SPA"]
+  root --> be["backend/<br/>REST API, phục vụ SPA"]
   root --> fe["frontend/<br/>React SPA, Playwright e2e"]
   root --> infra["docker-compose.yml, docker/<br/>MySQL + MinIO cho local"]
   root --> tooling["package.json, scripts/<br/>lint, build, test cho cả hai package"]
@@ -139,7 +139,7 @@ flowchart LR
   user["User<br/>trình duyệt"]
   subgraph sys["Hệ thống Lưu trữ và Chia sẻ Tài liệu"]
     app["Ứng dụng web<br/>React SPA + REST API"]
-    db[("MySQL / RDS<br/>users, sessions, documents,<br/>storage_cleanup_tasks")]
+    db[("MySQL / RDS<br/>users, sessions, documents")]
     obj[("Object storage<br/>MinIO / S3 private")]
   end
   ops["Nhóm vận hành<br/>log, health, CloudWatch"]
@@ -231,7 +231,7 @@ Luồng chi tiết từng bước có trong sơ đồ SEQ tương ứng (§A9).
 
 **UC-07 Tải lên** · User · FR-04, FR-05 · API-10 · P-06 · SEQ-02, SEQ-03
 - Trigger/Input · Tiền điều kiện: bấm "Tải lên"; `file`, `title`, `description?`, `visibility` · đã đăng nhập.
-- Luồng chính: FE kiểm đuôi/kích thước/trường → API-10 (XHR có tiến độ) → CSRF → auth → multer ghi tệp tạm → validate → FileInspector → guard → PutObject → transaction (xoá guard + INSERT `documents`) → 201 → toast, tới `/me/documents`.
+- Luồng chính: FE kiểm đuôi/kích thước/trường → API-10 (XHR có tiến độ) → CSRF → auth → multer ghi tệp tạm → validate → FileInspector → PutObject → INSERT `documents` → 201 → toast, tới `/me/documents`.
 - Lỗi: 413, 415, 400, 503, 500, người dùng huỷ. **Mọi lỗi: không có bản ghi `documents`.**
 - Kết quả: tài liệu mới `fileVersion = 1`; nếu Public thì có trong tìm kiếm.
 
@@ -255,15 +255,15 @@ Luồng chi tiết từng bước có trong sơ đồ SEQ tương ứng (§A9).
 
 **UC-11 Thay thế tệp** · Owner · FR-08 · API-12 · P-07 · SEQ-07, SEQ-08
 - Trigger/Input · Tiền điều kiện: chọn tệp mới, xác nhận CD-02; `file` · đã đăng nhập, là owner.
-- Luồng chính: guard key mới → PutObject → transaction (xoá guard, UPDATE có điều kiện `file_version`, lên lịch xoá key cũ) → 200.
-- Lỗi: 413/415/400, 503, 409 `CONFLICT`, 404 (bị xoá đồng thời), 500. **Mọi lỗi: vẫn trỏ tệp cũ.**
-- Kết quả: `DocumentDto` với `fileVersion` + 1, visibility không đổi; tải xuống trả tệp mới; object cũ bị xoá sau ân hạn.
+- Luồng chính: PutObject key mới → UPDATE theo id, tăng file_version → thử xoá key cũ → 200.
+- Lỗi: 413/415/400, 503, 404 (bị xoá đồng thời), 500. Lỗi trước UPDATE: vẫn trỏ tệp cũ.
+- Kết quả: `DocumentDto` với `fileVersion` + 1, visibility không đổi; tải xuống trả tệp mới; thử xoá object cũ ngay.
 
 **UC-12 Xoá vĩnh viễn** · Owner · FR-09 · API-14 · P-04, P-05, P-07 · SEQ-09
 - Trigger/Input · Tiền điều kiện: bấm Xoá, xác nhận CD-01; `id` · đã đăng nhập, là owner.
 - Luồng chính: transaction (DELETE có điều kiện `file_version` + INSERT task xoá object) → thử xoá object ngay → 204.
-- Lỗi: 403/404, 409; storage lỗi khi xoá object → vẫn 204, worker thử lại.
-- Kết quả: tài liệu không còn (404 ở mọi endpoint); object bị xoá ngay hoặc sau khi worker thử lại.
+- Lỗi: 403/404; storage lỗi khi xoá object → vẫn 204, WARN storage.orphan.
+- Kết quả: tài liệu không còn (404 ở mọi endpoint); object được thử xoá ngay; lỗi xoá ghi storage.orphan.
 
 ---
 
@@ -277,9 +277,8 @@ flowchart LR
   subgraph app["Backend process: Node.js 24 + Express 5, chạy N instance"]
     spa["Static SPA<br/>frontend/dist"]
     apiC["REST API /api/*"]
-    worker["Cleanup worker<br/>chạy trong cùng process"]
   end
-  db[("MySQL<br/>users, sessions, documents,<br/>storage_cleanup_tasks")]
+  db[("MySQL<br/>users, sessions, documents")]
   obj[("Object storage S3 / MinIO<br/>documents/...")]
   tmp[("Đĩa tạm cục bộ<br/>UPLOAD_TMP_DIR")]
   browser -->|"GET /, /assets/*"| spa
@@ -287,8 +286,6 @@ flowchart LR
   apiC --> db
   apiC --> obj
   apiC --> tmp
-  worker --> db
-  worker --> obj
 ```
 
 ### A3.2 Module backend
@@ -307,13 +304,11 @@ flowchart TB
     docS["DocumentService"]
     policy["DocumentPolicy"]
     inspector["FileInspector"]
-    cleanupS["CleanupService<br/>+ CleanupWorker"]
   end
   subgraph data["Tầng truy cập dữ liệu"]
     userR["UserRepository"]
     sessR["SessionRepository"]
     docR["DocumentRepository"]
-    taskR["CleanupTaskRepository"]
     storage["ObjectStorage<br/>interface"]
   end
   subgraph infra["Hạ tầng"]
@@ -329,17 +324,12 @@ flowchart TB
   docS --> policy
   docS --> docR
   docS --> storage
-  docS --> cleanupS
   inspector -.->|"InspectedFile"| docS
   authS --> userR
   authS --> sessR
-  cleanupS --> taskR
-  cleanupS --> docR
-  cleanupS --> storage
   userR --> prisma
   sessR --> prisma
   docR --> prisma
-  taskR --> prisma
   storage -.->|"hiện thực bởi"| s3impl
 ```
 
@@ -408,7 +398,6 @@ flowchart LR
     keys["storage-keys.ts<br/>documents/docId/objId.ext"]
     cdisp["content-disposition.ts<br/>filename + filename*"]
   end
-  cleanup["CleanupService"]
   storage["ObjectStorage"]
   db[("MySQL")]
   s3[("S3 / MinIO")]
@@ -427,45 +416,22 @@ flowchart LR
   dsvc --> drepo
   dsvc --> dmap
   dsvc --> keys
-  dsvc --> cleanup
   dsvc --> storage
   drepo --> db
   storage --> s3
 ```
 
-#### A3.2.3 Module `storage` + `cleanup`
+#### A3.2.3 Module `storage` và dọn lúc khởi động
+
+`DocumentService` gọi `ObjectStorage` (put/get/delete). `S3ObjectStorage` là adapter S3-compatible; `InMemoryObjectStorage` dùng trong unit test. `cleanup/tmp-sweeper.ts` xoá tệp tạm theo request và dọn thư mục khi server khởi động. Server gọi `SessionRepository.deleteExpired` theo lô lúc khởi động; không có worker định kỳ.
 
 ```mermaid
 flowchart LR
-  dsvc["DocumentService"]
-  subgraph cleanupmod["cleanup/"]
-    worker["cleanup.worker.ts<br/>mỗi 60 s + jitter, không chạy chồng"]
-    csvc["cleanup.service.ts<br/>guard, scheduleDeletion, processTask, runDueTasks"]
-    crepo["cleanup.repository.ts<br/>claim nguyên tử, backoff"]
-    sweep["tmp-sweeper.ts<br/>xoá tệp tạm cũ hơn 60 phút"]
-  end
-  subgraph storagemod["storage/"]
-    iface["object-storage.ts<br/>interface ObjectStorage"]
-    s3impl["s3-object-storage.ts<br/>AWS SDK v3, dùng cho MinIO và S3"]
-    mem["in-memory-object-storage.ts<br/>chỉ dùng trong test, chèn lỗi được"]
-  end
-  srepo["SessionRepository"]
-  db[("MySQL<br/>storage_cleanup_tasks,<br/>documents, sessions")]
-  s3[("S3 / MinIO")]
-  tmp[("UPLOAD_TMP_DIR")]
-  dsvc -->|"guard, scheduleDeletion, processTask"| csvc
-  dsvc --> iface
-  worker -->|"runDueTasks"| csvc
-  worker -->|"deleteExpired"| srepo
-  worker --> sweep
-  sweep --> tmp
-  csvc --> crepo
-  csvc --> iface
-  crepo --> db
-  srepo --> db
-  iface -.->|"hiện thực"| s3impl
-  iface -.->|"hiện thực"| mem
-  s3impl --> s3
+  doc["DocumentService"] --> iface["ObjectStorage"]
+  iface --> s3["S3ObjectStorage"]
+  iface --> mem["InMemoryObjectStorage"]
+  startup["server startup"] --> tmp["Dọn UPLOAD_TMP_DIR"]
+  startup --> sessions["Xoá phiên hết hạn"]
 ```
 
 #### A3.2.4 Interface và hàm chính (class diagram)
@@ -498,14 +464,6 @@ classDiagram
   class FileInspector {
     +inspect(tmpPath, originalName, sizeBytes) Promise~InspectedFile~
   }
-  class CleanupService {
-    +createGuard(key, documentId) Promise~void~
-    +consumeGuard(tx, key) Promise~boolean~
-    +releaseGuard(key) Promise~void~
-    +scheduleDeletion(tx, key, reason, documentId, notBefore) Promise~number~
-    +processTask(taskId) Promise~void~
-    +runDueTasks(limit) Promise~void~
-  }
   class ObjectStorage {
     <<interface>>
     +putObject(key, filePath, contentType, sizeBytes) Promise~void~
@@ -537,16 +495,14 @@ classDiagram
   ObjectStorage <|.. S3ObjectStorage
   ObjectStorage <|.. InMemoryObjectStorage
   DocumentService --> DocumentPolicy
-  DocumentService --> CleanupService
   DocumentService --> ObjectStorage
-  CleanupService --> ObjectStorage
   DocumentService ..> InspectedFile : nhận từ FileInspector
   FileInspector ..> InspectedFile : trả về
   AuthService ..> AuthContext : tạo
   DocumentPolicy ..> Decision : trả về
 ```
 
-Repository (chỉ tầng này dùng Prisma). Các hàm có điều kiện trả `Promise~number~` = **số dòng bị ảnh hưởng**; service dựa vào đó để phát hiện xung đột (D-08) và guard đã bị claim (INV-C3).
+Repository (chỉ tầng này dùng Prisma). `updateFile` trả số dòng bị ảnh hưởng; 0 dòng nghĩa là tài liệu đã bị xoá (404).
 
 ```mermaid
 classDiagram
@@ -565,20 +521,10 @@ classDiagram
   class DocumentRepository {
     +findById(id) Promise~DocumentRow~
     +search(filter, page, pageSize, sort) Promise~RowsAndTotal~
-    +insert(tx, row) Promise~void~
+    +insert(row) Promise~void~
     +updateMetadata(id, patch) Promise~DocumentRow~
-    +updateFileIfVersion(tx, id, version, file) Promise~number~
-    +deleteIfVersion(tx, id, version) Promise~number~
-    +existsByStorageKey(key) Promise~boolean~
-  }
-  class CleanupTaskRepository {
-    +insert(tx, task) Promise~number~
-    +deleteUnclaimedGuard(tx, key) Promise~number~
-    +markDueNow(key) Promise~void~
-    +findDueIds(limit) Promise~number[]~
-    +claim(id) Promise~boolean~
-    +reschedule(id, attempts, error) Promise~void~
-    +delete(id) Promise~void~
+    +updateFile(id, file) Promise~number~
+    +delete(id) Promise~DocumentRow~
   }
   class PrismaClient {
     <<external>>
@@ -586,7 +532,6 @@ classDiagram
   UserRepository --> PrismaClient
   SessionRepository --> PrismaClient
   DocumentRepository --> PrismaClient
-  CleanupTaskRepository --> PrismaClient
 ```
 
 ### A3.3 Frontend
@@ -776,11 +721,10 @@ ASG tối thiểu 2 / mong muốn 2 / tối đa 4 instance (theo S3) trên 2 pri
 | `modules/auth`, `modules/users` | Đăng ký, đăng nhập, đăng xuất, nạp phiên; băm mật khẩu; cookie | DTO, token → `UserDto`, `AuthContext` | repositories, argon2 | `EMAIL_ALREADY_EXISTS`, `INVALID_CREDENTIALS` |
 | `documents/document.policy` | `canView`, `canManage` (hàm thuần, §A5.5) | doc, viewer → `Decision` | — | — |
 | `documents/document.loader` | Nạp tài liệu theo `:id`, áp policy **trước khi đọc body** | `:id`, `req.auth` → `res.locals.document` | DocumentRepository, policy | 404/403; route multipart thì xả body |
-| `documents` (service) | Tìm, liệt kê, xem, tạo, sửa, thay, xoá, mở download; transaction và giao thức storage (§A6) | DTO, `InspectedFile` → `DocumentDto`, `Page`, stream | DocumentRepository, CleanupService, ObjectStorage | `CONFLICT`, `STORAGE_UNAVAILABLE`, `DOCUMENT_NOT_FOUND` |
+| `documents` (service) | Tìm, liệt kê, xem, tạo, sửa, thay, xoá, mở download; transaction và giao thức storage (§A6) | DTO, `InspectedFile` → `DocumentDto`, `Page`, stream | DocumentRepository, ObjectStorage | `STORAGE_UNAVAILABLE`, `DOCUMENT_NOT_FOUND` |
 | `files/upload.middleware` | multer: đúng 1 tệp vào `UPLOAD_TMP_DIR`, giới hạn §A7.1, tên tệp UTF-8 | multipart → `req.file`, `req.body` | multer | 413 `FILE_TOO_LARGE`, 400 |
 | `files/file-inspector` | Xác định loại theo đuôi + chữ ký (§A6.4); làm sạch tên | tệp tạm → `InspectedFile` | fs, yauzl | 415, 400 `EMPTY_FILE` |
 | `storage` | `putObject`, `getObject`, `deleteObject` (idempotent), `checkHealth` | key, tệp → void / stream | AWS SDK v3 (chỉ `S3ObjectStorage`) | `StorageError { UNAVAILABLE \| NOT_FOUND }` |
-| `cleanup` | Guard, lên lịch và xử lý xoá object (§A6.8); xoá phiên hết hạn; dọn tệp tạm | taskId, key → void | CleanupTaskRepository, DocumentRepository, ObjectStorage | Ghi vào task, không ném ra khỏi worker |
 | `lib/logger` | Log JSON pino, redact bí mật (§A5.8) | sự kiện → stdout | pino | — |
 | `http/static` | Phục vụ SPA khi `SERVE_FRONTEND=true` (§A3.7) | GET không thuộc `/api` → file | express.static | Thiếu dist → cảnh báo, chỉ phục vụ API |
 
@@ -837,11 +781,10 @@ Hệ quả quan trọng: **xác thực và phân quyền chạy trước khi nh�
 | Tài khoản (email, hash mật khẩu, tên hiển thị) | MySQL `users` |
 | Phiên (hash token, thời hạn); token gốc chỉ nằm trong cookie | MySQL `sessions` |
 | Metadata tài liệu (tiêu đề, mô tả, visibility, loại, MIME, tên gốc, kích thước, object key, `file_version`, thời gian). Đây là **nguồn sự thật** về sự tồn tại và quyền truy cập | MySQL `documents` |
-| Hàng đợi xoá object (D-07) | MySQL `storage_cleanup_tasks` |
 | **Byte nội dung tệp**; object chỉ có `Content-Type`, không lưu tên/owner/visibility | Object storage, key `documents/{documentId}/{objectId}.{ext}` |
 | Tệp đang upload dở (sống tối đa trong một request) | Đĩa cục bộ `UPLOAD_TMP_DIR` (EBS trên AWS) |
 
-Quan hệ: một User có 0..n Session và 0..n Document; mỗi Document có đúng 1 owner và trỏ tới đúng 1 object hiện hành. Object cũ hoặc chưa commit được theo dõi bằng StorageCleanupTask; bảng này **không có FK** tới Document, vì task phải tồn tại cả sau khi Document bị xoá.
+Quan hệ: một User có 0..n Session và 0..n Document; mỗi Document có đúng 1 owner và trỏ tới đúng 1 object hiện hành. Object không còn tham chiếu được xoá best-effort; có thể mồ côi khi lỗi.
 
 ### A4.2 ERD
 
@@ -879,17 +822,6 @@ erDiagram
     datetime3 updated_at
     datetime3 file_updated_at
   }
-  storage_cleanup_tasks {
-    bigint_unsigned id PK
-    varchar512 storage_key UK
-    enum reason "UPLOAD_GUARD, REPLACED, DELETED"
-    char36 document_id "không FK"
-    int_unsigned attempts
-    datetime3 next_attempt_at
-    varchar1000 last_error "NULL được"
-    datetime3 created_at
-    datetime3 updated_at
-  }
 ```
 
 ### A4.3 Đặc tả bảng
@@ -917,7 +849,7 @@ Ghi bởi API-04 (MVP không có cập nhật). Đọc bởi API-05, `sessionLoa
 | `created_at` | `DATETIME(3)` | NO | `CURRENT_TIMESTAMP(3)` |
 | `expires_at` | `DATETIME(3)` | NO | INDEX `idx_sessions_expires_at` |
 
-Tạo bởi API-04/05; xoá bởi API-06, API-05 (phiên cũ), `sessionLoader` (gặp phiên hết hạn), worker. Bất biến: chỉ lưu hash; hợp lệ ⇔ `expires_at > NOW(3)`; không bao giờ gia hạn.
+Tạo bởi API-04/05; xoá bởi API-06, API-05 (phiên cũ), `sessionLoader` (gặp phiên hết hạn), khởi động server. Bất biến: chỉ lưu hash; hợp lệ ⇔ `expires_at > NOW(3)`; không bao giờ gia hạn.
 
 **`documents`**: metadata và con trỏ tới object hiện hành.
 
@@ -942,24 +874,6 @@ Index: `idx_documents_visibility_created (visibility, created_at)`, `idx_documen
 - **INV-D2:** `visibility` chỉ đổi qua API-11; API-12 không bao giờ ghi cột này (BR-07).
 - **INV-D3:** `storage_key` có dạng `documents/{id}/{uuid}.{ext}`, `ext` khớp `file_type`.
 
-**`storage_cleanup_tasks`**: danh sách object **phải bị xoá trừ khi được commit**; mỗi dòng ứng với 1 key.
-
-| Cột | Kiểu | Null | Mặc định / ràng buộc |
-|---|---|---|---|
-| `id` | `BIGINT UNSIGNED AUTO_INCREMENT` | NO | PK |
-| `storage_key` | `VARCHAR(512)` | NO | UNIQUE `uq_cleanup_storage_key` |
-| `reason` | `ENUM('UPLOAD_GUARD','REPLACED','DELETED')` | NO | |
-| `document_id` | `CHAR(36)` | YES | chỉ để tra cứu/log, **không FK** |
-| `attempts` | `INT UNSIGNED` | NO | `0`; +1 mỗi lần bị claim |
-| `next_attempt_at` | `DATETIME(3)` | NO | INDEX `idx_cleanup_next_attempt` |
-| `last_error` | `VARCHAR(1000)` | YES | |
-| `created_at` / `updated_at` | `DATETIME(3)` | NO | |
-
-Tạo bởi API-10/12 (`UPLOAD_GUARD` trước PutObject), API-12 (`REPLACED` cho key cũ), API-14 (`DELETED`). Xoá bởi transaction commit (guard) và CleanupService (sau khi DeleteObject thành công).
-- **INV-C1:** tại ranh giới transaction, không key nào nằm đồng thời ở `documents` và ở bảng này.
-- **INV-C2:** mọi object hoặc được `documents` tham chiếu, hoặc có task.
-- **INV-C3:** guard chỉ được "tiêu thụ" khi `attempts = 0`, tức là chưa bị worker claim (§A6.8).
-
 ### A4.4 Truy vấn chính và index
 
 | Thao tác | Truy vấn | Index |
@@ -968,7 +882,6 @@ Tạo bởi API-10/12 (`UPLOAD_GUARD` trước PutObject), API-12 (`REPLACED` ch
 | Đăng nhập | `users WHERE email = ?` | `uq_users_email` |
 | Tìm công khai | `WHERE visibility='PUBLIC' [AND (title LIKE ? OR description LIKE ?)] [AND file_type=?] ORDER BY created_at DESC, id DESC LIMIT/OFFSET` + `COUNT(*)` | `idx_documents_visibility_created` |
 | Kho cá nhân | `WHERE owner_id=? [AND visibility=?] …` | `idx_documents_owner_created` |
-| Worker | `WHERE next_attempt_at <= NOW(3) ORDER BY next_attempt_at LIMIT 20` | `idx_cleanup_next_attempt` |
 | Xoá phiên hết hạn | `DELETE FROM sessions WHERE expires_at < NOW(3) LIMIT 1000` | `idx_sessions_expires_at` |
 
 ### A4.5 Vòng đời
@@ -988,24 +901,13 @@ stateDiagram-v2
   Deleted --> [*]
 ```
 
-Vòng đời một **object**:
-
-```mermaid
-stateDiagram-v2
-  [*] --> Guarded: INSERT task UPLOAD_GUARD
-  Guarded --> Referenced: COMMIT xoá guard và ghi storage_key
-  Guarded --> PendingDeletion: upload lỗi, crash hoặc guard quá hạn
-  Referenced --> PendingDeletion: thay thế COMMIT với key cũ, hoặc xoá COMMIT
-  PendingDeletion --> Removed: DeleteObject OK rồi xoá task
-  PendingDeletion --> PendingDeletion: DeleteObject lỗi, lùi thời gian thử lại
-  Removed --> [*]
-```
+Vòng đời object: PutObject → được `documents` tham chiếu → thay/xoá DB → thử DeleteObject. Lỗi DB sau PutObject cũng thử DeleteObject; lỗi xoá ghi `storage.orphan`.
 
 ### A4.6 Migration
 
-- Prisma Migrate; migration SQL commit trong `backend/prisma/migrations/`, **không sửa** sau khi đã áp dụng ở môi trường dùng chung. Migration đầu `init` tạo đủ 4 bảng như §A4.3; không có seed cho production.
+- Prisma Migrate; migration SQL commit trong `backend/prisma/migrations/`, **không sửa** sau khi đã áp dụng ở môi trường dùng chung. Migration đầu `init` được giữ nguyên; migration `20261023000000_drop_storage_cleanup_tasks` xoá bảng cleanup, còn 3 bảng như §A4.3; không có seed cho production.
 - Dev: `npm --prefix backend exec -- prisma migrate dev --name <tên>` (user `btl` dev có quyền tạo shadow DB).
-- Test: `prisma migrate reset --force` trên `btl_cloud_test` trong global setup; giữa các test xoá dữ liệu theo thứ tự `storage_cleanup_tasks`, `sessions`, `documents`, `users`.
+- Test: `prisma migrate reset --force` trên `btl_cloud_test` trong global setup; giữa các test xoá dữ liệu theo thứ tự `sessions`, `documents`, `users`.
 - Production: `npm --prefix backend run prisma:deploy` (= `prisma migrate deploy`) chạy một lần trước khi rollout (Prisma có advisory lock). Migration phải tương thích ngược (expand → deploy → contract), vì ASG chạy song song phiên bản cũ và mới.
 - Nếu Prisma major mới yêu cầu driver adapter cho MySQL: làm theo hướng dẫn chính thức và ghi vào bằng chứng M1-05; schema logic không đổi.
 
@@ -1029,7 +931,7 @@ stateDiagram-v2
 | Mỗi request `/api` | `sessionLoader`: không cookie → `null`; không thấy → `null` + xoá cookie; hết hạn → DELETE + xoá cookie + `null`; hợp lệ → `req.auth` |
 | Hết hạn | Cố định, **không** gia hạn trượt |
 | Đăng xuất | DELETE theo hash, xoá cookie, luôn 204 (idempotent); cookie cũ vô hiệu trên mọi instance |
-| Dọn dẹp | Mỗi lượt worker: `DELETE … WHERE expires_at < NOW(3) LIMIT 1000` |
+| Dọn dẹp | Lúc khởi động (lặp theo lô tới hết): `DELETE … WHERE expires_at < NOW(3) LIMIT 1000` |
 
 ### A5.3 Cookie
 
@@ -1130,7 +1032,7 @@ API-04, API-05: cửa sổ 15 phút, tối đa `AUTH_RATE_LIMIT_MAX` (20) reques
 2. **MySQL là nguồn sự thật**: tài liệu tồn tại ⇔ có bản ghi `documents`.
 3. **Ghi object trước, commit metadata sau** (INV-D1).
 4. **Không ghi đè object**: mỗi phiên bản tệp có key mới (D-06).
-5. Mọi object chưa được tham chiếu đều có task (INV-C2), nên mọi lỗi phục hồi được bằng cách xoá muộn.
+5. Xoá object best-effort; thất bại ghi WARN `storage.orphan` kèm `storageKey`. Không hàng đợi tự thử lại.
 
 ### A6.2 Bucket và object key
 
@@ -1151,13 +1053,11 @@ API-04, API-05: cửa sổ 15 phút, tối đa `AUTH_RATE_LIMIT_MAX` (20) reques
 | U2 | multer ghi đúng 1 tệp vào `UPLOAD_TMP_DIR/<uuid>`, đếm byte | > 52 428 800 → 413; > 1 tệp → 400 `TOO_MANY_FILES`; client huỷ | multer xoá tệp dở |
 | U3 | Validate `title`, `description`, `visibility` | 400 | Tệp tạm bị xoá |
 | U4 | FileInspector | 415 / 400 `EMPTY_FILE` | Tệp tạm bị xoá |
-| U5 | `documentId`, `key = newObjectKey()`; `createGuard`: task `UPLOAD_GUARD`, `next_attempt_at = now + UPLOAD_GUARD_MINUTES` (30) | 500 | Chưa có object |
-| U6 | `putObject(key, tmpPath, mimeType, sizeBytes)` | 503 `STORAGE_UNAVAILABLE`; **bù trừ** `releaseGuard` (đặt guard đến hạn ngay rồi `processTask`, DeleteObject idempotent) | Không có `documents` |
-| U7 | Transaction: `consumeGuard` (DELETE guard với `attempts = 0`, **phải đúng 1 dòng**) → INSERT `documents` (`file_version = 1`) → COMMIT | 0 dòng hoặc lỗi DB → ROLLBACK → 500; bù trừ như U6 | Không có `documents` |
-| U8 | Xoá tệp tạm (`finally`) | Log WARN; sweeper dọn sau | — |
-| U9 | 201 + `DocumentDto` | — | Tài liệu `Active` |
+| U5 | Sinh documentId và immutable key; PutObject | 503 STORAGE_UNAVAILABLE | Không có documents |
+| U6 | INSERT documents, file_version = 1 | Lỗi DB: thử DeleteObject(key), ném lại lỗi DB gốc | Không có documents; object có thể mồ côi |
+| U7 | Xoá tệp tạm trong finally; trả 201 DocumentDto | Xoá tạm lỗi: dọn ở lần khởi động sau | Tài liệu Active |
 
-**Crash giữa U5 và COMMIT:** guard còn lại, worker ở bất kỳ instance nào xoá object sau 30 phút. Không có bản ghi, nên không có gì hiển thị.
+Crash sau PutObject trước INSERT có thể để lại object không được tham chiếu.
 
 ### A6.4 FileInspector
 
@@ -1176,68 +1076,37 @@ API-04, API-05: cửa sổ 15 phút, tối đa `AUTH_RATE_LIMIT_MAX` (20) reques
 
 ### A6.6 Thay thế tệp (API-12)
 
-| Bước | Hành động | Nếu lỗi |
-|---|---|---|
-| R1–R2 | CSRF, session, auth; loader + `canManage` **trước khi đọc body**; nhớ `oldKey`, `v = file_version` | 403/401/404 (xả body) |
-| R3–R5 | multer (chỉ part `file`) + FileInspector (có thể khác loại tệp cũ) | 413 / 400 / 415 |
-| R6 | `newKey` (≠ `oldKey`); `createGuard(newKey)` | 500 |
-| R7 | `putObject(newKey)` | 503; bù trừ `newKey` như U6 |
-| R8 | Transaction: (a) `consumeGuard(newKey)` (đúng 1 dòng); (b) `UPDATE documents SET storage_key, file_type, mime_type, original_filename, size_bytes, file_version = v+1, file_updated_at WHERE id=? AND file_version=v` (đúng 1 dòng; **không** có `visibility`/`title`/`description`); (c) task `REPLACED` cho `oldKey`, `next_attempt_at = now + CLEANUP_GRACE_SECONDS` (120); COMMIT | (b) 0 dòng: ROLLBACK, còn tài liệu → 409 `CONFLICT`, không còn → 404. (a) 0 dòng / lỗi DB → 500. Mọi trường hợp: bù trừ `newKey` |
-| R9 | Xoá tệp tạm, đọc lại, 200 `DocumentDto` | — |
+CSRF → auth → loader + canManage trước khi đọc body → multer + FileInspector → sinh newKey bất biến → PutObject(newKey) → UPDATE documents SET các cột tệp, file_version = file_version + 1 WHERE id = ? → thử DeleteObject(oldKey) → 200 DocumentDto. Không ghi title, description hoặc visibility.
 
-Đáp ứng đủ yêu cầu: tệp cũ còn hợp lệ tới khi COMMIT; key mới khác key cũ; không ghi `visibility`; mọi lỗi trước COMMIT vẫn trỏ `oldKey`; xoá `oldKey` là task có thử lại.
+PutObject lỗi → 503, tài liệu vẫn trỏ oldKey. UPDATE lỗi → thử xoá newKey rồi ném lại lỗi gốc; 0 dòng → thử xoá newKey, trả 404. Hai replace đồng thời đều có thể thành công; lần ghi sau thắng. Không 409, không ân hạn xoá.
 
 ### A6.7 Xoá vĩnh viễn (API-14)
 
-| Bước | Hành động | Nếu lỗi |
-|---|---|---|
-| D1–D2 | CSRF, session, auth; loader + `canManage` | 403/401/404 |
-| D3 | Transaction: đọc `k = storage_key`, `v` → `DELETE … WHERE id=? AND file_version=v` (đúng 1 dòng) → task `DELETED` cho `k` (`next_attempt_at = now`) → COMMIT | 0 dòng: thử lại D3 **một lần**, vẫn 0 → 409 (hoặc 404). Lỗi DB → 500, **không gì thay đổi** |
-| D4 | `processTask(taskId)` ngay sau COMMIT | Storage lỗi → log WARN, task ở lại chờ thử lại; **vẫn 204** |
-| D5 | 204 | — |
+CSRF → auth → canManage → DELETE documents theo id (lấy key của dòng vừa xoá) → thử DeleteObject(key) → 204. DB lỗi → giữ nguyên object; không còn dòng → 404. Object xoá thất bại vẫn trả 204 vì tài liệu đã biến mất khỏi DB.
 
-### A6.8 Cleanup service và worker
+### A6.8 Dọn dẹp lúc khởi động
 
-- **`createGuard(key, documentId)`**: task `UPLOAD_GUARD` với `next_attempt_at = now + 30 phút` (U5, R6).
-- **`consumeGuard(tx, key)`**: xoá guard trong transaction commit với điều kiện `attempts = 0`; trả `false` nếu 0 dòng (U7, R8a).
-- **`releaseGuard(key)`**: khi bù trừ, đặt guard đến hạn ngay rồi `processTask` (U6, R7).
-- **`scheduleDeletion(tx, …)`**: INSERT task `REPLACED`/`DELETED` trong transaction nghiệp vụ.
-- **`processTask(taskId)`** (dùng chung cho request và worker):
-
-```mermaid
-flowchart TB
-  s(["processTask taskId"]) --> claim["Claim: UPDATE attempts + 1,<br/>next_attempt_at = now + 5 phút<br/>WHERE id và next_attempt_at ≤ now"]
-  claim --> got{"Ảnh hưởng 1 dòng ?"}
-  got -->|"0 dòng"| stop1(["Dừng: tiến trình khác đang xử lý<br/>hoặc chưa đến hạn"])
-  got -->|"1 dòng"| ref{"documents còn tham chiếu key ?"}
-  ref -->|"Có"| safe["DELETE task, log ERROR<br/>không xoá object"] --> stop2(["Dừng"])
-  ref -->|"Không"| del["storage.deleteObject key"]
-  del --> ok{"Thành công ?"}
-  ok -->|"Có"| rm["DELETE task"] --> done(["Xong"])
-  ok -->|"Không"| back["next_attempt_at = now + backoff<br/>min(2^(n-1), 60) phút, ghi last_error"]
-  back --> stuck{"attempts ≥ 10 ?"}
-  stuck -->|"Có"| alarm["log ERROR cleanup.task_stuck"] --> later(["Worker thử lại sau"])
-  stuck -->|"Không"| later
-```
-
-- **`CleanupWorker`** (mọi instance, khi `CLEANUP_WORKER_ENABLED=true`): mỗi `CLEANUP_INTERVAL_SECONDS` (60) + jitter 0–10 s, không chạy chồng lượt. Mỗi lượt: tối đa 20 task đến hạn → `processTask`; xoá phiên hết hạn; xoá tệp tạm cũ hơn 60 phút. Dừng khi nhận SIGTERM.
-- **Tính đúng của guard (INV-C3):** guard có `next_attempt_at` ở tương lai, nên worker không thể claim khi upload diễn ra bình thường. Nếu upload chậm quá 30 phút và guard đã bị claim (`attempts ≥ 1`), `consumeGuard` trả 0 dòng → rollback → upload báo lỗi, thay vì tạo tài liệu trỏ tới object có thể đã bị xoá.
+Mỗi lần xoá object thất bại ghi WARN `{ event: 'storage.orphan', storageKey }`. Không bảng task, guard, retry hay worker định kỳ. Khi server khởi động: dọn các tệp còn trong UPLOAD_TMP_DIR và xoá phiên hết hạn theo lô. Tệp tạm của request được xoá trong finally; xác thực vẫn từ chối phiên hết hạn trên mỗi request.
 
 ### A6.9 Ma trận lỗi
 
-| Điểm lỗi | `documents` | Object | Người dùng thấy | Phục hồi |
-|---|---|---|---|---|
-| Upload: storage lỗi | Không có | Không có / bị xoá | 503 | Bù trừ ngay; worker dự phòng |
-| Upload: DB lỗi sau PutObject | Không có | Bị xoá | 500 | Bù trừ ngay; worker dự phòng |
-| Upload: crash | Không có | Có thể đã ghi | Kết nối đứt | Worker xoá sau 30 phút |
-| Thay: storage lỗi | Trỏ `oldKey` | `newKey` không có / bị xoá | 503, tệp cũ vẫn tải được | Bù trừ |
-| Thay: xung đột | Trỏ key của lần thắng | `newKey` bị xoá | 409 | Bù trừ |
-| Thay: xoá `oldKey` lỗi | Trỏ `newKey` | `oldKey` còn tạm thời | 200 | Worker backoff |
-| Xoá: DB lỗi | Còn nguyên | Còn nguyên | 500 | Người dùng thử lại |
-| Xoá: storage lỗi sau COMMIT | Đã xoá | Còn tạm thời, private, không tham chiếu | 204 | Worker backoff |
-| Download: object mất | Có | Không có | 503 | Điều tra (vi phạm INV-D1) |
+| Điểm lỗi | documents | Object | HTTP / phục hồi |
+|---|---|---|---|
+| Upload PutObject lỗi | Không có | Có thể có phần dư | 503 |
+| Upload INSERT lỗi | Không có | Thử xoá key mới | Ném lỗi DB gốc; xoá lỗi ghi storage.orphan |
+| Crash sau PutObject | Không có | Có thể mồ côi | Kết nối đứt; xử lý thủ công |
+| Replace PutObject lỗi | Trỏ key cũ | Tệp cũ giữ nguyên | 503 |
+| Replace UPDATE 0 dòng | Đã bị xoá | Thử xoá key mới | 404 |
+| Replace UPDATE lỗi | Không đổi bởi request này | Thử xoá key mới | Ném lại lỗi DB gốc |
+| Replace xoá key cũ lỗi | Trỏ key mới | Key cũ mồ côi | 200 + WARN storage.orphan |
+| Delete DB lỗi | Còn nguyên | Còn nguyên | 500 |
+| Delete object lỗi | Đã xoá | Key mồ côi | 204 + WARN storage.orphan |
+| Download object mất | Có | Không có | 503 + ERROR download.object_missing |
 
-Tệp tạm: tên UUID ngẫu nhiên, luôn xoá trong `finally`, sweeper dọn tệp cũ hơn 60 phút. Trên AWS nằm trên EBS root của từng EC2 (vai trò rõ ràng của EBS trong hạng mục "hai loại lưu trữ"); không cần chia sẻ giữa các instance.
+#### Accepted limitations
+
+- Object mồ côi có thể còn lại sau lỗi; các lần xoá thất bại được thấy qua log `storage.orphan` kèm storageKey. Crash đột ngột trước bù trừ có thể không kịp ghi log.
+- Thay tệp đồng thời là last-write-wins; có thể để lại key của lần thay bị ghi đè. Không lịch sử phiên bản, không cơ chế tự thu gom.
 
 ---
 
@@ -1292,7 +1161,6 @@ Thành công (2xx, trừ 204): `{ "data": … }`. Lỗi (4xx/5xx; API-13 sau khi
 | `ROUTE_NOT_FOUND` | 404 | Đường dẫn `/api/*` không tồn tại | Không tìm thấy đường dẫn API. |
 | `DOCUMENT_NOT_FOUND` | 404 | Không tồn tại, `id` sai, hoặc Private của người khác | Không tìm thấy tài liệu. |
 | `EMAIL_ALREADY_EXISTS` | 409 | Đăng ký trùng email | Email đã được sử dụng. |
-| `CONFLICT` | 409 | Thay/xoá đồng thời | Tài liệu vừa được thay đổi bởi thao tác khác. Vui lòng tải lại trang và thử lại. |
 | `PAYLOAD_TOO_LARGE` | 413 | JSON > 16 KB / part văn bản > 16 KB | Dữ liệu gửi lên quá lớn. |
 | `FILE_TOO_LARGE` | 413 | Tệp > 52 428 800 byte | Tệp vượt quá dung lượng tối đa 50 MB. |
 | `UNSUPPORTED_FILE_TYPE` | 415 | Không phải PDF/DOCX/PPTX hợp lệ | Chỉ hỗ trợ tệp PDF, DOCX, PPTX. |
@@ -1496,7 +1364,7 @@ X-CSRF-Protection: 1
 | Input | `multipart/form-data` (trình duyệt tự đặt boundary), CSRF header. Part: `title` (bắt buộc), `description` (tuỳ chọn), `visibility` (bắt buộc), `file` (bắt buộc, đúng 1). Nên gửi part văn bản **trước** `file` |
 | Thành công | 201 `{ "data": DocumentDto }` + `Location: /api/documents/{id}`; `fileVersion = 1`, `isOwner = true` |
 | Lỗi | 401; 400 (thiếu/sai trường, `EMPTY_FILE`, `TOO_MANY_FILES`, `UNKNOWN_FIELD`, không phải multipart → `file`/`REQUIRED`); 413 `FILE_TOO_LARGE` / `PAYLOAD_TOO_LARGE`; 415; 503 `STORAGE_UNAVAILABLE` |
-| DB/Storage · Frontend | §A6.3: guard → PutObject → transaction (xoá guard + INSERT) · P-06 qua `api.documents.upload` (XHR) |
+| DB/Storage · Frontend | §A6.3: PutObject → INSERT · P-06 qua `api.documents.upload` (XHR) |
 
 ```bash
 curl -X POST http://localhost:3000/api/documents -H "X-CSRF-Protection: 1" -b "sid=<token>" \
@@ -1522,7 +1390,7 @@ curl -X POST http://localhost:3000/api/documents -H "X-CSRF-Protection: 1" -b "s
 | Input | Multipart + CSRF header; **chỉ** part `file` (part khác → 400 `UNKNOWN_FIELD`). `canManage` kiểm tra **trước khi đọc body** |
 | Ví dụ | `curl -X PUT …/api/documents/3f2b…/file -H "X-CSRF-Protection: 1" -b "sid=<token>" -F "file=@ban-moi.docx"` |
 | Thành công | 200 `{ "data": DocumentDto }`: `fileVersion` + 1; `originalFilename`, `fileType`, `sizeBytes`, `fileUpdatedAt` mới; `visibility`, `title`, `description` không đổi |
-| Lỗi | 401; 403 `FORBIDDEN`; 404; 400; 413; 415; 409 `CONFLICT`; 503. **Mọi lỗi: vẫn trỏ tệp cũ** |
+| Lỗi | 401; 403 `FORBIDDEN`; 404; 400; 413; 415; 503. Lỗi trước UPDATE: vẫn trỏ tệp cũ |
 | DB/Storage · Frontend | §A6.6 · P-07 mục Thay thế tệp qua `api.documents.replaceFile` |
 
 Khi từ chối (401/403/404) trước khi đọc body, backend trả lỗi kèm `Connection: close` và gọi `req.resume()` để xả body. FE vẫn phải xử lý trường hợp XHR báo `NETWORK_ERROR`.
@@ -1554,7 +1422,7 @@ X-Content-Type-Options: nosniff
 |---|---|
 | Mục đích | Xoá vĩnh viễn |
 | Input · Ví dụ | CSRF header; không body · `DELETE /api/documents/3f2b…` |
-| Thành công | 204, **kể cả khi xoá object lỗi** sau COMMIT (worker thử lại) |
+| Thành công | 204, **kể cả khi xoá object lỗi** sau COMMIT |
 | Lỗi · DB/Storage · Frontend | 401; 403; 404; 409 · §A6.7 · P-04, P-05, P-07 sau CD-01 |
 
 ---
@@ -1638,7 +1506,7 @@ Có skip link "Bỏ qua tới nội dung chính"; toast ở góc dưới phải 
 | Khoảng cách | `--space-1/2/3/4/6/8/12` = `4/8/12/16/24/32/48px` |
 | Khác | `--radius-sm/md` `6/10px` · `--shadow-card` `0 1px 3px rgba(15,23,42,.08)` · `--container-max` `1120px` · `--touch-min` `44px` · breakpoint `640px` / `1024px` |
 
-Cặp màu chữ/nền chọn để đạt ≥ 4,5:1 (M3-12 kiểm chứng). Không có dark mode trong MVP.
+Cặp màu chữ/nền kiểm tra qua UI suite (M3-12). Một bảng màu duy nhất; sáng/tối tự theo prefers-color-scheme, không bộ chọn và không localStorage. Giá trị cụ thể ở styles/tokens.css.
 
 ### A8.5 Component dùng chung
 
@@ -1894,7 +1762,7 @@ Chế độ hiển thị *
 | Components · API | Cây bên dưới; dòng tệp hiện tại: "{originalFilename} · {fileType} · {size} · Phiên bản {fileVersion} · cập nhật {fileUpdatedAt}" · API-09, 11, 12, 14 |
 | States | Đang tải; 404 như P-04; `isOwner = false` → "Bạn không có quyền chỉnh sửa tài liệu này." + link P-04; mỗi mục có trạng thái gửi/lỗi riêng; Mục 2 đang tải thì khoá nút "Xoá vĩnh viễn" |
 | Actions | **Lưu:** so với dữ liệu đã nạp (sau trim), chỉ gửi trường đã đổi; nút khoá khi chưa đổi gì; PRIVATE → PUBLIC → CD-03 trước. **Thay thế:** kiểm tệp như P-06 → CD-02 → API-12 có tiến độ → toast "Đã thay thế tệp", cập nhật thông tin tệp. **Xoá:** CD-01 → API-14 → toast → P-05 |
-| Lỗi | `VALIDATION_ERROR` theo trường; `FORBIDDEN`/404 → trạng thái tương ứng; `CONFLICT` → Alert + "Tải lại" (gọi lại API-09); 503 → "Không thể thay thế tệp lúc này. Tệp hiện tại vẫn được giữ nguyên."; 413/415 → trường tệp |
+| Lỗi | `VALIDATION_ERROR` theo trường; `FORBIDDEN`/404 → trạng thái tương ứng; 503 → "Không thể thay thế tệp lúc này. Tệp hiện tại vẫn được giữ nguyên."; 413/415 → trường tệp |
 | Navigation · Acceptance | P-04, P-05 · AC-07.1, 07.2, AC-08.1, 08.2, AC-09.1, 09.3 |
 
 ```mermaid
@@ -1970,7 +1838,6 @@ Khớp §A7.5; `MAX_UPLOAD_BYTES = 52_428_800` và danh sách đuôi nằm trong
 | `CSRF_REJECTED` | Alert "Yêu cầu bị từ chối vì lý do bảo mật. Vui lòng tải lại trang." |
 | `FORBIDDEN` | "Bạn không có quyền thực hiện thao tác này." (P-04, P-07) |
 | `DOCUMENT_NOT_FOUND` | Trạng thái "Không tìm thấy tài liệu…" (P-04, P-07); trong danh sách → toast + tải lại |
-| `CONFLICT` | Alert với `message` + nút "Tải lại" (P-07, xoá) |
 | `FILE_TOO_LARGE`, `UNSUPPORTED_FILE_TYPE` | Lỗi trường Tệp (P-06, P-07) |
 | `PAYLOAD_TOO_LARGE`, `INVALID_JSON` | Alert với `message` (`INVALID_JSON` chỉ xảy ra khi client có lỗi lập trình) |
 | `STORAGE_UNAVAILABLE` | Alert với `message` |
@@ -2147,92 +2014,49 @@ sequenceDiagram
 
 ### SEQ-02 — Tải lên thành công
 
-**Trigger** "Tải lên" ở P-06 · **Input** `title`, `description?`, `visibility`, `file` · **Trạng thái** tệp tạm → guard → object → transaction (xoá guard + INSERT `documents`) · **Output** 201 `DocumentDto` · **Lỗi** xem SEQ-03.
+Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  actor U as User
-  participant FE as Frontend P-06
+  participant FE as Frontend
   participant BE as Backend
-  participant TMP as Đĩa tạm
   participant DB as MySQL
   participant OS as Object storage
-  U->>FE: Chọn tệp, nhập tiêu đề, chọn Công khai hoặc Riêng tư, bấm Tải lên
-  FE->>FE: Kiểm tra phần mở rộng, kích thước, trường bắt buộc
-  FE->>BE: POST /api/documents multipart qua XHR, X-CSRF-Protection 1, cookie
-  BE->>BE: csrfGuard
-  BE->>DB: SELECT sessions JOIN users theo hash cookie
-  DB-->>BE: Phiên hợp lệ
-  BE->>TMP: multer ghi tệp tạm, tối đa 52428800 byte
-  FE-->>U: Thanh tiến độ theo sự kiện progress của XHR
-  BE->>BE: Validate title, description, visibility
-  BE->>TMP: FileInspector đọc chữ ký và danh sách entry ZIP
-  BE->>DB: INSERT storage_cleanup_tasks UPLOAD_GUARD, next_attempt_at bằng now cộng 30 phút
-  BE->>OS: PutObject documents/docId/objId.pdf
+  FE->>BE: Request hợp lệ, đã kiểm quyền
+  BE->>OS: PutObject(newKey)
   OS-->>BE: OK
-  BE->>DB: BEGIN, DELETE guard WHERE attempts bằng 0, INSERT documents, COMMIT
+  BE->>DB: INSERT documents, file_version = 1
   DB-->>BE: OK
-  BE->>TMP: Xoá tệp tạm
-  BE-->>FE: 201 data là DocumentDto, header Location
-  FE-->>U: Toast Tải lên thành công, chuyển tới /me/documents
+  BE-->>FE: 201 DocumentDto
 ```
+
+---
 
 ### SEQ-03 — Tải lên thất bại
 
-**Input** tệp quá lớn / sai định dạng / storage lỗi / DB lỗi / huỷ / crash · **Trạng thái** **không bao giờ** có bản ghi `documents`; tệp tạm bị xoá; object (nếu đã ghi) bị xoá · **Output** 413 / 415 / 503 / 500 / request bị huỷ · **Phục hồi** bù trừ ngay (DeleteObject idempotent); dự phòng guard + worker; crash → worker xoá sau 30 phút.
+Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  actor U as User
-  participant FE as Frontend P-06
+  participant FE as Frontend
   participant BE as Backend
-  participant TMP as Đĩa tạm
   participant DB as MySQL
   participant OS as Object storage
-  U->>FE: Bấm Tải lên
-  FE->>BE: POST /api/documents multipart
-  alt Tệp vượt 52428800 byte
-    BE->>TMP: multer dừng ghi, xoá tệp dở, xả phần body còn lại
-    BE-->>FE: 413 FILE_TOO_LARGE
-    FE-->>U: Lỗi tại trường Tệp
-  else Nội dung không phải PDF, DOCX, PPTX hợp lệ
-    BE->>TMP: FileInspector phát hiện sai chữ ký, xoá tệp tạm
-    BE-->>FE: 415 UNSUPPORTED_FILE_TYPE
-    FE-->>U: Lỗi tại trường Tệp
-  else Object storage lỗi
-    BE->>DB: INSERT guard UPLOAD_GUARD
-    BE->>OS: PutObject
-    OS--xBE: Lỗi hoặc timeout
-    BE->>DB: UPDATE guard SET next_attempt_at bằng now WHERE attempts bằng 0
-    BE->>OS: processTask gọi DeleteObject, idempotent
-    alt DeleteObject thành công
-      BE->>DB: DELETE guard
-    else DeleteObject cũng lỗi
-      BE->>DB: UPDATE guard với lịch thử lại, worker xử lý sau
-    end
-    BE->>TMP: Xoá tệp tạm
-    BE-->>FE: 503 STORAGE_UNAVAILABLE
-    FE-->>U: Alert, giữ nguyên form và tệp để thử lại
-  else DB lỗi khi COMMIT sau khi PutObject thành công
-    BE->>DB: INSERT guard UPLOAD_GUARD
-    BE->>OS: PutObject
-    OS-->>BE: OK
-    BE->>DB: BEGIN, DELETE guard, INSERT documents
-    DB--xBE: Lỗi, ROLLBACK, guard vẫn còn
-    BE->>OS: Bù trừ bằng processTask, DeleteObject
-    BE-->>FE: 500 INTERNAL_ERROR
-    FE-->>U: Alert Đã có lỗi xảy ra
-  else Người dùng huỷ
-    U->>FE: Bấm Huỷ tải lên
-    FE->>FE: xhr.abort
-    BE->>TMP: Request bị huỷ, multer xoá tệp dở
-    FE-->>U: Đã huỷ tải lên
+  FE->>BE: Request hợp lệ, đã kiểm quyền
+  BE->>OS: PutObject(newKey)
+  alt Storage lỗi
+    OS--xBE: Lỗi
+    BE-->>FE: 503, không INSERT
+  else Storage OK nhưng DB lỗi
+    BE->>DB: INSERT documents
+    DB--xBE: Lỗi
+    BE->>OS: DeleteObject(newKey) best-effort
+    Note over BE,OS: Xoá lỗi: WARN storage.orphan + storageKey
+    BE-->>FE: Lỗi DB gốc
   end
-  Note over BE,OS: Crash giữa INSERT guard và COMMIT thì guard còn lại, worker xoá object sau 30 phút
-  Note over DB: Mọi nhánh lỗi đều không có bản ghi documents
 ```
+
+---
 
 ### SEQ-04 — Tìm kiếm công khai
 
@@ -2332,126 +2156,72 @@ sequenceDiagram
 
 ### SEQ-07 — Thay thế tệp thành công
 
-**Trigger** xác nhận CD-02 · **Trạng thái** guard `newKey` → object `newKey` → transaction (xoá guard, UPDATE có điều kiện, task `REPLACED` cho `oldKey`) → sau ân hạn xoá `oldKey` · **Output** 200, `fileVersion` + 1, visibility giữ nguyên · **Phục hồi** xoá `oldKey` lỗi → worker thử lại.
+Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  actor U as Owner
-  participant FE as Frontend P-07
-  participant BE as Backend
-  participant TMP as Đĩa tạm
-  participant DB as MySQL
-  participant OS as Object storage
-  U->>FE: Chọn tệp mới, bấm Thay thế tệp, xác nhận CD-02
-  FE->>BE: PUT /api/documents/:id/file multipart, chỉ part file
-  BE->>DB: SELECT sessions, SELECT documents WHERE id
-  BE->>BE: canManage ALLOW, ghi nhớ oldKey và v là file_version
-  BE->>TMP: multer ghi tệp tạm
-  BE->>TMP: FileInspector
-  BE->>DB: INSERT guard UPLOAD_GUARD cho newKey
-  BE->>OS: PutObject newKey
-  OS-->>BE: OK
-  BE->>DB: BEGIN
-  BE->>DB: DELETE guard newKey WHERE attempts bằng 0
-  BE->>DB: UPDATE documents SET storage_key newKey, các cột tệp, file_version v cộng 1 WHERE id và file_version bằng v
-  BE->>DB: INSERT task REPLACED cho oldKey, next_attempt_at bằng now cộng 120 giây
-  BE->>DB: COMMIT
-  BE->>TMP: Xoá tệp tạm
-  BE-->>FE: 200 DocumentDto, fileVersion tăng 1, visibility giữ nguyên
-  FE-->>U: Toast Đã thay thế tệp, cập nhật thông tin tệp
-  Note over BE,OS: Sau ít nhất 120 giây, worker ở một instance bất kỳ
-  BE->>DB: Claim task REPLACED
-  BE->>OS: DeleteObject oldKey
-  alt Thành công
-    BE->>DB: DELETE task
-  else Lỗi
-    BE->>DB: UPDATE task, thử lại theo backoff
-  end
-```
-
-### SEQ-08 — Thay thế tệp thất bại
-
-**Input** storage lỗi / xung đột phiên bản / DB lỗi (413/415/400 xử lý như SEQ-03) · **Trạng thái** `documents` **không đổi** (vẫn trỏ `oldKey`); `newKey` bị xoá · **Output** 503 / 409 hoặc 404 / 500 · **Phục hồi** bù trừ `newKey` ngay; worker dự phòng.
-
-```mermaid
-sequenceDiagram
-  autonumber
-  actor U as Owner
-  participant FE as Frontend P-07
-  participant BE as Backend
-  participant DB as MySQL
-  participant OS as Object storage
-  U->>FE: Xác nhận thay thế tệp
-  FE->>BE: PUT /api/documents/:id/file
-  BE->>DB: Nạp tài liệu, canManage ALLOW, ghi nhớ oldKey và v
-  BE->>DB: INSERT guard cho newKey
-  alt PutObject newKey lỗi
-    BE->>OS: PutObject newKey
-    OS--xBE: Lỗi
-    BE->>DB: Đặt guard đến hạn ngay
-    BE->>OS: DeleteObject newKey, idempotent
-    BE-->>FE: 503 STORAGE_UNAVAILABLE
-    FE-->>U: Không thể thay thế tệp lúc này, tệp hiện tại vẫn được giữ nguyên
-  else Xung đột phiên bản
-    BE->>OS: PutObject newKey
-    OS-->>BE: OK
-    BE->>DB: BEGIN, DELETE guard, UPDATE documents WHERE file_version bằng v
-    DB-->>BE: 0 dòng vì thao tác khác đã đổi file_version
-    BE->>DB: ROLLBACK, guard newKey vẫn còn
-    BE->>OS: Bù trừ DeleteObject newKey
-    BE-->>FE: 409 CONFLICT, hoặc 404 nếu tài liệu đã bị xoá
-    FE-->>U: Alert kèm nút Tải lại
-  else DB lỗi khi COMMIT
-    BE->>OS: PutObject newKey
-    OS-->>BE: OK
-    BE->>DB: BEGIN, các câu lệnh, COMMIT
-    DB--xBE: Lỗi, ROLLBACK
-    BE->>OS: Bù trừ DeleteObject newKey
-    BE-->>FE: 500 INTERNAL_ERROR
-    FE-->>U: Alert, tệp hiện tại vẫn được giữ nguyên
-  end
-  Note over DB,OS: Mọi nhánh đều giữ documents.storage_key là oldKey, không chạm vào oldKey, download vẫn trả tệp cũ
-```
-
-### SEQ-09 — Xoá vĩnh viễn, gồm lỗi một phần
-
-**Trigger** xác nhận CD-01 · **Trạng thái** transaction (DELETE + task `DELETED`) → DeleteObject → DELETE task · **Output** 204 (kể cả khi DeleteObject lỗi) · **Lỗi** DB lỗi trước COMMIT → 500, không gì thay đổi; xung đột → thử lại 1 lần rồi 409; storage lỗi sau COMMIT → lỗi một phần, vẫn 204 · **Phục hồi** worker trên mọi instance thử lại theo backoff.
-
-```mermaid
-sequenceDiagram
-  autonumber
-  actor U as Owner
   participant FE as Frontend
   participant BE as Backend
   participant DB as MySQL
   participant OS as Object storage
-  participant W as Cleanup worker
-  U->>FE: Bấm Xoá, xác nhận CD-01
-  FE->>BE: DELETE /api/documents/:id, X-CSRF-Protection 1
-  BE->>DB: SELECT sessions, SELECT documents, canManage ALLOW
-  BE->>DB: BEGIN, đọc k là storage_key và v là file_version
-  BE->>DB: DELETE documents WHERE id và file_version bằng v
-  BE->>DB: INSERT task DELETED cho k, next_attempt_at bằng now
-  BE->>DB: COMMIT
-  Note over FE,DB: Từ đây tài liệu biến mất khỏi mọi endpoint
-  BE->>DB: Claim task, attempts cộng 1
-  BE->>OS: DeleteObject k
-  alt Xoá object thành công
-    OS-->>BE: OK
-    BE->>DB: DELETE task
-  else Lỗi một phần, storage không khả dụng
+  FE->>BE: Request hợp lệ, đã kiểm quyền
+  BE->>OS: PutObject(newKey)
+  OS-->>BE: OK
+  BE->>DB: UPDATE file fields, file_version + 1 WHERE id
+  DB-->>BE: 1 dòng
+  BE->>OS: DeleteObject(oldKey) best-effort
+  Note over BE,OS: Xoá lỗi: WARN storage.orphan
+  BE-->>FE: 200 DocumentDto, visibility giữ nguyên
+```
+
+---
+
+### SEQ-08 — Thay thế tệp thất bại
+
+Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
+
+```mermaid
+sequenceDiagram
+  participant FE as Frontend
+  participant BE as Backend
+  participant DB as MySQL
+  participant OS as Object storage
+  FE->>BE: Request hợp lệ, đã kiểm quyền
+  BE->>OS: PutObject(newKey)
+  alt Storage lỗi
     OS--xBE: Lỗi
-    BE->>DB: UPDATE task với last_error và lịch thử lại
-    Note over BE: Không báo lỗi cho người dùng
+    BE-->>FE: 503, giữ tệp cũ
+  else Storage OK
+    BE->>DB: UPDATE file fields WHERE id
+    DB--xBE: 0 dòng hoặc lỗi DB
+    BE->>OS: DeleteObject(newKey) best-effort
+    Note over BE,OS: Xoá lỗi: WARN storage.orphan
+    BE-->>FE: 404 nếu 0 dòng, hoặc lỗi DB gốc
   end
-  BE-->>FE: 204
-  FE-->>U: Toast Đã xoá tài liệu, cập nhật danh sách
-  loop Mỗi 60 giây trên mọi instance
-    W->>DB: SELECT task đến hạn, claim nguyên tử
-    W->>DB: Kiểm tra không còn documents tham chiếu k
-    W->>OS: DeleteObject k
-    W->>DB: DELETE task nếu thành công, ngược lại lùi lịch thử lại
+```
+
+---
+
+### SEQ-09 — Xoá vĩnh viễn, gồm lỗi một phần
+
+Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
+
+```mermaid
+sequenceDiagram
+  participant FE as Frontend
+  participant BE as Backend
+  participant DB as MySQL
+  participant OS as Object storage
+  FE->>BE: Request hợp lệ, đã kiểm quyền
+  BE->>DB: DELETE documents WHERE id, lấy storageKey
+  alt DB lỗi
+    DB--xBE: Lỗi
+    BE-->>FE: 500, không xoá object
+  else DB thành công
+    DB-->>BE: Dòng vừa xoá
+    BE->>OS: DeleteObject(key) best-effort
+    Note over BE,OS: Xoá lỗi: WARN storage.orphan + storageKey
+    BE-->>FE: 204
   end
 ```
 
@@ -2497,9 +2267,6 @@ sequenceDiagram
 | `SESSION_TTL_HOURS` | `168` | `168` | `168` |
 | `TRUST_PROXY` | `false` | `false` | `1` |
 | `UPLOAD_TMP_DIR` | `./tmp/uploads` | thư mục tạm của OS | `/var/lib/btl-cloud/tmp` (EBS) |
-| `UPLOAD_GUARD_MINUTES` | `30` | `30` | `30` |
-| `CLEANUP_WORKER_ENABLED` | `true` | `false` (test gọi `processTask` trực tiếp) | `true` |
-| `CLEANUP_INTERVAL_SECONDS` / `CLEANUP_GRACE_SECONDS` | `60` / `120` | — / `0` | `60` / `120` |
 | `AUTH_RATE_LIMIT_MAX` | `20` | `1000` | `20` |
 | `LOG_LEVEL` | `debug` | `silent` | `info` |
 | `SERVE_FRONTEND` / `FRONTEND_DIST_DIR` | `false` / `../frontend/dist` | `false` / — | `true` / `/opt/btl-cloud/frontend/dist` |
@@ -2537,13 +2304,13 @@ Instance thứ 2:  PowerShell: $env:PORT='3001'; npm --prefix backend start
 Tắt: Ctrl+C (graceful shutdown) · docker compose stop (giữ dữ liệu) · docker compose down -v (xoá dữ liệu)
 ```
 
-Graceful shutdown (SIGTERM/SIGINT): dừng timer worker → `server.close()` → chờ request đang chạy tối đa 30 s → `prisma.$disconnect()` → thoát mã 0 (quá hạn thì buộc thoát). Kiểm tra sức khoẻ: `curl http://localhost:3000/api/health` và `/api/health/ready`.
+Graceful shutdown (SIGTERM/SIGINT): `server.close()` → chờ request đang chạy tối đa 30 s → `prisma.$disconnect()` → thoát mã 0 (quá hạn thì buộc thoát). Kiểm tra sức khoẻ: `curl http://localhost:3000/api/health` và `/api/health/ready`.
 
 ### A10.6 Môi trường test
 
 | Loại | Lệnh | Cần hạ tầng | Phạm vi |
 |---|---|---|---|
-| Backend unit | `npm --prefix backend test` | Không | policy, FileInspector, schema, mapper, content-disposition, cleanup với `InMemoryObjectStorage` |
+| Backend unit | `npm --prefix backend test` | Không | policy, FileInspector, schema, mapper, content-disposition, ObjectStorage |
 | Backend integration | `npm --prefix backend run test:integration` | MySQL + MinIO, DB/bucket test | Supertest qua toàn app; lỗi storage giả lập bằng chèn lỗi hoặc dừng MinIO; chạy tuần tự |
 | Frontend | `npm --prefix frontend test` | Không | RTL, mock `fetch`/XHR |
 | E2E | `npm --prefix frontend run test:e2e` | Stack production-like `:3000` | Playwright, FR-01…FR-09 |
@@ -2567,7 +2334,7 @@ Một artifact cho mọi instance (§A3.7); instance giống hệt nhau, statele
 
 ### A10.9 Thiết kế AWS
 
-**Stateless:** phiên ở bảng `sessions` trên RDS; tệp ở S3; tệp tạm chỉ trong một request; cleanup phối hợp qua DB; rate limit theo instance (RK-10). ALB **không** cần sticky session.
+**Stateless:** phiên ở bảng `sessions` trên RDS; tệp ở S3; tệp tạm chỉ trong một request; rate limit theo instance (RK-10). ALB **không** cần sticky session.
 
 **IAM Role cho EC2** (instance profile, không access key; launch template bắt buộc IMDSv2 `HttpTokens=required`, hop limit 1):
 
@@ -2606,8 +2373,8 @@ Không mở SSH từ Internet.
 - **S3:** §A6.2; EC2 đi qua S3 Gateway Endpoint (route table private). Bucket policy theo `aws:SourceVpce` là tuỳ chọn (sẽ chặn cả console).
 - **RDS:** private subnet, `PubliclyAccessible=false`, chỉ `sg-app` vào; TLS bằng CA bundle RDS; user ứng dụng có quyền trên schema `btl_cloud` (gồm DDL cho migration); bật automated backup.
 - **ALB:** internet-facing trên 2 public subnet; listener 80 (forward, hoặc redirect 443 nếu HTTPS); target group HTTP:3000, health check `/api/health`, matcher 200, interval 15 s, timeout 5 s, healthy 2 / unhealthy 3; không stickiness; timeout §A10.4.
-- **ASG:** launch template AL2023, `t3.micro`, EBS gp3 20 GiB mã hoá (khớp tổng 40 GB EBS của S2), instance profile, IMDSv2; min 2 / desired 2 / max 4; 2 private subnet; health check type ELB, grace 300 s; target tracking theo OD-09; triển khai bản mới bằng instance refresh. Tương thích: instance stateless, `/api/health` nhanh, graceful shutdown nằm trong deregistration delay, worker an toàn khi nhiều instance.
-- **CloudWatch:** metric có sẵn không cần agent (EC2 `CPUUtilization`; ALB `RequestCount`, `TargetResponseTime`, `HTTPCode_Target_5XX_Count`, `UnHealthyHostCount`; RDS `CPUUtilization`, `FreeStorageSpace`, `DatabaseConnections`; ASG group metrics). Alarm đề xuất: (1) CPU trung bình ASG > 70% trong 2 × 1 phút; (2) `UnHealthyHostCount ≥ 1` trong 2 phút, **kích hoạt thử** bằng cách dừng service trên một instance (S5 #7); (3) 5XX > 10 trong 5 phút; (4) RDS `FreeStorageSpace < 2 GiB`. Nếu có CloudWatch Logs (OD-06): metric filter `level ≥ 50` và `cleanup.task_stuck`. Thông báo qua SNS email.
+- **ASG:** launch template AL2023, `t3.micro`, EBS gp3 20 GiB mã hoá (khớp tổng 40 GB EBS của S2), instance profile, IMDSv2; min 2 / desired 2 / max 4; 2 private subnet; health check type ELB, grace 300 s; target tracking theo OD-09; triển khai bản mới bằng instance refresh. Tương thích: instance stateless, `/api/health` nhanh, graceful shutdown nằm trong deregistration delay.
+- **CloudWatch:** metric có sẵn không cần agent (EC2 `CPUUtilization`; ALB `RequestCount`, `TargetResponseTime`, `HTTPCode_Target_5XX_Count`, `UnHealthyHostCount`; RDS `CPUUtilization`, `FreeStorageSpace`, `DatabaseConnections`; ASG group metrics). Alarm đề xuất: (1) CPU trung bình ASG > 70% trong 2 × 1 phút; (2) `UnHealthyHostCount ≥ 1` trong 2 phút, **kích hoạt thử** bằng cách dừng service trên một instance (S5 #7); (3) 5XX > 10 trong 5 phút; (4) RDS `FreeStorageSpace < 2 GiB`. Nếu có CloudWatch Logs (OD-06): metric filter `level ≥ 50` và `storage.orphan`. Thông báo qua SNS email.
 
 ### A10.10 Ràng buộc AWS chưa giải quyết
 
@@ -2674,12 +2441,11 @@ Mọi hành động trong §A8.7 đều có trong §A8.12. F-08, F-11, F-17, F-1
 | API-07 | `documents`, `users` | — | — | ✅ `idx_documents_visibility_created` |
 | API-08 | `documents`, `users` | — | — | ✅ `idx_documents_owner_created` |
 | API-09 | `documents`, `users` | — | — | ✅ |
-| API-10 | `sessions` | task, INSERT `documents` | PutObject (+ DeleteObject khi bù trừ) | ✅ INV-D1, INV-C1–C3 |
+| API-10 | `sessions` | INSERT `documents` | PutObject (+ DeleteObject khi bù trừ) | ✅ INV-D1 |
 | API-11 | `documents` | UPDATE metadata | — | ✅ INV-D2 |
-| API-12 | `documents` | task, UPDATE có điều kiện `file_version` | PutObject key mới, DeleteObject | ✅ D-06, D-08, D-09 |
+| API-12 | `documents` | UPDATE theo id, file_version + 1 | PutObject key mới, DeleteObject | ✅ D-06, D-08, D-09 |
 | API-13 | `documents` | — | GetObject | ✅ |
-| API-14 | `documents` | DELETE `documents`, task | DeleteObject | ✅ BR-08 |
-| Worker | task, `documents` | UPDATE/DELETE task, DELETE phiên hết hạn | DeleteObject | ✅ |
+| API-14 | `documents` | DELETE `documents` | DeleteObject | ✅ BR-08 |
 
 ### A11.4 Ranh giới bảo mật
 
@@ -2704,7 +2470,7 @@ Luồng lỗi trọng yếu đã định nghĩa: upload (§A6.3, SEQ-03), thay t
 - [x] Mọi khác biệt local/AWS nằm trong biến môi trường (§A10.2).
 - [x] Giới hạn 52 428 800 byte là cùng một hằng số ở FE (§A8.8) và BE (§A6.3).
 - [x] MySQL 8.4 ở cả local và RDS, cùng collation.
-- [x] Liveness không phụ thuộc DB/S3 (D-14); worker an toàn khi nhiều instance (D-10).
+- [x] Liveness không phụ thuộc DB/S3 (D-14); dọn tệp tạm và phiên lúc khởi động (D-10).
 - [ ] HTTPS, egress, bí mật, metric scaling **chưa chốt** (OD-05/06/07/09); không ảnh hưởng M1–M4.
 
 Kết quả kiểm tra chéo (lệnh và số liệu): bằng chứng task M0-11 trong MILESTONES.
