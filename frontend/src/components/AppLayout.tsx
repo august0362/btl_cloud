@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/context";
 import { Button } from "./ui";
-import { ThemePicker } from "./ThemePicker";
 import styles from "./AppLayout.module.css";
 
 export function AppHeader() {
@@ -71,7 +70,6 @@ export function AppHeader() {
           )}
         </nav>
         <div className={styles.headerActions}>
-          <ThemePicker />
           <button
             type="button"
             className="menu-toggle button button--secondary"

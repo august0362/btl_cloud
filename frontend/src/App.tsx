@@ -9,11 +9,9 @@ import { HomePage, MyDocumentsPage } from "./pages/DocumentListPages";
 import { EditDocumentPage } from "./pages/EditDocumentPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { UploadPage } from "./pages/UploadPage";
-import { ThemeProvider } from "./theme/ThemeProvider";
 
 export function App() {
   return (
-    <ThemeProvider>
       <ToastProvider>
         <AuthProvider>
           <Routes>
@@ -34,6 +32,5 @@ export function App() {
           </Routes>
         </AuthProvider>
       </ToastProvider>
-    </ThemeProvider>
   );
 }
