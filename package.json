@@ -1,0 +1,11 @@
+{
+  "name": "btl-cloud",
+  "private": true,
+  "description": "Root không có dependency; chạy script cho backend/ và frontend/ nếu thư mục tồn tại (ARCHITECTURE D-16).",
+  "scripts": {
+    "postinstall": "node scripts/run-all.mjs install",
+    "lint": "node scripts/run-all.mjs lint",
+    "build": "node scripts/run-all.mjs build",
+    "test": "node scripts/run-all.mjs test"
+  }
+}

@@ -1,0 +1,48 @@
+# Dịch vụ local cho backend (ARCHITECTURE §A10.1).
+# MinIO đã ngừng phát hành image/binary miễn phí (RK-06) → object storage local dùng SeaweedFS (S3 API),
+# map ra cổng 9000 để S3_ENDPOINT giữ nguyên http://localhost:9000. Xem Nhật ký thay đổi baseline CR-001.
+# Mật khẩu/khoá dưới đây là GIÁ TRỊ DEV CÔNG KHAI, không dùng cho môi trường nào khác.
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_password
+      MYSQL_DATABASE: btl_cloud
+      MYSQL_USER: btl
+      MYSQL_PASSWORD: btl_dev_password
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot_dev_password']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    restart: unless-stopped
+    # Mặc định chỉ 8 volume → bucket thứ hai (dev + test) báo "No writable volumes"; tăng giới hạn, giảm kích thước volume.
+    command: >
+      server -dir=/data -ip.bind=0.0.0.0
+      -master.volumeSizeLimitMB=1024 -volume.max=100
+      -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - '9000:8333'
+    volumes:
+      - seaweedfs-data:/data
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  mysql-data:
+  seaweedfs-data:
