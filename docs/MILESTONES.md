@@ -360,9 +360,9 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
 
 | Bug ID | Phát hiện ở | Mô tả | Tham chiếu | Mức độ | Phụ trách | Trạng thái |
 |---|---|---|---|---|---|---|
-| BUG-001 | M4-04 | E2E-03 locator heading khớp h1 và h2; thêm exact: true | FR-06 | MINOR | Nhóm | FIXED; chờ chạy lại suite |
+| BUG-001 | M4-04 | E2E-03 locator heading khớp h1 và h2; thêm exact: true | FR-06 | MINOR | Nhóm | FIXED; E2E 6/6 và 3/3 bổ sung đạt |
 | ENV-001 | M4-01 | DEBUG=release từ môi trường agent làm SeaweedFS không lên; README chỉ cách bỏ DEBUG | Local launcher | MINOR | Nhóm | WORKAROUND DOCUMENTED |
-| TEST-001 | M4-09 | Hai RTL test timing lỗi khi chạy nhiều process song song; chạy riêng 61/61 đạt | Frontend unit | MINOR | Nhóm | Đang kiểm tra lại qua root CI |
+| TEST-001 | M4-09 | Route focus RAF có thể giành focus input/dialog khi render chậm; bỏ focus nếu đang tương tác | Frontend unit | MINOR | Nhóm | FIXED; chờ root CI xác minh |
 
 ---
 
