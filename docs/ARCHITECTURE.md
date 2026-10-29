@@ -6,7 +6,7 @@
 >
 > **Cách xem sơ đồ:** khối ` ```mermaid ` là sơ đồ viết bằng mã [Mermaid](https://mermaid.js.org/). GitHub tự vẽ thành hình; trong VS Code cần extension **Markdown Preview Mermaid Support** (`bierner.markdown-mermaid`) rồi bấm `Ctrl+Shift+V`. Mọi sơ đồ đã được kiểm tra bằng parser Mermaid 11.
 >
-> `BASELINE_VERSION: 1.0` · `CONTRACT_STATUS: PROPOSED` · `OWNER_APPROVAL: PENDING`
+> `BASELINE_VERSION: 1.0` · `CONTRACT_STATUS: APPROVED` · `OWNER_APPROVAL: APPROVED` (MILESTONES › OWNER DESIGN APPROVAL) · cập nhật theo CR-001…CR-008
 
 **Mục lục:** [A1 Quyết định](#a1-quyết-định-kiến-trúc) · [A2 Use Case](#a2-ngữ-cảnh-và-use-case) · [A3 Kiến trúc ứng dụng](#a3-kiến-trúc-ứng-dụng) · [A4 Cơ sở dữ liệu](#a4-cơ-sở-dữ-liệu) · [A5 Xác thực, phân quyền](#a5-xác-thực-và-phân-quyền) · [A6 Storage, vòng đời](#a6-object-storage-và-vòng-đời-tài-liệu) · [A7 API Contract](#a7-rest-api-contract) · [A8 Frontend UX/UI](#a8-frontend-uxui) · [A9 Sơ đồ tuần tự](#a9-sơ-đồ-tuần-tự) · [A10 Local và AWS](#a10-local-và-aws) · [A11 Kiểm tra nhất quán](#a11-kiểm-tra-nhất-quán)
 
@@ -26,12 +26,12 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 | Validation | `zod` | Một schema vừa validate vừa sinh type |
 | ORM | Prisma ORM + Prisma Migrate | Ưu tiên của owner; migration có version |
 | Database | MySQL **8.4** (local `mysql:8.4`; AWS RDS 8.4) | Cùng major, collation mặc định `utf8mb4_0900_ai_ci` |
-| Object storage | AWS SDK v3 (`client-s3`, `lib-storage`), **một adapter** cho MinIO và S3 | Local → AWS chỉ đổi cấu hình |
+| Object storage | AWS SDK v3 (`client-s3`, `lib-storage`), **một adapter** cho SeaweedFS (local) và S3 | Local → AWS chỉ đổi cấu hình |
 | Upload / kiểm tệp | `multer` (disk storage), `yauzl` (đọc entry ZIP) | Không đệm 50 MB trong RAM; phân biệt DOCX/PPTX thật |
 | Bảo mật | `argon2` (argon2id), `helmet`, `cookie-parser`, `express-rate-limit` (bộ nhớ, theo instance) | |
 | Log | `pino` + `pino-http` (JSON ra stdout) | Dễ gửi lên CloudWatch |
 | Test | Vitest + Supertest; Vitest + React Testing Library; Playwright (E2E) | Ưu tiên của owner |
-| Local | Docker Compose: `mysql`, `minio`, `minio-init` | Tái lập được cho cả nhóm (OD-14) |
+| Local | Docker Compose: `mysql`, `seaweedfs` (CR-001); hoặc `run.bat` chạy MySQL/SeaweedFS portable (CR-004); bucket tạo bằng `storage:init` | Tái lập được cho cả nhóm (OD-14) |
 
 **Không dùng:** microservices, Kubernetes, Redis, Elasticsearch, queue, JWT, CORS, presigned URL, UI/state library, package code dùng chung FE–BE.
 
@@ -64,15 +64,20 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 /
 ├── README.md                       runbook ngắn (INTEGRATION, M4)
 ├── package.json, package-lock.json root: không dependency; scripts → scripts/run-all.mjs
+├── run.bat                         launcher Windows: MySQL + SeaweedFS portable, cài đặt, migrate, chạy app (CR-004)
 ├── scripts/run-all.mjs             npm ci / npm run <script> --if-present trong backend/, frontend/ nếu tồn tại
-├── docker-compose.yml, docker/mysql/init/01-init.sql
-├── docs/                           CONTEXT.md, ARCHITECTURE.md, MILESTONES.md
+├── scripts/verify/                 authz-matrix.mjs, upload-matrix.mjs, client.mjs (kiểm chứng trên :3000)
+├── docker-compose.yml, docker/mysql/init/01-init.sql, docker/seaweedfs/s3.json
+├── docs/                           CONTEXT.md, ARCHITECTURE.md, MILESTONES.md, PROJECT_OVERVIEW.md, PR_M4.md
 ├── backend/
 │   ├── package.json, package-lock.json, tsconfig.json, eslint.config.js, vitest.config.ts, .env.example
 │   ├── prisma/schema.prisma, prisma/migrations/
+│   ├── scripts/init-storage.ts     `npm run storage:init`: tạo bucket dev + test (chỉ local)
 │   ├── src/
 │   │   ├── server.ts               load config → createApp → startup cleanup → listen → graceful shutdown
 │   │   ├── app.ts                  createApp(deps) — dùng trực tiếp trong Supertest
+│   │   ├── container.ts            dựng dependency (Prisma, storage, repository, service)
+│   │   ├── lifecycle.ts            graceful shutdown
 │   │   ├── config/env.ts
 │   │   ├── http/                   errors.ts, validate.ts, static.ts, middleware/
 │   │   ├── modules/                health/, auth/, users/, documents/, files/   (chi tiết §A3.2)
@@ -80,11 +85,12 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 │   │   ├── cleanup/                tmp-sweeper.ts
 │   │   ├── db/prisma.ts
 │   │   └── lib/                    logger.ts, clock.ts, ids.ts
-│   └── test/                       unit/ (npm test), integration/ (npm run test:integration), fixtures/
+│   └── test/                       unit/ (npm test), integration/ (npm run test:integration), helpers/
 └── frontend/
     ├── package.json, package-lock.json, vite.config.ts, tsconfig.json, eslint.config.js, index.html
     ├── src/                        main.tsx, App.tsx, api/, auth/, components/, pages/, hooks/, lib/, styles/
-    └── e2e/                        Playwright spec (chạy ở M4)
+    ├── e2e/                        Playwright E2E trên stack thật :3000 (`test:e2e`)
+    └── ui-tests/                   Playwright với API mock (`test:ui`)
 ```
 
 ```mermaid
@@ -93,7 +99,7 @@ flowchart LR
   root --> docs["docs/<br/>CONTEXT, ARCHITECTURE, MILESTONES"]
   root --> be["backend/<br/>REST API, phục vụ SPA"]
   root --> fe["frontend/<br/>React SPA, Playwright e2e"]
-  root --> infra["docker-compose.yml, docker/<br/>MySQL + MinIO cho local"]
+  root --> infra["docker-compose.yml, docker/<br/>MySQL + SeaweedFS cho local"]
   root --> tooling["package.json, scripts/<br/>lint, build, test cho cả hai package"]
   root --> gh[".github/<br/>CODEOWNERS, CI"]
   docs -.- o1(["CLAUDE_DESIGN"])
@@ -140,7 +146,7 @@ flowchart LR
   subgraph sys["Hệ thống Lưu trữ và Chia sẻ Tài liệu"]
     app["Ứng dụng web<br/>React SPA + REST API"]
     db[("MySQL / RDS<br/>users, sessions, documents")]
-    obj[("Object storage<br/>MinIO / S3 private")]
+    obj[("Object storage<br/>SeaweedFS / S3 private")]
   end
   ops["Nhóm vận hành<br/>log, health, CloudWatch"]
   guest -->|"tìm kiếm, xem metadata Public"| app
@@ -279,7 +285,7 @@ flowchart LR
     apiC["REST API /api/*"]
   end
   db[("MySQL<br/>users, sessions, documents")]
-  obj[("Object storage S3 / MinIO<br/>documents/...")]
+  obj[("Object storage S3 / SeaweedFS<br/>documents/...")]
   tmp[("Đĩa tạm cục bộ<br/>UPLOAD_TMP_DIR")]
   browser -->|"GET /, /assets/*"| spa
   browser -->|"fetch JSON, XHR multipart, download"| apiC
@@ -400,7 +406,7 @@ flowchart LR
   end
   storage["ObjectStorage"]
   db[("MySQL")]
-  s3[("S3 / MinIO")]
+  s3[("S3 / SeaweedFS")]
   req -->|"1"| csrf -->|"2"| sess -->|"3"| droutes
   droutes -->|"4"| rauth
   droutes -->|"5"| loader
@@ -644,24 +650,24 @@ classDiagram
 
 ```mermaid
 flowchart LR
-  subgraph devbox["Máy dev: Windows 11 + WSL2"]
+  subgraph devbox["Máy dev: Windows 11"]
     browser["Trình duyệt<br/>http://localhost:5173"]
     vite["Vite dev server :5173<br/>proxy /api"]
     be["Backend :3000<br/>tuỳ chọn instance thứ 2 :3001"]
     tmp[("backend/tmp/uploads")]
-    subgraph compose["Docker Compose"]
-      mysql[("mysql:8.4 :3306<br/>btl_cloud, btl_cloud_test")]
-      minio[("MinIO :9000 API, :9001 console<br/>bucket btl-cloud-documents")]
-      init["minio-init<br/>tạo bucket rồi thoát"]
+    subgraph compose["Docker Compose hoặc run.bat (portable)"]
+      mysql[("MySQL 8.4 :3306<br/>btl_cloud, btl_cloud_test")]
+      weed[("SeaweedFS 4.48 S3 API :9000<br/>btl-cloud-documents, -test")]
     end
+    init["npm run storage:init<br/>tạo bucket rồi thoát"]
   end
   browser --> vite
   vite -->|"/api/*"| be
   browser -.->|"chế độ production-like<br/>http://localhost:3000"| be
   be --> mysql
-  be --> minio
+  be --> weed
   be --> tmp
-  init --> minio
+  init --> weed
 ```
 
 ### A3.5 Ánh xạ triển khai AWS (mục tiêu, chưa provisioning)
@@ -1043,7 +1049,7 @@ API-04, API-05: cửa sổ 15 phút, tối đa `AUTH_RATE_LIMIT_MAX` (20) reques
 | Metadata object | Chỉ `Content-Type` do server xác định |
 | Cách ghi | `lib-storage` `Upload` với `Body = fs.createReadStream(tmpPath)` (tự dùng multipart cho tệp lớn) |
 | S3 (M5) | Bật đủ Block Public Access; Object Ownership = BucketOwnerEnforced; SSE-S3; **tắt versioning** (nếu bật, DeleteObject chỉ tạo delete marker, trái BR-08); lifecycle `AbortIncompleteMultipartUpload` sau 1 ngày |
-| MinIO (local) | Bucket do `minio-init` tạo, không có anonymous policy |
+| SeaweedFS (local) | Bucket do `npm --prefix backend run storage:init` tạo (`S3_BUCKET` và `S3_BUCKET-test`); truy cập cần access key trong `docker/seaweedfs/s3.json`, không có quyền ẩn danh |
 
 ### A6.3 Upload (API-10)
 
@@ -1423,7 +1429,7 @@ X-Content-Type-Options: nosniff
 | Mục đích | Xoá vĩnh viễn |
 | Input · Ví dụ | CSRF header; không body · `DELETE /api/documents/3f2b…` |
 | Thành công | 204, **kể cả khi xoá object lỗi** sau COMMIT |
-| Lỗi · DB/Storage · Frontend | 401; 403; 404; 409 · §A6.7 · P-04, P-05, P-07 sau CD-01 |
+| Lỗi · DB/Storage · Frontend | 401; 403; 404 (không có 409, CR-007) · §A6.7 · P-04, P-05, P-07 sau CD-01 |
 
 ---
 
@@ -2238,15 +2244,16 @@ sequenceDiagram
 | Backend API / chế độ production-like (`SERVE_FRONTEND=true`) | `http://localhost:3000/api` / `http://localhost:3000` |
 | Backend instance thứ 2 (thử stateless) | `http://localhost:3001` (`PORT=3001`) |
 | MySQL | `localhost:3306`, DB `btl_cloud` / `btl_cloud_test`, user `btl` |
-| MinIO S3 API / console | `http://localhost:9000` / `http://localhost:9001` |
+| SeaweedFS S3 API (không có console) | `http://localhost:9000` |
 
 | Service | Image | Cấu hình | Volume · Healthcheck |
 |---|---|---|---|
 | `mysql` | `mysql:8.4` | `MYSQL_ROOT_PASSWORD=root_dev_password`, `MYSQL_DATABASE=btl_cloud`, `MYSQL_USER=btl`, `MYSQL_PASSWORD=btl_dev_password`; mount `docker/mysql/init` | `mysql-data` · `mysqladmin ping` |
-| `minio` | `minio/minio:<tag RELEASE ghim>` | `MINIO_ROOT_USER=minioadmin`, `MINIO_ROOT_PASSWORD=minioadmin-dev`; `server /data --console-address :9001` | `minio-data` · `/minio/health/live` |
-| `minio-init` | `minio/mc:<tag ghim>` | Chạy một lần: `mc alias set` → `mc mb --ignore-existing` cho `btl-cloud-documents` và `btl-cloud-documents-test`; **không** đặt anonymous policy | `depends_on: minio (healthy)` |
+| `seaweedfs` | `chrislusf/seaweedfs:4.48` | `server -dir=/data -master.volumeSizeLimitMB=1024 -volume.max=100 -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json`; cổng `9000:8333`; identity `minioadmin` / `minioadmin-dev` trong `docker/seaweedfs/s3.json` | `seaweedfs-data` · `wget http://127.0.0.1:9333/cluster/status` |
 
-`01-init.sql` (chỉ cho dev): tạo `btl_cloud_test` (`utf8mb4_0900_ai_ci`) và `GRANT ALL PRIVILEGES ON *.* TO 'btl'@'%'` (Prisma cần quyền tạo shadow DB). Các mật khẩu trên là **giá trị dev công khai**. Nếu không còn image MinIO dùng được (RK-06), thay bằng emulator S3 khác và ghi vào Nhật ký thay đổi baseline.
+Compose không tạo bucket: chạy `npm --prefix backend run storage:init` (tạo `btl-cloud-documents` và `btl-cloud-documents-test`, bỏ qua nếu đã có; không đặt quyền ẩn danh). `run.bat` dùng cùng `s3.json` và chạy S3 API thẳng ở `127.0.0.1:9000`.
+
+`01-init.sql` (chỉ cho dev): tạo `btl_cloud_test` (`utf8mb4_0900_ai_ci`) và `GRANT ALL PRIVILEGES ON *.* TO 'btl'@'%'` (Prisma cần quyền tạo shadow DB). Các mật khẩu trên là **giá trị dev công khai**. MinIO không còn image miễn phí (RK-06) nên đã thay bằng SeaweedFS (CR-001); tên access key `minioadmin` được giữ để `.env.example` không đổi.
 
 ### A10.2 Biến môi trường backend
 
@@ -2289,16 +2296,19 @@ sequenceDiagram
 ### A10.5 Khởi động và tắt
 
 ```text
-Lần đầu (đã có Docker Desktop và Node 24 – task M1-00):
-  1. docker compose up -d                     # đợi mysql healthy, minio-init thoát mã 0
+Windows không cần Docker: run.bat (tải MySQL/SeaweedFS portable, cài, tạo .env, migrate, storage:init, mở web) · run.bat stop
+
+Lần đầu với Docker Desktop và Node 24:
+  1. docker compose up -d --wait              # đợi mysql và seaweedfs healthy
   2. npm ci                                   # ở root; postinstall chạy npm ci trong backend/ và frontend/
   3. copy backend\.env.example backend\.env   # bash: cp backend/.env.example backend/.env
   4. npm --prefix backend run prisma:deploy
-  5. Terminal 1: npm --prefix backend run dev      → http://localhost:3000/api/health
-  6. Terminal 2: npm --prefix frontend run dev     → http://localhost:5173
+  5. npm --prefix backend run storage:init    # tạo bucket dev + test
+  6. Terminal 1: npm --prefix backend run dev      → http://localhost:3000/api/health
+  7. Terminal 2: npm --prefix frontend run dev     → http://localhost:5173
 
 Production-like (cùng origin, giống ALB):
-  npm --prefix frontend run build && npm --prefix backend run build
+  npm run build                              # build cả backend và frontend
   PowerShell: $env:SERVE_FRONTEND='true'; npm --prefix backend start      → http://localhost:3000
 Instance thứ 2:  PowerShell: $env:PORT='3001'; npm --prefix backend start
 
@@ -2312,9 +2322,11 @@ Graceful shutdown (SIGTERM/SIGINT): `server.close()` → chờ request đang ch�
 | Loại | Lệnh | Cần hạ tầng | Phạm vi |
 |---|---|---|---|
 | Backend unit | `npm --prefix backend test` | Không | policy, FileInspector, schema, mapper, content-disposition, ObjectStorage |
-| Backend integration | `npm --prefix backend run test:integration` | MySQL + MinIO, DB/bucket test | Supertest qua toàn app; lỗi storage giả lập bằng chèn lỗi hoặc dừng MinIO; chạy tuần tự |
+| Backend integration | `npm --prefix backend run test:integration` | MySQL + SeaweedFS, DB/bucket test | Supertest qua toàn app; lỗi storage giả lập bằng chèn lỗi; chạy tuần tự |
 | Frontend | `npm --prefix frontend test` | Không | RTL, mock `fetch`/XHR |
 | E2E | `npm --prefix frontend run test:e2e` | Stack production-like `:3000` | Playwright, FR-01…FR-09 |
+| UI mock | `npm --prefix frontend run test:ui` | Không | Playwright với API mock (`ui-tests/`) |
+| Kiểm chứng | `node scripts/verify/authz-matrix.mjs`, `upload-matrix.mjs` | Stack production-like `:3000` | Ma trận phân quyền và upload |
 | Như CI | `npm ci && npm run lint && npm run build && npm test` (root) | Không | Khớp job `ci-required` |
 
 ### A10.7 Giả định production
@@ -2326,7 +2338,7 @@ Một artifact cho mọi instance (§A3.7); instance giống hệt nhau, statele
 | Local | AWS | Thay đổi cấu hình |
 |---|---|---|
 | Container MySQL 8.4 | RDS MySQL 8.4 `db.t3.micro` Single-AZ, không public, DB subnet group 2 private subnet | `DATABASE_URL`, TLS |
-| MinIO bucket | S3 bucket private + S3 Gateway Endpoint | `S3_ENDPOINT` trống, path-style tắt, bỏ access key → IAM Role |
+| SeaweedFS bucket | S3 bucket private + S3 Gateway Endpoint | `S3_ENDPOINT` trống, path-style tắt, bỏ access key → IAM Role |
 | Backend `:3000` (và `:3001`) | EC2 trong ASG (2–4) trên 2 private subnet, cùng artifact, cổng 3000 | `SERVE_FRONTEND=true`, `TRUST_PROXY=1` |
 | Vite proxy `:5173` | ALB listener → target group HTTP:3000 | SPA do backend phục vụ |
 | `backend/tmp/uploads` | EBS gp3 root volume | `UPLOAD_TMP_DIR` |
@@ -2480,9 +2492,9 @@ Kết quả kiểm tra chéo (lệnh và số liệu): bằng chứng task M0-11
 
 ```text
 BASELINE_VERSION: 1.0
-DESIGN_STATUS: READY_FOR_OWNER_REVIEW
-CONTRACT_STATUS: PROPOSED
-OWNER_APPROVAL: PENDING
+DESIGN_STATUS: APPROVED
+CONTRACT_STATUS: APPROVED
+OWNER_APPROVAL: APPROVED (MILESTONES › OWNER DESIGN APPROVAL)
 ```
 
 **Quyết định chưa giải quyết** (chi tiết: CONTEXT §C6.6):

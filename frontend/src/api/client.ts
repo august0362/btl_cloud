@@ -1,4 +1,5 @@
 import { ApiError, notifyUnauthorized, responseError } from "./errors";
+import { backendUnavailable, reportConnectionFailure, reportConnectionSuccess } from "./serviceStatus";
 
 interface RequestOptions {
   body?: unknown;
@@ -9,6 +10,8 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  if (method !== "GET" && backendUnavailable())
+    throw new ApiError(0, "NETWORK_ERROR", "Máy chủ đang ngoại tuyến. Nội dung của bạn vẫn được giữ.");
   const headers: Record<string, string> = { Accept: "application/json" };
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method))
     headers["X-CSRF-Protection"] = "1";
@@ -33,12 +36,15 @@ export async function request<T>(
     ) {
       throw new ApiError(0, "ABORTED", "Đã huỷ yêu cầu.");
     }
+    reportConnectionFailure();
     throw new ApiError(
       0,
       "NETWORK_ERROR",
       "Không thể kết nối máy chủ. Kiểm tra mạng và thử lại.",
     );
   }
+  if (response.status >= 500) reportConnectionFailure();
+  else reportConnectionSuccess();
   if (response.status === 204) return undefined as T;
   let payload: unknown;
   try {

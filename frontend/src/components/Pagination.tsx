@@ -18,6 +18,7 @@ export function Pagination({
   return (
     <nav className="pagination" aria-label="Phân trang">
       <Button
+        requiresBackend
         variant="secondary"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
@@ -26,6 +27,7 @@ export function Pagination({
       </Button>
       {pages.map((number) => (
         <Button
+          requiresBackend
           key={number}
           variant={number === page ? "primary" : "ghost"}
           aria-current={number === page ? "page" : undefined}
@@ -36,6 +38,7 @@ export function Pagination({
         </Button>
       ))}
       <Button
+        requiresBackend
         variant="secondary"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}

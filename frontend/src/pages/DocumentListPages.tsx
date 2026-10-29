@@ -36,7 +36,7 @@ function DocumentListPage({ mine }: { mine: boolean }) {
     },
     [mine, filters, user?.id],
   );
-  const { data, error, loading, reload } = useResource(loader);
+  const { data, error, loading, reload } = useResource(loader, `${mine}:${user?.id ?? "guest"}`);
   const download = useDownload();
   const deletion = useDeleteDocument(() => {
     if (data?.items.length === 1 && (filters.page ?? 1) > 1)
@@ -64,7 +64,8 @@ function DocumentListPage({ mine }: { mine: boolean }) {
         {mine && <LinkButton to="/upload">Tải lên tài liệu</LinkButton>}
       </div>
       <SearchBar key={key} filters={filters} mine={mine} onChange={update} />
-      {error ? (
+      {error != null && data && <Alert tone="info">{errorMessage(error)} Đang hiển thị kết quả đã tải trước đó.</Alert>}
+      {error && !data ? (
         <Alert
           title={
             mine
