@@ -31,6 +31,13 @@ export function interruptOwned(child, executable, startedAt) {
     '-TargetProcessId', String(child.pid), '-ExpectedPath', executable, '-StartedAt', String(startedAt)], { timeout: 15_000 });
 }
 
+// Use this launcher's environment, so an earlier headless controller cannot suppress later clicks.
+export async function openBrowser(url, { env = process.env, runCommand = command } = {}) {
+  if (env.BTL_LOCAL_NO_BROWSER === '1') return;
+  // Wait for URL dispatch before this short-lived launcher exits.
+  await runCommand('rundll32.exe', ['url.dll,FileProtocolHandler', url], { env, quiet: true, timeout: 15_000 });
+}
+
 export async function notifyFailure(message, diagnosticPath) {
   if (process.env.BTL_LOCAL_NO_NOTIFY === '1' || process.platform !== 'win32') return;
   const text = `${message}\nNhật ký: ${diagnosticPath}`.replaceAll("'", "''");

@@ -3,7 +3,6 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createStackManager } from './stack-manager.mjs';
 import { createLogs } from './logs.mjs';
@@ -15,9 +14,8 @@ export { runtimeFile } from './local-config.mjs';
 export const origin = 'http://localhost:5173';
 const controllerPort = 3001;
 
-export function createController(manager, token, port = controllerPort, onShutdown, onFailure = () => {}, openBrowser, developerAuth = createDeveloperAuth()) {
+export function createController(manager, token, port = controllerPort, onShutdown, onFailure = () => {}, developerAuth = createDeveloperAuth()) {
   let shuttingDown = false;
-  let browserOpened = false;
   return createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -61,18 +59,11 @@ export function createController(manager, token, port = controllerPort, onShutdo
       } catch { reply(503, { error: 'Không đọc được tài khoản nhà phát triển. Hãy liên hệ người quản lý dự án.' }); return; }
     }
     if (req.method === 'GET' && req.url === '/status') { reply(200, { ...manager.status(), busy: shuttingDown || manager.status().busy }); return; }
-    const allowed = ['/start', '/stop', '/restart', '/start-all', ...(onShutdown ? ['/stop-all', '/shutdown'] : []), ...(openBrowser ? ['/open-browser'] : [])];
+    const allowed = ['/start', '/stop', '/restart', '/start-all', ...(onShutdown ? ['/stop-all', '/shutdown'] : [])];
     if (req.method !== 'POST' || req.headers['x-local-control'] !== '1' || !allowed.includes(req.url)) {
       reply(403, { error: 'Yêu cầu điều khiển không hợp lệ.' }); return;
     }
     if (shuttingDown) { reply(409, { error: 'Đang dừng toàn bộ dịch vụ.' }); return; }
-    if (req.url === '/open-browser') {
-      try {
-        if (!browserOpened) { browserOpened = true; await openBrowser(); }
-        reply(200, { opened: true });
-      } catch (error) { browserOpened = false; reply(503, { error: error.message }); }
-      return;
-    }
     if (req.url === '/stop-all' || req.url === '/shutdown') {
       shuttingDown = true;
       // Acknowledge through Vite before stopping Vite itself.
@@ -118,13 +109,7 @@ async function main() {
     await new Promise((resolve) => server.close(resolve));
     await rm(runtimeFile, { force: true });
   }
-  const openBrowser = async () => {
-    if (process.env.BTL_LOCAL_NO_BROWSER === '1') return;
-    const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', origin], { windowsHide: true, stdio: 'ignore' });
-    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
-    child.unref();
-  };
-  const server = createController(manager, token, controllerPort, close, failure, openBrowser);
+  const server = createController(manager, token, controllerPort, close, failure);
   server.requestTimeout = 900_000;
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(controllerPort, '127.0.0.1', resolve); });
   try {

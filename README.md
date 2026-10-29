@@ -37,7 +37,7 @@ Production-like: `npm run build`, đặt biến **của process** `SERVE_FRONTEN
 
 **Thành viên mới cần tài khoản developer:** sau khi clone, mở terminal ở gốc repo, chạy `npm ci`, rồi `npm --prefix backend run dev:account -- ten_cua_ban`. Lưu mật khẩu được in ra, mở Start.vbs và chọn **Đăng nhập nhà phát triển** trên web. Chỉ cấp một lần mỗi bản sao; những lần sau dùng lại tài khoản. Hướng dẫn chi tiết và lệnh cấp lại nằm bên dưới.
 
-Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShell; chỉ mở trình duyệt một lần trong mỗi phiên controller. Nhấn Start nhiều lần không tạo tiến trình hoặc tab trùng. **Stop.vbs** dừng toàn bộ. Trong terminal dùng `run.bat` / `run.bat start`, `run.bat stop`; `run.bat restart` dừng rồi bật lại. Nếu Start đang chạy, Stop/Restart chờ lượt để thực hiện; `run.bat status` vẫn đọc được trạng thái và log đã lọc bí mật. Không dùng launcher trên AWS/production.
+Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShell. Nếu dịch vụ đã chạy, bấm Start lần nữa sẽ mở lại web và giữ các dịch vụ hiện có. Các yêu cầu Start trùng trong lúc đang khởi động được gộp lại. **Stop.vbs** dừng toàn bộ. Trong terminal dùng `run.bat` / `run.bat start`, `run.bat stop`; `run.bat restart` dừng rồi bật lại. Nếu Start đang chạy, Stop/Restart chờ lượt để thực hiện; `run.bat status` vẫn đọc được trạng thái và log đã lọc bí mật. Không dùng launcher trên AWS/production.
 
 Controller Node duy nhất tại **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, thu stdout/stderr và giữ các handle/PID nó tạo. Dịch vụ chạy ẩn; cấu hình `.env`, thư mục MySQL, SeaweedFS và tài liệu đã có được giữ. Lần đầu vẫn dùng MySQL 8.4.7 / SeaweedFS 4.48 portable, `npm ci`, migration deploy và tạo bucket như launcher cũ; không reset DB. Biến `DEBUG` được bỏ riêng trong môi trường con của dịch vụ để tránh lỗi SeaweedFS. Backend không có watcher: dùng **Khởi động lại** sau khi sửa mã backend.
 
@@ -65,7 +65,7 @@ Docker vẫn tùy chọn: mặc định dùng Docker khi `docker info` thành c�
 
 Chỉ báo kết nối luôn hiện, độc lập hai công tắc: sage **Trực tuyến**, amber **Hoạt động hạn chế** (nêu dependency lỗi), coral **Ngoại tuyến**, cyan **Đang kết nối lại**. Dev kiểm tra health mỗi 12 giây khi tab hiện, khi focus, khi mạng trở lại và sau lỗi API. Nút **Thử kết nối lại** kiểm tra ngay. Bản nháp, tệp đã chọn và cache giữ trong trang; uploads/mutations không tự gửi lại. Tránh đóng/tải lại trang khi còn bản nháp.
 
-Toàn bộ launcher/controller/worker nằm ngoài `backend/src` và `backend/dist`; UI Tools chỉ được import trong `import.meta.env.DEV`, cầu nối chỉ đăng ký trong Vite dev. Express production không đăng ký endpoint control/diagnostic. Production giữ chỉ báo kết nối, không thêm polling định kỳ; không sửa AWS, EC2 Auto Scaling, deployment hay tạo tài nguyên cloud. Launcher từ chối NODE_ENV=production hoặc DB/storage không phải loopback. Các biến `BTL_LOCAL_NO_BROWSER=1`, `BTL_LOCAL_NO_NOTIFY=1` chỉ dành cho automation local.
+Toàn bộ launcher/controller/worker nằm ngoài `backend/src` và `backend/dist`; UI Tools chỉ được import trong `import.meta.env.DEV`, cầu nối chỉ đăng ký trong Vite dev. Express production không đăng ký endpoint control/diagnostic. Production giữ chỉ báo kết nối, không thêm polling định kỳ; không sửa AWS, EC2 Auto Scaling, deployment hay tạo tài nguyên cloud. Launcher từ chối NODE_ENV=production hoặc DB/storage không phải loopback. Các biến `BTL_LOCAL_NO_BROWSER=1`, `BTL_LOCAL_NO_NOTIFY=1` chỉ dành cho automation local; bỏ mở trình duyệt được xét theo từng lần chạy launcher.
 
 Kiểm tra:
 
