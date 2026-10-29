@@ -44,17 +44,14 @@ test('controller requires capability + exact Host/Origin + write header; denies 
   } finally { await close(server); }
 });
 
-test('Stop All acknowledges before shutting down services and controller; browser opens once', async () => {
+test('Stop All acknowledges before shutting down services and controller', async () => {
   const calls = [];
   let stopped = false;
-  let browserCount = 0;
   const manager = { status: () => ({ state: 'running' }), execute: async (action) => { calls.push(action); } };
-  const server = createController(manager, 'token', 0, () => { stopped = true; }, () => {}, async () => { browserCount++; });
+  const server = createController(manager, 'token', 0, () => { stopped = true; });
   const port = await listen(server);
   const headers = { Origin: origin, Authorization: 'Bearer token', 'X-Local-Control': '1' };
   try {
-    for (let i = 0; i < 2; i++) await fetch(`http://127.0.0.1:${port}/open-browser`, { method: 'POST', headers });
-    assert.equal(browserCount, 1);
     const response = await fetch(`http://127.0.0.1:${port}/stop-all`, { method: 'POST', headers });
     assert.equal(response.status, 202);
     assert.equal((await response.json()).accepted, true);

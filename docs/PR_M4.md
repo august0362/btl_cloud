@@ -1,3 +1,5 @@
+> Hồ sơ lịch sử: [PR #1](https://github.com/august0362/btl_cloud/pull/1) đã được gộp vào main. Các số liệu dưới đây thuộc lượt M4; xem MILESTONES cho phần còn chờ nghiệm thu.
+
 Tích hợp local prototype để nhóm tiếp tục phát triển.
 
 - CR-006: một bảng màu sáng/tối theo hệ thống; bỏ picker, provider, palette/PNG và theme test.
@@ -23,6 +25,6 @@ Tích hợp local prototype để nhóm tiếp tục phát triển.
 
 Thử nhanh: Node 24, chạy run.bat (Windows không Docker), vào http://localhost:5173/register; dừng bằng run.bat stop. Nhánh Docker có hướng dẫn, chưa chạy vì máy không có Docker. Prototype chấp nhận object mồ côi sau lỗi/crash và concurrent replace last-write-wins. Không thực hiện công việc AWS.
 
-Không merge PR này tự động. Owner: review/merge, bật branch protection với ci-required + code owner review, mời collaborators, chạy M4-12/M4-G. Không thay .github trong PR này.
+Việc owner còn cần làm: kiểm quyền cộng tác/branch protection và chạy M4-12/M4-G. Hồ sơ này không xác nhận nghiệm thu cuối hoặc triển khai AWS.
 
 CI local và ci-required GitHub đã PASS tại 5922964: https://github.com/august0362/btl_cloud/actions/runs/39898331031. UI suite mock bổ sung: 7/7. Thống kê source/test/schema/tooling (không docs/JSON/lockfiles): xoá 1.738 dòng, giảm ròng 1.294 dòng, xoá 22 PNG. Bằng chứng đầy đủ: docs/MILESTONES.md.

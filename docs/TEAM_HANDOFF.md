@@ -2,8 +2,8 @@
 
 Đối chiếu ngày 29/10/2026 với hai tài liệu trong `pdf/`:
 
-- [Hướng dẫn bài tập lớn](../pdf/Bài%20tập%20lớn%20cuối%20kỳ%20-%20Hướng%20dẫn.pdf), trang 1–3: tám hạng mục bắt buộc, sản phẩm nộp, trách nhiệm cá nhân và hạn nộp.
-- [Đề xuất của nhóm](../pdf/Đề%20xuất%20BTL%20Cloud%20Trần%20Anh%20Việt%2024020362.pdf), trang 1–3: thành viên, kiến trúc, phân công và demo 10 phút.
+- **Bài tập lớn cuối kỳ - Hướng dẫn.pdf**, trang 1–3: tám hạng mục bắt buộc, sản phẩm nộp, trách nhiệm cá nhân và hạn nộp.
+- **Đề xuất BTL Cloud Trần Anh Việt 24020362.pdf**, trang 1–3: thành viên, kiến trúc, phân công và demo 10 phút.
 
 ## 1. Điểm bắt đầu
 
@@ -11,14 +11,14 @@
 
 Theo hướng dẫn PDF, phần CLO4 chiếm 80% điểm bài tập lớn và yêu cầu hạ tầng chạy/demo được. Việc tiếp theo của nhóm là hoàn thành tám hạng mục cloud dựa trên ứng dụng đã có. Mỗi người vẫn cần hiểu, kiểm chứng và giải thích được phần mình cùng kiến trúc tổng thể.
 
-**Nhánh bàn giao:** [`chore/local-developer-handoff`](https://github.com/august0362/btl_cloud/tree/chore/local-developer-handoff), gồm launcher, công cụ developer và hướng dẫn này. Thành viên clone đúng nhánh để nhận đầy đủ bản bàn giao. `pdf/` được Git bỏ qua; gửi riêng hai PDF cho nhóm.
+**Nguồn code:** launcher, đăng nhập developer và tài liệu bàn giao đã có trên [`main`](https://github.com/august0362/btl_cloud/tree/main) qua PR #2. Thành viên clone main để bắt đầu; mỗi đầu việc làm trên nhánh riêng và gửi PR. `pdf/` được Git bỏ qua, nhóm chia sẻ PDF riêng.
 
 ## 2. Mỗi thành viên chạy trên máy mình
 
 Cài Node.js 24 và Git. Trên Windows, chạy:
 
 ```powershell
-git clone --branch chore/local-developer-handoff https://github.com/august0362/btl_cloud.git BTL_Cloud
+git clone https://github.com/august0362/btl_cloud.git BTL_Cloud
 cd BTL_Cloud
 npm ci
 npm --prefix backend run dev:account -- ten_cua_ban

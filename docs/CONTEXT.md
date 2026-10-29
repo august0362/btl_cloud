@@ -6,27 +6,22 @@
 
 **Mục lục:** [C0 Nguồn](#c0-nguồn-và-quy-ước) · [C1 Tổng quan](#c1-tổng-quan) · [C2 Phạm vi](#c2-phạm-vi) · [C3 Tác nhân và quyền](#c3-tác-nhân-và-quyền) · [C4 Yêu cầu chức năng](#c4-yêu-cầu-chức-năng) · [C5 Phi chức năng](#c5-yêu-cầu-phi-chức-năng) · [C6 Giả định, rủi ro, quyết định](#c6-giả-định-ràng-buộc-rủi-ro-quyết-định) · [C7 Scope Freeze](#c7-scope-freeze--requirements-baseline)
 
----
-
 ## C0. Nguồn và quy ước
 
 | # | Nguồn | Vai trò |
 |---|---|---|
-| S1 | Yêu cầu M0 của owner (2026-10-20) | FR-01…FR-09 và các quy tắc bắt buộc |
-| S2 | `C:\Users\admin\Desktop\Đề xuất BTL Cloud Trần Anh Việt 24020362.pdf` | **Baseline nghiệp vụ** (đề xuất đã nộp) |
-| S3 | `C:\Users\admin\Downloads\Đề xuất BTL Cloud.docx` | Bản nguồn của S2: sơ đồ kiến trúc (ASG "2 EC2 ban đầu, tối đa 4", S3 qua VPC Endpoint) và ảnh AWS Pricing Calculator |
-| S4 | 3 bản nháp docx khác trên Desktop | Khác câu chữ, không đổi phạm vi |
-| S5 | `C:\Users\admin\Desktop\Bài tập lớn cuối kỳ - Hướng dẫn đề xuất dự án - Student-1.pdf` | 8 hạng mục bắt buộc, mốc thời gian, tiêu chí từ chối |
-| S6 | `README.md`, `.github/` trong repo | Quy trình PR, CI `ci-required`; chưa có mã ứng dụng |
-| S7 | Trả lời của owner (2026-10-20) | AWS cá nhân + credits; làm local trước, chưa deploy; HTTPS và egress chốt ở M5 |
+| S1 | Yêu cầu M0 của owner (20/10/2026) | FR-01…09 và quy tắc bắt buộc |
+| S2 | `pdf/Đề xuất BTL Cloud Trần Anh Việt 24020362.pdf` | Baseline nghiệp vụ, kiến trúc và phân công đã nộp |
+| S3/S4 | Bản nguồn và các nháp Word trước đây | Lịch sử đối chiếu; sơ đồ ASG 2–4 EC2, S3 Endpoint và ảnh dự toán |
+| S5 | `pdf/Bài tập lớn cuối kỳ - Hướng dẫn.pdf` | Tám hạng mục, mốc thời gian và cách chấm |
+| S6 | README, mã nguồn và .github trong repo | Cách chạy, hợp đồng thực tế, PR/CI |
+| S7 | Owner chốt ngày 20/10/2026 | AWS cá nhân/credits; làm local trước; HTTPS/egress quyết định ở M5 |
 
-Không có tệp tên đúng `BTL Cloud.docx`; S3 là bản gần nhất (DS-02). Các tệp S2–S5 nằm ngoài repo.
+Thư mục pdf không theo Git, nhóm chia sẻ riêng. Các sai lệch lịch sử còn cần xử lý được giữ ở §C6.5.
 
-**Quy ước ID:** `FR`, `AC`, `BR`, `NFR`, `AS`, `CN`, `RK`, `DS`, `OD` được định nghĩa ở tài liệu này; `D`, `UC`, `API`, `P`, `SEQ`, `CD`, `F`, `U`, `INV` ở ARCHITECTURE; `M<n>-xx` (task) và `ACC` (nghiệm thu) ở MILESTONES.
+**Quy ước:** FR/AC/BR/NFR là chức năng/tiêu chí/quy tắc/phi chức năng; CN/AS/RK/DS/OD là ràng buộc/giả định/rủi ro/sai lệch/quyết định trong tài liệu này. D/UC/API/P/SEQ/CD/F/U/INV ở ARCHITECTURE; task M<n>-xx và nghiệm thu ACC ở MILESTONES.
 
-**Thuật ngữ:** **Guest** = chưa đăng nhập · **User** = đã đăng nhập · **Owner** = User đã tải lên tài liệu đang xét · **metadata** = tiêu đề, mô tả, chế độ hiển thị, tên tệp, kích thước… · **object** = byte của tệp trong object storage.
-
----
+**Thuật ngữ:** Guest chưa đăng nhập; User đã đăng nhập; Owner sở hữu tài liệu đang xét; metadata là thông tin tài liệu, object là byte tệp trong storage.
 
 ## C1. Tổng quan
 
@@ -49,8 +44,6 @@ Không có tệp tên đúng `BTL Cloud.docx`; S3 là bản gần nhất (DS-02)
 | CSDL quan hệ (RDS MySQL; local: MySQL) | Người dùng, phiên, tài liệu, quan hệ sở hữu cần ràng buộc toàn vẹn và truy vấn lọc/phân trang |
 | Compute mở rộng ngang (EC2 + ALB + ASG) | Tải dao động theo mùa thi. Ứng dụng stateless nên thêm/bớt instance mà không mất phiên hay dữ liệu |
 | Block storage (EBS) | Ổ hệ điều hành và vùng đệm tạm khi nhận tệp upload |
-
----
 
 ## C2. Phạm vi
 
@@ -79,8 +72,6 @@ Mạng xã hội (bình luận, đánh giá, theo dõi, chia sẻ cho người c
 
 Chuyển từ local lên AWS **chỉ đổi cấu hình**, không đổi kiến trúc hay mã nguồn (NFR-POR-01).
 
----
-
 ## C3. Tác nhân và quyền
 
 ### C3.1 Tác nhân
@@ -105,8 +96,6 @@ Chuyển từ local lên AWS **chỉ đổi cấu hình**, không đổi kiến 
 | Sửa metadata / đổi chế độ, thay tệp, xoá | ❌ 401 | ❌ Public 403 · Private 404 | ✅ |
 
 Tài liệu Private của người khác được đối xử **như không tồn tại** (404) để không lộ sự tồn tại của nó. Tài liệu Public vốn đã công khai, nên thao tác trái phép trên nó trả 403 (OD-03).
-
----
 
 ## C4. Yêu cầu chức năng
 
@@ -225,8 +214,6 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | Lỗi | Không phải owner → 403/404. Storage lỗi khi xoá object → vẫn báo thành công (metadata đã xoá); object có thể còn lại, log WARN `storage.orphan` để xử lý thủ công |
 | Tiêu chí chấp nhận | **AC-09.1** Sau khi xoá, chi tiết/tải xuống → 404 với mọi người. **AC-09.2** Object không còn trong bucket khi storage hoạt động; nếu DeleteObject lỗi thì có log `storage.orphan` chứa key. **AC-09.3** Bấm "Huỷ" ở hộp thoại → không có gì thay đổi |
 
----
-
 ## C5. Yêu cầu phi chức năng
 
 **M** = bắt buộc (có trong S1/S2/S5) · **P** = mục tiêu do thiết kế đề xuất. Không có con số hiệu năng nào được bịa ra; mọi số liệu tải sẽ đo ở M5.
@@ -265,8 +252,6 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | NFR-POR-02 | Cấu hình qua biến môi trường, kiểm tra khi khởi động | P | Test config |
 | NFR-CST-01 | Có dự toán chi phí tháng theo kiến trúc cuối | M (S5 #8) | M5 |
 
----
-
 ## C6. Giả định, ràng buộc, rủi ro, quyết định
 
 ### C6.1 Ràng buộc tệp và xác thực
@@ -282,7 +267,7 @@ Xác thực: một mô hình duy nhất là **phiên lưu DB + cookie HttpOnly**
 
 ### C6.2 Thời gian và ngân sách
 
-| Mốc học phần (S5) | Hạn (đọc từ bảng bị vỡ định dạng, cần owner xác nhận, AS-06) |
+| Mốc học phần (S5) | Hạn (đã đối chiếu PDF S5, trang 3) |
 |---|---|
 | HP-M1 Chốt nhóm · HP-M2 Nộp đề xuất | 19/10/2026 |
 | HP-M3 Giảng viên duyệt | 21/10/2026 |
@@ -300,7 +285,7 @@ Kế hoạch S2 kéo dài 3 tuần, nhóm 4 người. Phân công con người t
 | AS-03 | Trình duyệt: Chrome, Edge, Firefox bản hiện hành trên desktop và di động |
 | AS-04 | Quy mô demo: vài chục người dùng, vài trăm tài liệu; `LIKE` là đủ, chưa cần full-text |
 | AS-05 | Tài khoản AWS cá nhân có credits, đủ quyền tạo IAM/VPC/ALB/ASG/RDS/S3/CloudWatch; region `us-east-1` |
-| AS-06 | Cách đọc mốc thời gian ở C6.2 là đúng |
+| AS-06 | Mốc thời gian ở C6.2 được đối chiếu trực tiếp với PDF S5, trang 3 |
 | AS-07 | Không có yêu cầu pháp lý đặc thù; người tải lên chịu trách nhiệm nội dung |
 
 Bất định về cloud: chưa kiểm tra hạn mức (quota) của tài khoản (M5-09); credits có thể có hạn dùng (theo dõi bằng AWS Budgets); HTTPS (OD-05) và egress (OD-06) chưa chốt nhưng không chặn M1–M4.
@@ -355,8 +340,6 @@ Baseline được viết theo **đề xuất mặc định** cho tới khi owner
 | OD-12 | Phiên cố định 7 ngày, không gia hạn trượt? | Có | — |
 | OD-13 | Node.js 24 LTS cho dev, CI (`lts/*`) và EC2? | Có | M1 |
 | OD-14 | Local dùng Docker Desktop hay cài MySQL/MinIO trực tiếp? | Cả hai: Docker Compose, hoặc `run.bat` với MySQL/SeaweedFS portable (CR-004) | M1 |
-
----
 
 ## C7. Scope Freeze / Requirements Baseline
 

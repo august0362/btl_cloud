@@ -16,7 +16,7 @@ async function fixture(t, provision = true) {
   const auth = createDeveloperAuth({ file, now: () => time });
   const actions = [];
   const manager = { status: () => ({ state: 'stopped', logs: [{ message: 'private diagnostics' }] }), execute: async (action) => { actions.push(action); } };
-  const server = createController(manager, 'test-capability', 0, undefined, undefined, undefined, auth);
+  const server = createController(manager, 'test-capability', 0, undefined, undefined, auth);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(async () => {

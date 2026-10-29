@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { root, runtimeDir, runtimeFile, diagnosticFile, projectId, localConfig } from './local-config.mjs';
 import { createLogs } from './logs.mjs';
-import { notifyFailure } from './commands.mjs';
+import { notifyFailure, openBrowser } from './commands.mjs';
 import { origin } from './controller.mjs';
 import { acquireLauncherLock } from './launcher-lock.mjs';
 
@@ -100,7 +100,7 @@ async function main() {
     try { await request('start-all'); } catch (error) { failure = error; }
     const status = await current();
     if (status?.services?.find((service) => service.name === 'frontend')?.state === 'running') {
-      await request('open-browser');
+      await openBrowser(origin);
       if (failure) { console.error('Một dịch vụ chưa sẵn sàng. Xem Services trong web.'); process.exitCode = 1; }
       else console.log('BTL Cloud đã sẵn sàng: http://localhost:5173');
     } else throw failure ?? new Error('Không khởi động được giao diện.');
