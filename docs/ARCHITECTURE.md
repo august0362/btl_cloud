@@ -10,8 +10,6 @@
 
 **Mục lục:** [A1 Quyết định](#a1-quyết-định-kiến-trúc) · [A2 Use Case](#a2-ngữ-cảnh-và-use-case) · [A3 Kiến trúc ứng dụng](#a3-kiến-trúc-ứng-dụng) · [A4 Cơ sở dữ liệu](#a4-cơ-sở-dữ-liệu) · [A5 Xác thực, phân quyền](#a5-xác-thực-và-phân-quyền) · [A6 Storage, vòng đời](#a6-object-storage-và-vòng-đời-tài-liệu) · [A7 API Contract](#a7-rest-api-contract) · [A8 Frontend UX/UI](#a8-frontend-uxui) · [A9 Sơ đồ tuần tự](#a9-sơ-đồ-tuần-tự) · [A10 Local và AWS](#a10-local-và-aws) · [A11 Kiểm tra nhất quán](#a11-kiểm-tra-nhất-quán)
 
----
-
 ## A1. Quyết định kiến trúc
 
 ### A1.1 Technology stack
@@ -133,8 +131,6 @@ flowchart LR
 - Mọi quyết định phân quyền tài liệu nằm trong `document.policy.ts` (RK-02).
 - Frontend: `components` không gọi `api` (nhận dữ liệu/callback qua props); chỉ `api/*` được gọi `fetch`/`XMLHttpRequest`. Không có mũi tên ngược; khuyến nghị lint rule `no-restricted-imports`.
 
----
-
 ## A2. Ngữ cảnh và Use Case
 
 ### A2.1 Sơ đồ ngữ cảnh
@@ -197,81 +193,55 @@ Ma trận quyền nghiệp vụ: CONTEXT §C3.2.
 
 ### A2.4 Mô tả Use Case
 
-Luồng chi tiết từng bước có trong sơ đồ SEQ tương ứng (§A9).
+Giữ actor, dữ liệu vào, luồng chính, kết quả và lỗi quan trọng ở đây; chi tiết payload ở §A7, trạng thái màn hình ở §A8 và luồng tuần tự ở §A9.
 
 **UC-01 Đăng ký** · Guest · FR-01 · API-04 · P-03 · SEQ-01
-- Trigger/Input · Tiền điều kiện: gửi form `displayName`, `email`, `password` (+ `confirmPassword`, chỉ kiểm phía client) · không.
-- Luồng chính: FE validate → API-04 → CSRF, rate limit, schema → chuẩn hoá email, băm mật khẩu → transaction INSERT `users` + `sessions` → 201 + `Set-Cookie` → FE cập nhật AuthProvider, chuyển tới `/me/documents`.
-- Lỗi: 400 (theo trường), 409 `EMAIL_ALREADY_EXISTS` (trường Email), 429, 500.
-- Kết quả: `UserDto` + cookie; có 1 user và 1 phiên, đang đăng nhập.
+- Gửi `displayName, email, password`; confirmPassword chỉ kiểm tại FE. Sau CSRF/rate limit/schema: chuẩn hoá email → băm mật khẩu → transaction INSERT users + sessions → 201 UserDto/cookie → vào kho cá nhân.
+- Lỗi: 400 theo trường, 409 EMAIL_ALREADY_EXISTS tại Email, 429, 500. Thành công tự đăng nhập.
 
 **UC-02 Đăng nhập** · Guest · FR-01 · API-05 · P-02 · SEQ-01
-- Trigger/Input · Tiền điều kiện: gửi form `email`, `password` (có thể kèm `?redirect=`) · có tài khoản.
-- Luồng chính: API-05 → tìm user theo email chuẩn hoá, verify argon2id → xoá phiên cũ theo cookie (nếu có) → INSERT `sessions` → 200 + `Set-Cookie` → chuyển tới `redirect` an toàn hoặc `/me/documents`.
-- Lỗi: 401 `INVALID_CREDENTIALS` (cùng một thông báo cho email sai và mật khẩu sai), 429.
-- Kết quả: phiên mới còn hạn 7 ngày; phiên cũ trên trình duyệt này bị xoá.
+- Tài khoản đã có; gửi email/password và redirect nếu cần. Verify Argon2id → xoá phiên cũ trên trình duyệt → tạo phiên mới → 200/cookie → redirect an toàn hoặc kho cá nhân.
+- Email/mật khẩu sai dùng chung INVALID_CREDENTIALS (401); quá giới hạn 429. Phiên mới mặc định 7 ngày.
 
 **UC-03 Đăng xuất** · User · FR-01 · API-06 · AppHeader · SEQ-01
-- Trigger/Input · Tiền điều kiện: bấm "Đăng xuất", cookie phiên · không bắt buộc (idempotent).
-- Luồng chính: API-06 → DELETE `sessions` theo hash cookie → 204 + xoá cookie → FE đặt Guest, về `/`.
-- Lỗi: lỗi mạng → FE vẫn đặt Guest; phiên server tự hết hạn theo TTL.
-- Kết quả: cookie cũ vô hiệu trên mọi instance (AC-01.4).
+- Xoá phiên theo hash cookie → 204 + xoá cookie → FE đặt Guest, về trang chủ. Endpoint idempotent, không bắt buộc phiên hợp lệ.
+- Cookie cũ vô hiệu trên mọi instance; lỗi mạng thì FE vẫn bỏ trạng thái đăng nhập, phiên server tự hết hạn theo TTL.
 
-**UC-04 Tìm kiếm, duyệt tài liệu Public** · Guest/User · FR-02 · API-07 · P-01 · SEQ-04
-- Trigger/Input · Tiền điều kiện: mở `/` hoặc gửi SearchBar; `q`, `fileType`, `sort`, `page` (đồng bộ URL) · không.
-- Luồng chính: FE đọc URL → API-07 → SQL với `visibility='PUBLIC'` → lưới thẻ + phân trang.
-- Lỗi: 400 (URL sửa tay → FE đưa về mặc định); 500/mạng → Alert + "Thử lại"; rỗng → EmptyState.
-- Kết quả: `Page<DocumentDto>` chỉ gồm tài liệu Public; không thay đổi dữ liệu.
+**UC-04 Tìm kiếm Public** · Guest/User · FR-02 · API-07 · P-01 · SEQ-04
+- Mở trang hoặc gửi q/fileType/sort/page từ URL → query chỉ PUBLIC → Page<DocumentDto>, lưới thẻ và phân trang.
+- URL sai được FE chuẩn hoá; lỗi server/mạng có Thử lại; rỗng có EmptyState. Không thay đổi dữ liệu.
 
-**UC-05 Xem chi tiết tài liệu** · Guest/User/Owner · FR-02, FR-06 · API-09 · P-04, P-07
-- Trigger/Input · Tiền điều kiện: bấm tiêu đề hoặc mở link `/documents/:id` · không.
-- Luồng chính: API-09 → Public: trả cho mọi người; Private: chỉ trả cho owner → hiển thị metadata và hành động theo vai trò (`isOwner`, §A8.6).
-- Lỗi: không tồn tại hoặc Private của người khác → 404 `DOCUMENT_NOT_FOUND`.
-- Kết quả: `DocumentDto`; không thay đổi dữ liệu.
+**UC-05 Xem chi tiết** · Guest/User/Owner · FR-02, FR-06 · API-09 · P-04, P-07
+- Mở `/documents/:id` → Public trả cho mọi người, Private chỉ owner → metadata và hành động theo isOwner.
+- Không tồn tại/Private của người khác trả 404 DOCUMENT_NOT_FOUND. Không thay đổi dữ liệu.
 
-**UC-06 Tải xuống** · User · FR-03 · API-03 + API-13 · P-01, P-04, P-05 · SEQ-05
-- Trigger/Input · Tiền điều kiện: bấm "Tải xuống"; `id` + cookie · đã đăng nhập, có quyền xem.
-- Luồng chính: FE gọi API-03 để chắc còn phiên → điều hướng thẻ `<a>` ẩn tới `/api/documents/{id}/download` → backend `requireAuth` + `canView` → GetObject → stream với `Content-Disposition: attachment`.
-- Lỗi: `user = null` → `/login?redirect=…`; 401/404 phát sinh giữa hai bước → trình duyệt hiện JSON lỗi (hạn chế đã biết); storage lỗi trước header → 503; lỗi giữa chừng → kết nối bị huỷ.
-- Kết quả: byte tệp đúng tên gốc; không thay đổi dữ liệu.
+**UC-06 Tải xuống** · User có quyền xem · FR-03 · API-03 + API-13 · P-01, P-04, P-05 · SEQ-05
+- Bấm Tải xuống → FE kiểm phiên qua API-03 → điều hướng link tải → backend requireAuth + canView → GetObject và stream attachment, đúng tên/nội dung tệp.
+- Hết phiên chuyển tới login kèm redirect; 401/404 giữa hai bước có thể hiện JSON. Storage lỗi trước header trả 503, sau header ngắt kết nối.
 
 **UC-07 Tải lên** · User · FR-04, FR-05 · API-10 · P-06 · SEQ-02, SEQ-03
-- Trigger/Input · Tiền điều kiện: bấm "Tải lên"; `file`, `title`, `description?`, `visibility` · đã đăng nhập.
-- Luồng chính: FE kiểm đuôi/kích thước/trường → API-10 (XHR có tiến độ) → CSRF → auth → multer ghi tệp tạm → validate → FileInspector → PutObject → INSERT `documents` → 201 → toast, tới `/me/documents`.
-- Lỗi: 413, 415, 400, 503, 500, người dùng huỷ. **Mọi lỗi: không có bản ghi `documents`.**
-- Kết quả: tài liệu mới `fileVersion = 1`; nếu Public thì có trong tìm kiếm.
+- Gửi file/title/description?/visibility bằng XHR có tiến độ. CSRF/auth → tệp tạm → validate/FileInspector → PutObject → INSERT documents → 201, fileVersion=1 → kho cá nhân; Public xuất hiện trong tìm kiếm.
+- Sai input/loại/kích thước: 400/415/413; storage 503; DB 500; cho phép huỷ. Lỗi trước INSERT không tạo metadata, tệp tạm được dọn và object mới được thử xoá khi cần bù trừ.
 
-**UC-08 Xem kho cá nhân** · User · FR-06 · API-08 · P-05
-- Trigger/Input · Tiền điều kiện: mở `/me/documents`; `q`, `visibility`, `fileType`, `sort`, `page` · đã đăng nhập (`RequireAuth`).
-- Luồng chính: API-08 lọc `owner_id = userId` → bảng/thẻ có nhãn chế độ và hành động Tải xuống/Sửa/Xoá.
-- Lỗi: 401 → xử lý hết phiên (§A8.6); rỗng → EmptyState + "Tải lên tài liệu đầu tiên".
-- Kết quả: `Page<DocumentDto>` gồm cả Public và Private của chính User; không thay đổi dữ liệu.
+**UC-08 Kho cá nhân** · User · FR-06 · API-08 · P-05
+- RequireAuth; q/visibility/fileType/sort/page từ URL → lọc owner_id=userId → Page<DocumentDto> gồm Public/Private của mình, kèm hành động quản lý.
+- 401 xử lý hết phiên; rỗng có lời mời tải lên. Không thay đổi dữ liệu.
 
 **UC-09 Sửa metadata** · Owner · FR-07 · API-11 · P-07
-- Trigger/Input · Tiền điều kiện: bấm "Lưu thay đổi"; `title?`, `description?` (chỉ trường đã đổi) · đã đăng nhập, là owner.
-- Luồng chính: API-11 → CSRF → auth → loader + `canManage` → validate → UPDATE → 200 → toast "Đã lưu thay đổi".
-- Lỗi: 403/404, 400 theo trường, 401.
-- Kết quả: `DocumentDto` mới; `updated_at` đổi; tệp và `file_version` giữ nguyên.
+- Gửi title?/description? đã đổi → CSRF/auth/canManage → validate → UPDATE → 200 DocumentDto mới. updated_at đổi; tệp và fileVersion giữ nguyên.
+- Lỗi: 400 theo trường, 401, 403/404. Không gửi trường chưa đổi.
 
-**UC-10 Đổi chế độ hiển thị** · Owner · FR-07 · API-11 · P-07
-- Trigger/Input · Tiền điều kiện: đổi radio chế độ rồi lưu; `visibility` · đã đăng nhập, là owner.
-- Luồng chính: Private → Public phải qua CD-03 → API-11 với `visibility` → hiệu lực ngay với API-07/09/13.
-- Lỗi: như UC-09; huỷ ở CD-03 → không gọi API.
-- Kết quả: chuyển sang Private thì biến mất khỏi tìm kiếm, User khác nhận 404.
+**UC-10 Đổi chế độ** · Owner · FR-07 · API-11 · P-07
+- Gửi visibility đã đổi; Private → Public phải xác nhận CD-03. Đổi chế độ có hiệu lực ngay với tìm kiếm/xem/tải.
+- Huỷ dialog không gọi API; lỗi như UC-09. Chuyển Private làm tài liệu biến mất khỏi tìm kiếm và user khác nhận 404.
 
-**UC-11 Thay thế tệp** · Owner · FR-08 · API-12 · P-07 · SEQ-07, SEQ-08
-- Trigger/Input · Tiền điều kiện: chọn tệp mới, xác nhận CD-02; `file` · đã đăng nhập, là owner.
-- Luồng chính: PutObject key mới → UPDATE theo id, tăng file_version → thử xoá key cũ → 200.
-- Lỗi: 413/415/400, 503, 404 (bị xoá đồng thời), 500. Lỗi trước UPDATE: vẫn trỏ tệp cũ.
-- Kết quả: `DocumentDto` với `fileVersion` + 1, visibility không đổi; tải xuống trả tệp mới; thử xoá object cũ ngay.
+**UC-11 Thay tệp** · Owner · FR-08 · API-12 · P-07 · SEQ-07, SEQ-08
+- Chọn file, xác nhận CD-02 → PutObject key mới → UPDATE file fields, tăng fileVersion → thử xoá key cũ → 200. Giữ id/title/description/visibility.
+- 400/413/415, 503, 404 nếu bị xoá đồng thời, 500. Lỗi trước UPDATE giữ tham chiếu cũ; object thừa được thử xoá theo best-effort.
 
 **UC-12 Xoá vĩnh viễn** · Owner · FR-09 · API-14 · P-04, P-05, P-07 · SEQ-09
-- Trigger/Input · Tiền điều kiện: bấm Xoá, xác nhận CD-01; `id` · đã đăng nhập, là owner.
-- Luồng chính: DELETE documents theo id → thử xoá object theo key của dòng vừa xoá → 204.
-- Lỗi: 403/404; storage lỗi khi xoá object → vẫn 204, WARN storage.orphan.
-- Kết quả: tài liệu không còn (404 ở mọi endpoint); object được thử xoá ngay; lỗi xoá ghi storage.orphan.
-
----
+- Xác nhận CD-01 → DELETE metadata theo id → thử xoá object của dòng vừa xoá → 204; tài liệu mất khỏi danh sách và các endpoint trả 404.
+- 401/403/404 theo quyền; xoá object lỗi vẫn 204, ghi WARN storage.orphan để xử lý thủ công.
 
 ## A3. Kiến trúc ứng dụng
 
@@ -653,7 +623,7 @@ flowchart LR
   subgraph devbox["Máy dev: Windows 11"]
     browser["Trình duyệt<br/>http://localhost:5173"]
     vite["Vite dev server :5173<br/>proxy /api"]
-    be["Backend :3000<br/>tuỳ chọn instance thứ 2 :3001"]
+    be["Backend :3000<br/>tuỳ chọn instance thứ 2 :3002"]
     tmp[("backend/tmp/uploads")]
     subgraph compose["Docker Compose hoặc run.bat (portable)"]
       mysql[("MySQL 8.4 :3306<br/>btl_cloud, btl_cloud_test")]
@@ -775,8 +745,6 @@ flowchart TB
 ```
 
 Hệ quả quan trọng: **xác thực và phân quyền chạy trước khi nhận tệp upload**. Request chưa đăng nhập hoặc không phải owner không thể khiến server ghi 50 MB xuống đĩa.
-
----
 
 ## A4. Cơ sở dữ liệu
 
@@ -917,8 +885,6 @@ Vòng đời object: PutObject → được `documents` tham chiếu → thay/xo
 - Production: `npm --prefix backend run prisma:deploy` (= `prisma migrate deploy`) chạy một lần trước khi rollout (Prisma có advisory lock). Migration phải tương thích ngược (expand → deploy → contract), vì ASG chạy song song phiên bản cũ và mới.
 - Nếu Prisma major mới yêu cầu driver adapter cho MySQL: làm theo hướng dẫn chính thức và ghi vào bằng chứng M1-05; schema logic không đổi.
 
----
-
 ## A5. Xác thực và phân quyền
 
 ### A5.1 Mô hình và mật khẩu
@@ -1028,7 +994,15 @@ API-04, API-05: cửa sổ 15 phút, tối đa `AUTH_RATE_LIMIT_MAX` (20) reques
 - **Header:** `helmet`, CSP `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`; `nosniff`; `Referrer-Policy: no-referrer`; HSTS chỉ khi bật. JSON dưới `/api` có `Cache-Control: no-store`. FE không dùng inline script, không chèn `<style>`, không tải font/ảnh từ CDN.
 - **Log:** pino `redact` gồm `req.headers.cookie`, `res.headers["set-cookie"]`, `req.body.password`; không log body multipart; log `userId`, không log email.
 
----
+### A5.9 Xác thực công cụ developer local
+
+Công cụ local có tài khoản riêng, không thêm role admin vào bảng users. Người quản lý máy cấp tài khoản từ gốc repo bằng `npm --prefix backend run dev:account -- ten_cua_ban`; mật khẩu ngẫu nhiên chỉ in một lần. `backend/tmp/developer-account.json` lưu username/salt/hash scrypt, được Git bỏ qua và Vite chặn phục vụ.
+
+- Vite giữ capability của controller trên server; trình duyệt gọi `/__local/backend/*`, được chuyển vào nhóm route `/browser/*` đã kiểm phiên.
+- Controller xác thực cho cả đọc trạng thái/log và start/stop/restart. Không dùng localStorage hay phiên tài khoản website để cấp quyền.
+- Phiên cookie HttpOnly, SameSite=Strict, Path=/__local/backend, tối đa 8 giờ; đăng xuất/cấp lại tài khoản thu hồi phiên, controller khởi động lại yêu cầu đăng nhập lại.
+- Giới hạn năm lần thử đăng nhập/phút; đăng nhập vẫn dùng được khi Express hoặc MySQL tắt.
+- Launcher/CLI dùng capability từ file local để khởi động/khôi phục dịch vụ. Toàn bộ công cụ này chỉ đăng ký trong development, không đưa vào artifact production.
 
 ## A6. Object storage và vòng đời tài liệu
 
@@ -1113,8 +1087,6 @@ Mỗi lần xoá object thất bại ghi WARN `{ event: 'storage.orphan', storag
 
 - Object mồ côi có thể còn lại sau lỗi; các lần xoá thất bại được thấy qua log `storage.orphan` kèm storageKey. Crash đột ngột trước bù trừ có thể không kịp ghi log.
 - Thay tệp đồng thời là last-write-wins; có thể để lại key của lần thay bị ghi đè. Không lịch sử phiên bản, không cơ chế tự thu gom.
-
----
 
 ## A7. REST API Contract
 
@@ -1431,8 +1403,6 @@ X-Content-Type-Options: nosniff
 | Thành công | 204, **kể cả khi xoá object lỗi** sau COMMIT |
 | Lỗi · DB/Storage · Frontend | 401; 403; 404 (không có 409, CR-007) · §A6.7 · P-04, P-05, P-07 sau CD-01 |
 
----
-
 ## A8. Frontend UX/UI
 
 ### A8.1 Nguyên tắc
@@ -1552,6 +1522,8 @@ Hook `useDownload().download(id)`: gọi `api.auth.me()`; `user = null` → `/lo
 - **Hết phiên giữa chừng:** `api/*` phát `auth:unauthorized` khi nhận 401 `UNAUTHENTICATED` (không áp dụng cho `INVALID_CREDENTIALS`) → `AuthProvider` đặt Guest, toast "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", nếu đang ở route `RequireAuth` thì tới `/login?redirect=…`.
 - **`safeRedirect`:** chỉ nhận đường dẫn bắt đầu bằng `/` và không bắt đầu bằng `//` hoặc `/\`; ngược lại dùng `/me/documents`.
 - **Sau đăng xuất:** về `/`, toast "Đã đăng xuất".
+
+Khi backend mất kết nối, giữ bản nháp/tệp đã chọn và dữ liệu đã nạp đúng tài khoản/tài liệu; khoá thao tác cần server, không tự gửi lại upload hay mutation. Chi tiết chỉ báo kết nối và điều khiển local xem README.
 
 ### A8.7 Đặc tả màn hình
 
@@ -1969,8 +1941,6 @@ flowchart LR
   fnRemove --> ep14
 ```
 
----
-
 ## A9. Sơ đồ tuần tự
 
 `FE` = SPA; `BE` = một instance backend bất kỳ; `TMP` = đĩa tạm; `DB` = MySQL; `OS` = object storage. Tên endpoint, bảng, cột khớp §A4 và §A7.
@@ -2037,8 +2007,6 @@ sequenceDiagram
   BE-->>FE: 201 DocumentDto
 ```
 
----
-
 ### SEQ-03 — Tải lên thất bại
 
 Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
@@ -2062,8 +2030,6 @@ sequenceDiagram
     BE-->>FE: Lỗi DB gốc
   end
 ```
-
----
 
 ### SEQ-04 — Tìm kiếm công khai
 
@@ -2181,8 +2147,6 @@ sequenceDiagram
   BE-->>FE: 200 DocumentDto, visibility giữ nguyên
 ```
 
----
-
 ### SEQ-08 — Thay thế tệp thất bại
 
 Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
@@ -2207,8 +2171,6 @@ sequenceDiagram
   end
 ```
 
----
-
 ### SEQ-09 — Xoá vĩnh viễn, gồm lỗi một phần
 
 Kiểm quyền và nội dung trước các bước storage; tệp tạm được xoá trong finally (§A6).
@@ -2232,17 +2194,18 @@ sequenceDiagram
   end
 ```
 
----
-
 ## A10. Local và AWS
 
 ### A10.1 Local: cổng, URL, Docker Compose
+
+Launcher/controller nằm trong backend/dev, cầu nối Vite trong frontend/dev, UI trong frontend/src/dev. Start.vbs/Stop.vbs hoặc run.bat điều khiển các dịch vụ do launcher tạo; controller listen 127.0.0.1:3001. Hướng dẫn đăng nhập developer ở §A5.9 và README.
 
 | Thành phần | Địa chỉ |
 |---|---|
 | Frontend dev (Vite, proxy `/api` → `:3000`) | `http://localhost:5173` |
 | Backend API / chế độ production-like (`SERVE_FRONTEND=true`) | `http://localhost:3000/api` / `http://localhost:3000` |
-| Backend instance thứ 2 (thử stateless) | `http://localhost:3001` (`PORT=3001`) |
+| Controller local | `http://127.0.0.1:3001`, chỉ qua cầu nối Vite/launcher |
+| Backend instance thứ 2 (thử stateless) | `http://localhost:3002` (`PORT=3002`) |
 | MySQL | `localhost:3306`, DB `btl_cloud` / `btl_cloud_test`, user `btl` |
 | SeaweedFS S3 API (không có console) | `http://localhost:9000` |
 
@@ -2309,11 +2272,13 @@ Lần đầu với Docker Desktop và Node 24:
 
 Production-like (cùng origin, giống ALB):
   npm run build                              # build cả backend và frontend
-  PowerShell: $env:SERVE_FRONTEND='true'; npm --prefix backend start      → http://localhost:3000
-Instance thứ 2:  PowerShell: $env:PORT='3001'; npm --prefix backend start
+  PowerShell: $env:SERVE_FRONTEND='true'; $env:INSTANCE_ID='local-1'; npm --prefix backend start → http://localhost:3000
+Instance thứ 2: PowerShell: $env:SERVE_FRONTEND='true'; $env:PORT='3002'; $env:INSTANCE_ID='local-2'; npm --prefix backend start
 
 Tắt: Ctrl+C (graceful shutdown) · docker compose stop (giữ dữ liệu) · docker compose down -v (xoá dữ liệu)
 ```
+
+Cổng 3001 dành cho controller local; dùng 3002 cho backend thứ hai. Khi kiểm thao tác ghi giữa hai instance, đặt ALLOWED_ORIGINS gồm http://localhost:3000,http://localhost:3002 cho cả hai process. Đây là hướng dẫn thử thêm; M4-08 vẫn chưa nghiệm thu.
 
 Graceful shutdown (SIGTERM/SIGINT): `server.close()` → chờ request đang chạy tối đa 30 s → `prisma.$disconnect()` → thoát mã 0 (quá hạn thì buộc thoát). Kiểm tra sức khoẻ: `curl http://localhost:3000/api/health` và `/api/health/ready`.
 
@@ -2339,7 +2304,7 @@ Một artifact cho mọi instance (§A3.7); instance giống hệt nhau, statele
 |---|---|---|
 | Container MySQL 8.4 | RDS MySQL 8.4 `db.t3.micro` Single-AZ, không public, DB subnet group 2 private subnet | `DATABASE_URL`, TLS |
 | SeaweedFS bucket | S3 bucket private + S3 Gateway Endpoint | `S3_ENDPOINT` trống, path-style tắt, bỏ access key → IAM Role |
-| Backend `:3000` (và `:3001`) | EC2 trong ASG (2–4) trên 2 private subnet, cùng artifact, cổng 3000 | `SERVE_FRONTEND=true`, `TRUST_PROXY=1` |
+| Backend `:3000` (và `:3002` khi thử local) | EC2 trong ASG (2–4) trên 2 private subnet, cùng artifact, cổng 3000 | `SERVE_FRONTEND=true`, `TRUST_PROXY=1` |
 | Vite proxy `:5173` | ALB listener → target group HTTP:3000 | SPA do backend phục vụ |
 | `backend/tmp/uploads` | EBS gp3 root volume | `UPLOAD_TMP_DIR` |
 | Log console / healthcheck compose | CloudWatch Logs (nếu OD-06 cho phép) / ALB target health `/api/health` | CloudWatch Agent |
@@ -2404,8 +2369,6 @@ Không đưa con số giá; M5-09 tra bằng AWS Pricing Calculator.
 | U-07 | Burst credit t3 | `t3.micro` mặc định unlimited, CPU cao lâu có thể phát sinh phí; dùng chế độ standard hoặc giới hạn thời gian thử tải | M5 |
 | U-08 | Quota tài khoản | Giới hạn vCPU/ALB có thể chặn ASG tối đa 4 instance | M5-09 |
 
----
-
 ## A11. Kiểm tra nhất quán
 
 ### A11.1 Truy vết FR → UC → API → Page → AC → Task
@@ -2424,41 +2387,11 @@ Không đưa con số giá; M5-09 tra bằng AWS Pricing Calculator.
 
 ### A11.2 Use Case → API → hành động UI
 
-| UC | API | UI (§A8.12) |
-|---|---|---|
-| UC-01 | API-04 | F-02 |
-| UC-02 | API-05 | F-03 |
-| UC-03 | API-06 | F-04 |
-| UC-04 | API-07 | F-05 |
-| UC-05 | API-09 | F-06, F-12 |
-| UC-06 | API-03, API-13 | F-07, F-08 |
-| UC-07 | API-10 | F-10, F-11 |
-| UC-08 | API-08 | F-09 |
-| UC-09 | API-11 | F-13 |
-| UC-10 | API-11 | F-14 |
-| UC-11 | API-12 | F-15, F-11 |
-| UC-12 | API-14 | F-16 |
-
-Mọi hành động trong §A8.7 đều có trong §A8.12. F-08, F-11, F-17, F-18 là hành động cục bộ; các dòng còn lại ánh xạ tới đúng một endpoint ở §A7.7.
+Bảng §A11.1 giữ ánh xạ FR/UC/API/Page/AC/task. Đối chiếu hành động cụ thể F-01…F-18 tại §A8.12; mô tả UC ở §A2.4 nêu endpoint và trang sử dụng. F-08, F-11, F-17, F-18 là hành động cục bộ.
 
 ### A11.3 API → dữ liệu
 
-| API | Đọc | Ghi | Storage | Khớp |
-|---|---|---|---|---|
-| API-01 | — | — | — | ✅ |
-| API-02 | `SELECT 1` | — | HeadBucket | ✅ (IAM `s3:ListBucket`) |
-| API-03 | `sessions`, `users` | DELETE phiên hết hạn | — | ✅ |
-| API-04 | — | INSERT `users`, `sessions` | — | ✅ `uq_users_email` |
-| API-05 | `users` | INSERT/DELETE `sessions` | — | ✅ |
-| API-06 | — | DELETE `sessions` | — | ✅ |
-| API-07 | `documents`, `users` | — | — | ✅ `idx_documents_visibility_created` |
-| API-08 | `documents`, `users` | — | — | ✅ `idx_documents_owner_created` |
-| API-09 | `documents`, `users` | — | — | ✅ |
-| API-10 | `sessions` | INSERT `documents` | PutObject (+ DeleteObject khi bù trừ) | ✅ INV-D1 |
-| API-11 | `documents` | UPDATE metadata | — | ✅ INV-D2 |
-| API-12 | `documents` | UPDATE theo id, file_version + 1 | PutObject key mới, DeleteObject | ✅ D-06, D-08, D-09 |
-| API-13 | `documents` | — | GetObject | ✅ |
-| API-14 | `documents` | DELETE `documents` | DeleteObject | ✅ BR-08 |
+Chi tiết DB/Storage đặt cùng mỗi endpoint trong §A7.7: API-03…06 dùng users/sessions; API-07…14 dùng documents, JOIN users khi trả owner. API-10/12 ghi object trước metadata; API-14 xoá metadata trước object. Query/index ở §A4.4; bất biến và bù trừ ở §A6.
 
 ### A11.4 Ranh giới bảo mật
 
