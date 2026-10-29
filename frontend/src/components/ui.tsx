@@ -10,6 +10,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { Link, type LinkProps } from "react-router";
+import { useServiceStatus } from "../hooks/useServiceStatus";
 
 export function Button({
   variant = "primary",
@@ -18,17 +19,20 @@ export function Button({
   disabled,
   className = "",
   type = "button",
+  requiresBackend = type === "submit",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "danger" | "ghost";
   loading?: boolean;
+  requiresBackend?: boolean;
 }) {
+  const { unavailable } = useServiceStatus();
   return (
     <button
       {...props}
       type={type}
       className={`button button--${variant} ${className}`}
-      disabled={disabled || loading}
+      disabled={disabled || loading || (requiresBackend && unavailable)}
       aria-busy={loading || undefined}
     >
       {loading && (
@@ -226,6 +230,7 @@ export function ConfirmDialog({
   loading = false,
   error,
   errorAction,
+  requiresBackend = true,
   onConfirm,
   onCancel,
 }: {
@@ -238,6 +243,7 @@ export function ConfirmDialog({
   loading?: boolean;
   error?: string;
   errorAction?: ReactNode;
+  requiresBackend?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -309,6 +315,7 @@ export function ConfirmDialog({
           {cancelLabel}
         </button>
         <Button
+          requiresBackend={requiresBackend}
           variant={tone === "danger" ? "danger" : "primary"}
           loading={loading}
           onClick={onConfirm}

@@ -2,7 +2,7 @@
 
 > Tài liệu 3/3 của Design Baseline v1.0: **CÔNG VIỆC, TIẾN ĐỘ, KIỂM CHỨNG, NGHIỆM THU**. Yêu cầu: [CONTEXT.md](CONTEXT.md). Thiết kế: [ARCHITECTURE.md](ARCHITECTURE.md).
 >
-> `BASELINE_VERSION: 1.0` · `OWNER_APPROVED_M0: YES` cho tới khi owner phê duyệt ở [OWNER DESIGN APPROVAL](#owner-design-approval).
+> `BASELINE_VERSION: 1.0` · `OWNER_APPROVED_M0: YES` — owner đã phê duyệt ở [OWNER DESIGN APPROVAL](#owner-design-approval); thay đổi sau đó ghi ở Nhật ký thay đổi baseline.
 
 
 ---
@@ -107,8 +107,8 @@ OWNER_APPROVED_M0: YES
 - [x] **M1-02** Root `package.json` (không dependency), `scripts/run-all.mjs`, `.gitignore` (`node_modules`, `dist`, `.env`, `tmp`)
   - In: D-16, `ci.yml` · Out: script root `postinstall`/`lint`/`build`/`test` · Dep: M1-01 · Verify: ở root `npm ci && npm run lint && npm run build && npm test` thành công khi chưa có `frontend/`
   - Bằng chứng: (lịch sử M0–M3) `package.json`, `package-lock.json` (root, rỗng), `scripts/run-all.mjs` (thêm tham số lọc package, ví dụ `node scripts/run-all.mjs test backend`), `.gitignore`. Kiểm trên **bản.
-- [ ] **M1-03** `docker-compose.yml` + `docker/mysql/init/01-init.sql` theo §A10.1; ghim tag MinIO/mc còn tải được (RK-06)
-  - In: §A10.1 · Out: compose `mysql`, `minio`, `minio-init` · Dep: M1-00 · Verify: `docker compose ps` → mysql, minio healthy, minio-init exit 0; 2 bucket tồn tại; GET ẩn danh một object → 403; có `btl_cloud_test`
+- [ ] **M1-03** `docker-compose.yml` + `docker/mysql/init/01-init.sql` theo §A10.1; storage local là SeaweedFS 4.48 thay MinIO (RK-06, CR-001)
+  - In: §A10.1 · Out: compose `mysql`, `seaweedfs`; `docker/seaweedfs/s3.json` · Dep: M1-00 · Verify: `docker compose up -d --wait` → mysql, seaweedfs healthy; `npm --prefix backend run storage:init` → 2 bucket tồn tại; GET ẩn danh một object → 403; có `btl_cloud_test`
   - Bằng chứng: (lịch sử M0–M3) **IMPLEMENTED / NOT VERIFIED — BLOCKED bởi M1-00 (chưa có Docker).** MinIO không còn dùng được: `dl.min.io` trả 410 Gone, `hub.docker.com/v2/repositories/minio/minio` trả 404 →.
 - [x] **M1-04** `config/env.ts` (zod) + `.env.example` theo §A10.2
   - In: §A10.2, D-17 · Out: `Config` bất biến · Dep: M1-01 · Verify: unit test: thiếu `DATABASE_URL` → lỗi nêu tên biến; mặc định đúng bảng; parse boolean/number đúng
@@ -117,7 +117,7 @@ OWNER_APPROVED_M0: YES
   - In: §A4 · Out: `prisma/schema.prisma`, `prisma/migrations/<ts>_init/` · Dep: M1-03 · Verify: `prisma:deploy` trên DB trống; `SHOW CREATE TABLE` 4 bảng khớp §A4.3 (dán tóm tắt); collation `utf8mb4_0900_ai_ci`
   - Bằng chứng: (lịch sử M0–M3) Dùng lại phần database của **Antigravity** (owner cho phép): giữ migration `20261020100306_init` (đã sửa collation `utf8mb4_0900_ai_ci`, có chú thích), chỉ thêm `DEFAULT.
 - [x] **M1-06** `db/prisma.ts`; interface `ObjectStorage`; `S3ObjectStorage`; `InMemoryObjectStorage` có chèn lỗi
-  - In: §A3.2.4, §A6.2 · Out: `src/storage/*`, `src/db/prisma.ts` · Dep: M1-03, M1-04 · Verify: integration với MinIO: put → get (so byte) → delete → delete lần 2 không lỗi → `checkHealth`; bucket sai → `StorageError UNAVAILABLE`
+  - In: §A3.2.4, §A6.2 · Out: `src/storage/*`, `src/db/prisma.ts` · Dep: M1-03, M1-04 · Verify: integration với storage S3-compatible local (SeaweedFS): put → get (so byte) → delete → delete lần 2 không lỗi → `checkHealth`; bucket sai → `StorageError UNAVAILABLE`
   - Bằng chứng: (lịch sử M0–M3) `src/db/prisma.ts` (factory thay singleton của Antigravity + `TransactionRunner` để service không phụ thuộc PrismaClient),.
 - [x] **M1-07** `createApp` + middleware nền (requestId, logger redact, helmet/CSP, JSON 16 KB, cookie, `notFound`, `errorHandler`, `no-store`), timeout server §A10.4, graceful shutdown §A10.5
   - In: §A3.8, §A5.8, §A7.1–A7.3 · Out: `src/app.ts`, `src/server.ts`, `src/http/**` · Dep: M1-04 · Verify: Supertest: `/api/khong-co` → 404 `ROUTE_NOT_FOUND` có `details: []` và `requestId` = header; JSON hỏng → `INVALID_JSON`; 17 KB → `PAYLOAD_TOO_LARGE`; có CSP và nosniff
@@ -179,7 +179,7 @@ OWNER_APPROVED_M0: YES
 - [x] **M2-13** Dọn tệp tạm và phiên hết hạn lúc khởi động (CR-007)
   - Bằng chứng: server.ts, tmp-sweeper.ts; không worker định kỳ, không bảng cleanup.
 
-- [x] **M2-14** Log: trường requestId, method, path, status, durationMs, userId, instanceId; sự kiện `cleanup.*`, `download.object_missing`; redact
+- [x] **M2-14** Log: trường requestId, method, path, status, durationMs, userId, instanceId; sự kiện `storage.orphan`, `download.object_missing`, `sessions.startup_cleanup_failed`, `server.*`; redact
   - In: §A5.8, NFR-OBS-02 · Out: cấu hình logger · Dep: M2-04 · Verify: log khi đăng nhập/upload không chứa mật khẩu, cookie, `Set-Cookie`
   - Bằng chứng: (lịch sử M0–M3) `src/lib/logger.ts`, `src/http/middleware/request-context.ts`. `contract.test.ts`: log JSON của request có `requestId`, `req.method`, `req.url`, `res.statusCode`, `durationMs`,.
 - [x] **M2-15** Contract test API-01…API-14 (đủ trường và đúng kiểu DTO, envelope lỗi có `details` mảng và `requestId`)
@@ -448,7 +448,7 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
   - Làm: so cấu trúc repo với §A1.3; chạy `git grep -n "@prisma/client" -- backend/src/modules/*/*.controller.ts` và `git grep -n "@aws-sdk" -- backend/src ":!backend/src/storage/s3-object-storage.ts"` → Mong đợi: cấu trúc khớp; hai lệnh không có kết quả
   - Bằng chứng agent: —
 - [ ] **ACC-04** Cơ sở dữ liệu · ARCHITECTURE §A4.3
-  - Làm: `docker compose exec mysql mysql -ubtl -pbtl_dev_password btl_cloud -e "SHOW CREATE TABLE users; SHOW CREATE TABLE sessions; SHOW CREATE TABLE documents;"` → Mong đợi: PK, FK (CASCADE/RESTRICT), UNIQUE, index, kiểu cột, nullability đúng; `visibility` không có mặc định
+  - Làm: `docker compose exec mysql mysql -ubtl -pbtl_dev_password btl_cloud -e "SHOW CREATE TABLE users; SHOW CREATE TABLE sessions; SHOW CREATE TABLE documents;"` (với `run.bat`: chạy cùng câu lệnh bằng `%LOCALAPPDATA%\btl-cloud-services\mysql-8.4.7-winx64\bin\mysql.exe -h127.0.0.1 -ubtl -pbtl_dev_password btl_cloud -e "…"`) → Mong đợi: PK, FK (CASCADE/RESTRICT), UNIQUE, index, kiểu cột, nullability đúng; `visibility` không có mặc định
   - Bằng chứng agent: —
 - [ ] **ACC-05** API và frontend tương thích · ARCHITECTURE §A7, §A8.12; M4-03
   - Làm: DevTools › Network khi tìm kiếm, tải lên, sửa, xoá; so với §A7.7 → Mong đợi: tên trường, mã trạng thái, envelope khớp; 18/18 dòng F-xx đạt
@@ -463,13 +463,13 @@ Mức độ: `CRITICAL` (vi phạm BR/bảo mật/mất dữ liệu) · `MAJOR` 
   - Làm: tải lên mỗi loại PDF/DOCX/PPTX; thử tệp > 50 MB, `.txt` đổi tên `.pdf`, gửi khi chưa chọn chế độ → Mong đợi: 3 tệp hợp lệ thành công; 3 trường hợp sau bị từ chối với thông báo tiếng Việt rõ ràng
   - Bằng chứng agent: —
 - [ ] **ACC-09** Upload thất bại · BR-06, ARCHITECTURE §A6.3, SEQ-03
-  - Làm: `docker compose stop minio` → thử tải lên → `docker compose start minio` → sau ~2 phút xem P-01, P-05 và MinIO console `http://localhost:9001` → Mong đợi: upload báo lỗi; không có tài liệu mới; object mới được xoá best-effort; lỗi xoá có WARN storage.orphan; có thể còn object mồ côi theo CR-007
+  - Làm: `docker compose stop seaweedfs` (với `run.bat`: đóng cửa sổ "BTL SeaweedFS") → thử tải lên → `docker compose start seaweedfs` (với `run.bat`: chạy lại `run.bat`) → xem P-01, P-05 và liệt kê `documents/` trong bucket bằng S3 client trỏ `http://localhost:9000` (vd. `aws --endpoint-url http://localhost:9000 s3 ls s3://btl-cloud-documents/documents/ --recursive`, key `minioadmin`/`minioadmin-dev`) → Mong đợi: upload báo lỗi; không có tài liệu mới; object mới được xoá best-effort; lỗi xoá có WARN storage.orphan; có thể còn object mồ côi theo CR-007
   - Bằng chứng agent: —
 - [ ] **ACC-10** Thay thế an toàn · FR-08, BR-07, ARCHITECTURE §A6.6
-  - Làm: (1) thay tệp một tài liệu Public rồi tải xuống; (2) `stop minio` → thử thay → `start minio` → tải xuống; (3) sau (1) kiểm tra storage → Mong đợi: (1) nội dung mới, nhãn vẫn "Công khai"; (2) báo lỗi, vẫn ra tệp **cũ**; (3) chỉ còn object mới
+  - Làm: (1) thay tệp một tài liệu Public rồi tải xuống; (2) `docker compose stop seaweedfs` (với `run.bat`: đóng cửa sổ "BTL SeaweedFS") → thử thay → `docker compose start seaweedfs` (với `run.bat`: chạy lại `run.bat`) → tải xuống; (3) sau (1) liệt kê `documents/` trong bucket bằng S3 client trỏ `http://localhost:9000` (vd. `aws --endpoint-url http://localhost:9000 s3 ls s3://btl-cloud-documents/documents/ --recursive`, key `minioadmin`/`minioadmin-dev`) → Mong đợi: (1) nội dung mới, nhãn vẫn "Công khai"; (2) báo lỗi, vẫn ra tệp **cũ**; (3) chỉ còn object mới
   - Bằng chứng agent: —
 - [ ] **ACC-11** Xoá vĩnh viễn · FR-09, BR-08, ARCHITECTURE §A6.7, SEQ-09
-  - Làm: (1) xoá một tài liệu, mở lại link chi tiết và URL tải; (2) `stop minio` → xoá tài liệu khác → `start minio` → chờ vài phút → MinIO console → Mong đợi: (1) 404 ở mọi nơi, object mất; (2) xoá báo thành công, nếu DeleteObject lỗi thì object có thể còn và log storage.orphan cho phép tra cứu (CR-007)
+  - Làm: (1) xoá một tài liệu, mở lại link chi tiết và URL tải; (2) `docker compose stop seaweedfs` (với `run.bat`: đóng cửa sổ "BTL SeaweedFS") → xoá tài liệu khác → `docker compose start seaweedfs` (với `run.bat`: chạy lại `run.bat`) → liệt kê `documents/` trong bucket bằng S3 client trỏ `http://localhost:9000` (vd. `aws --endpoint-url http://localhost:9000 s3 ls s3://btl-cloud-documents/documents/ --recursive`, key `minioadmin`/`minioadmin-dev`) → Mong đợi: (1) 404 ở mọi nơi, object mất; (2) xoá báo thành công, nếu DeleteObject lỗi thì object có thể còn và log storage.orphan cho phép tra cứu (CR-007)
   - Bằng chứng agent: —
 - [ ] **ACC-12** Frontend dễ dùng · ARCHITECTURE §A8, NFR-USA-01/02
   - Làm: chạy toàn bộ luồng trên desktop và giả lập 360 px; một lần tải lên chỉ dùng bàn phím; xem trạng thái rỗng (tài khoản mới) và lỗi (dừng backend) → Mong đợi: nhãn tiếng Việt nhất quán, không cuộn ngang, có tiến độ upload, lỗi dễ hiểu

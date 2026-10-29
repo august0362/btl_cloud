@@ -7,3 +7,4 @@ tmp/
 !.env.example
 frontend/dist/
 *.log
+pdf/

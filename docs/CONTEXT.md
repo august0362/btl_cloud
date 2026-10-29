@@ -2,7 +2,7 @@
 
 > Tài liệu 1/3 của Design Baseline v1.0: **CÁI GÌ** và **TẠI SAO**. Cách làm: [ARCHITECTURE.md](ARCHITECTURE.md). Công việc và nghiệm thu: [MILESTONES.md](MILESTONES.md).
 >
-> `BASELINE_VERSION: 1.0` · `DESIGN_STATUS: READY_FOR_OWNER_REVIEW` · `OWNER_APPROVAL: PENDING` · 2026-10-20
+> `BASELINE_VERSION: 1.0` · `DESIGN_STATUS: APPROVED` · `OWNER_APPROVAL: APPROVED` (MILESTONES › OWNER DESIGN APPROVAL) · 2026-10-20 · cập nhật theo CR-001…CR-008
 
 **Mục lục:** [C0 Nguồn](#c0-nguồn-và-quy-ước) · [C1 Tổng quan](#c1-tổng-quan) · [C2 Phạm vi](#c2-phạm-vi) · [C3 Tác nhân và quyền](#c3-tác-nhân-và-quyền) · [C4 Yêu cầu chức năng](#c4-yêu-cầu-chức-năng) · [C5 Phi chức năng](#c5-yêu-cầu-phi-chức-năng) · [C6 Giả định, rủi ro, quyết định](#c6-giả-định-ràng-buộc-rủi-ro-quyết-định) · [C7 Scope Freeze](#c7-scope-freeze--requirements-baseline)
 
@@ -45,7 +45,7 @@ Không có tệp tên đúng `BTL Cloud.docx`; S3 là bản gần nhất (DS-02)
 
 | Thành phần | Lý do |
 |---|---|
-| Object storage dùng chung (S3; local: MinIO) | Tệp tới 50 MB. Tệp tải lên qua instance A phải tải xuống được qua instance B |
+| Object storage dùng chung (S3; local: SeaweedFS, CR-001) | Tệp tới 50 MB. Tệp tải lên qua instance A phải tải xuống được qua instance B |
 | CSDL quan hệ (RDS MySQL; local: MySQL) | Người dùng, phiên, tài liệu, quan hệ sở hữu cần ràng buộc toàn vẹn và truy vấn lọc/phân trang |
 | Compute mở rộng ngang (EC2 + ALB + ASG) | Tải dao động theo mùa thi. Ứng dụng stateless nên thêm/bớt instance mà không mất phiên hay dữ liệu |
 | Block storage (EBS) | Ổ hệ điều hành và vùng đệm tạm khi nhận tệp upload |
@@ -73,7 +73,7 @@ Mạng xã hội (bình luận, đánh giá, theo dõi, chia sẻ cho người c
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| Local prototype (M1–M4) | Backend + frontend trên máy dev; MySQL và MinIO chạy bằng Docker Compose; thử nhiều instance dùng chung DB/MinIO | Mục tiêu hiện tại |
+| Local prototype (M1–M4) | Backend + frontend trên máy dev; MySQL và SeaweedFS chạy bằng Docker Compose hoặc `run.bat` (CR-004); thử nhiều instance dùng chung DB/storage | Mục tiêu hiện tại |
 | Chuẩn bị AWS (M5) | Kế hoạch EC2/ALB/ASG/RDS/S3/IAM/CloudWatch, thử tải, chi phí; chốt HTTPS và egress | Chỉ lập kế hoạch, **không provisioning** |
 | Triển khai AWS | Dựng hạ tầng thật, demo 8 hạng mục | Ngoài baseline; cần owner cho phép riêng |
 
@@ -121,7 +121,7 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | BR-05 | Chỉ PDF, DOCX, PPTX; 1 byte … 50 MB (= 52 428 800 byte, OD-02); loại tệp xác minh theo **nội dung**, không tin phần mở rộng hay MIME client gửi |
 | BR-06 | Upload dở dang/thất bại **không bao giờ** xuất hiện ở danh sách, tìm kiếm hay endpoint nào |
 | BR-07 | Thay tệp giữ nguyên chế độ hiển thị; thay thất bại thì tệp cũ vẫn còn và tải được |
-| BR-08 | Xoá là vĩnh viễn: metadata mất ngay; object bị xoá ngay hoặc qua cơ chế dọn dẹp tự thử lại; không khôi phục |
+| BR-08 | Xoá là vĩnh viễn: metadata mất ngay; object bị thử xoá ngay (best-effort, lỗi ghi log `storage.orphan`, CR-007); không khôi phục |
 | BR-09 | Mọi xác thực và phân quyền thực thi ở backend; UI ẩn/hiện nút chỉ để tiện, không có giá trị bảo mật |
 | BR-10 | Email là định danh đăng nhập, duy nhất, không phân biệt hoa thường |
 | BR-11 | Tìm kiếm công khai chỉ trả tài liệu Public (kể cả tài liệu Public của chính người tìm) |
@@ -209,10 +209,10 @@ Tài liệu Private của người khác được đối xử **như không tồ
 |---|---|
 | Mô tả | Owner thay tệp hiện tại bằng tệp mới (có thể khác loại); `id`, tiêu đề, mô tả, chế độ giữ nguyên |
 | Actor · Tiền điều kiện | Owner · Tệp mới thoả BR-05 |
-| Kết quả | Tải xuống trả tệp mới; `fileVersion` + 1; tệp cũ bị dọn sau ân hạn ngắn (D-09) |
+| Kết quả | Tải xuống trả tệp mới; `fileVersion` + 1; thử xoá object cũ ngay sau khi cập nhật DB (D-09) |
 | Quy tắc | BR-05, BR-07; tệp mới có object key mới |
-| Lỗi | Tệp mới không hợp lệ, storage lỗi hoặc DB lỗi → báo lỗi, vẫn trỏ tệp cũ. Hai lần thay đồng thời → một lần thành công, lần kia 409 |
-| Tiêu chí chấp nhận | **AC-08.1** Sau khi thay, tải xuống ra nội dung mới; tiêu đề và chế độ không đổi. **AC-08.2** Storage ngừng giữa lúc thay → báo lỗi, tải xuống vẫn ra nội dung cũ. **AC-08.3** Sau ân hạn, object cũ không còn trong bucket |
+| Lỗi | Tệp mới không hợp lệ, storage lỗi hoặc DB lỗi → báo lỗi, vẫn trỏ tệp cũ. Hai lần thay đồng thời → cả hai có thể thành công, lần ghi sau thắng (D-08, không 409) |
+| Tiêu chí chấp nhận | **AC-08.1** Sau khi thay, tải xuống ra nội dung mới; tiêu đề và chế độ không đổi. **AC-08.2** Storage ngừng giữa lúc thay → báo lỗi, tải xuống vẫn ra nội dung cũ. **AC-08.3** Sau khi thay thành công, object cũ không còn trong bucket (trừ khi DeleteObject lỗi → log `storage.orphan`) |
 
 ### FR-09 — Xoá vĩnh viễn tài liệu của mình
 
@@ -222,8 +222,8 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | Actor · Tiền điều kiện | Owner · Tài liệu tồn tại |
 | Kết quả | Tài liệu biến mất ngay khỏi mọi danh sách và endpoint (404); object bị xoá khỏi storage |
 | Quy tắc | BR-02, BR-08; hộp thoại xác nhận nêu rõ "không thể hoàn tác" |
-| Lỗi | Không phải owner → 403/404. Storage lỗi khi xoá object → vẫn báo thành công (metadata đã xoá), hệ thống tự thử xoá object lại |
-| Tiêu chí chấp nhận | **AC-09.1** Sau khi xoá, chi tiết/tải xuống → 404 với mọi người. **AC-09.2** Object không còn trong bucket (ngay, hoặc sau khi storage hoạt động lại). **AC-09.3** Bấm "Huỷ" ở hộp thoại → không có gì thay đổi |
+| Lỗi | Không phải owner → 403/404. Storage lỗi khi xoá object → vẫn báo thành công (metadata đã xoá); object có thể còn lại, log WARN `storage.orphan` để xử lý thủ công |
+| Tiêu chí chấp nhận | **AC-09.1** Sau khi xoá, chi tiết/tải xuống → 404 với mọi người. **AC-09.2** Object không còn trong bucket khi storage hoạt động; nếu DeleteObject lỗi thì có log `storage.orphan` chứa key. **AC-09.3** Bấm "Huỷ" ở hộp thoại → không có gì thay đổi |
 
 ---
 
@@ -246,13 +246,13 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | NFR-AVL-02 | Health liveness không phụ thuộc DB/storage | P | `/api/health` vẫn 200 khi DB dừng |
 | NFR-REL-01 | Upload dở dang/thất bại không bao giờ hiển thị (BR-06) | M | Test lỗi storage |
 | NFR-REL-02 | Thay thế thất bại giữ tệp cũ (BR-07) | M | Test lỗi storage |
-| NFR-REL-03 | Object mồ côi được dọn tự động, có thử lại | P | Test worker |
+| NFR-REL-03 | Lỗi xoá object được ghi log WARN `storage.orphan` kèm key; không dọn tự động (CR-007) | P | Test lỗi storage |
 | NFR-REL-04 | Tắt êm khi nhận SIGTERM | P | Thử ở M4 |
 | NFR-SCL-01 | Nhiều instance dùng chung DB và storage; không trạng thái cục bộ ảnh hưởng tính đúng | M (S1) | 2 instance local (M4) |
 | NFR-SCL-02 | ASG mở rộng khi tải tăng, demo được | M (S5 #6) | Kế hoạch thử tải M5 |
 | NFR-SCL-03 | Upload không đệm toàn bộ tệp trong RAM | P | Rà soát + test |
-| NFR-CON-01 | MySQL là nguồn sự thật; object không được tham chiếu cuối cùng sẽ bị xoá | P | Test |
-| NFR-CON-02 | Thay/xoá đồng thời không làm mất dấu object | P | Test đồng thời |
+| NFR-CON-01 | MySQL là nguồn sự thật; object không còn được tham chiếu được thử xoá một lần (best-effort, CR-007) | P | Test |
+| NFR-CON-02 | Thay/xoá đồng thời không làm tài liệu trỏ tới object không tồn tại; object của lần thay bị ghi đè có thể mồ côi (last write wins, CR-007) | P | Test đồng thời |
 | NFR-MNT-01 | TypeScript strict; modular monolith; lint trong CI | P | CI |
 | NFR-MNT-02 | Hợp đồng API duy nhất tại ARCHITECTURE §A7 | P | Contract test |
 | NFR-MNT-03 | Có unit, integration, E2E test cho luồng chính | P | M2–M4 |
@@ -261,7 +261,7 @@ Tài liệu Private của người khác được đối xử **như không tồ
 | NFR-OBS-01 | CloudWatch có ≥ 1 alarm được kích hoạt thử | M (S5 #7) | M5 |
 | NFR-OBS-02 | Log JSON có `requestId`, `instanceId`; không ghi mật khẩu/cookie/token | P | Test log |
 | NFR-OBS-03 | Health trả `instanceId` để minh hoạ cân bằng tải | P | Test |
-| NFR-POR-01 | Local → AWS chỉ đổi cấu hình (MySQL→RDS, MinIO→S3, credentials→IAM Role) | M (S1) | Rà soát M5 |
+| NFR-POR-01 | Local → AWS chỉ đổi cấu hình (MySQL→RDS, SeaweedFS→S3, credentials→IAM Role) | M (S1) | Rà soát M5 |
 | NFR-POR-02 | Cấu hình qua biến môi trường, kiểm tra khi khởi động | P | Test config |
 | NFR-CST-01 | Có dự toán chi phí tháng theo kiến trúc cuối | M (S5 #8) | M5 |
 
@@ -296,7 +296,7 @@ Kế hoạch S2 kéo dài 3 tuần, nhóm 4 người. Phân công con người t
 | ID | Giả định |
 |---|---|
 | AS-01 | Máy dev: Windows 11 + WSL2 (Ubuntu 22.04), Node.js 24 LTS (đang có v24.19.0), npm 11, Git |
-| AS-02 | Docker **chưa cài**; owner cài Docker Desktop trước M1 (M1-00; phương án khác: OD-14) |
+| AS-02 | Docker là tuỳ chọn: chạy bằng Docker Desktop hoặc `run.bat` tải MySQL/SeaweedFS portable (CR-004, OD-14) |
 | AS-03 | Trình duyệt: Chrome, Edge, Firefox bản hiện hành trên desktop và di động |
 | AS-04 | Quy mô demo: vài chục người dùng, vài trăm tài liệu; `LIKE` là đủ, chưa cần full-text |
 | AS-05 | Tài khoản AWS cá nhân có credits, đủ quyền tạo IAM/VPC/ALB/ASG/RDS/S3/CloudWatch; region `us-east-1` |
@@ -309,12 +309,12 @@ Bất định về cloud: chưa kiểm tra hạn mức (quota) của tài khoả
 
 | ID | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|---|
-| RK-01 | DB và storage không có transaction chung → object mồ côi hoặc metadata trỏ tới object không có | Cao | Guard + `storage_cleanup_tasks` + worker (ARCHITECTURE §A6) |
+| RK-01 | DB và storage không có transaction chung → object mồ côi hoặc metadata trỏ tới object không có | Cao | Ghi object trước rồi mới ghi DB; xoá best-effort + log `storage.orphan`; chấp nhận object mồ côi (CR-007, ARCHITECTURE §A6) |
 | RK-02 | Sai phân quyền làm lộ tài liệu Private (S2 đã nêu) | Cao | Policy tập trung một chỗ; test tự động ma trận C3.2 |
 | RK-03 | Tệp lớn qua ALB/Node bị timeout | TB | Timeout ở ARCHITECTURE §A10.4; thử ở M5 |
 | RK-04 | Không có HTTPS làm cookie phiên đi qua kênh không mã hoá | TB | OD-05; nếu không có HTTPS thì ghi là rủi ro được chấp nhận cho demo |
 | RK-05 | Ứng dụng chủ yếu chờ I/O, CPU khó tăng, khó kích hoạt ASG khi demo | TB | Chọn metric phù hợp + thử tải trước (OD-09) |
-| RK-06 | Có thông tin (cuối 2025) rằng MinIO ngừng phát hành image miễn phí | TB | Ghim tag image còn tồn tại; adapter chỉ dùng S3 API nên thay được bằng emulator khác |
+| RK-06 | Có thông tin (cuối 2025) rằng MinIO ngừng phát hành image miễn phí | TB | Đã xảy ra: thay bằng SeaweedFS 4.48 (CR-001); adapter chỉ dùng S3 API nên không đổi mã |
 | RK-07 | Hai agent làm song song tạo hợp đồng lệch nhau | TB | §A7 là nguồn sự thật duy nhất; contract test hai phía |
 | RK-08 | Collation có thể không coi "đ" ≡ "d" | Thấp | Kiểm chứng ở M2-08, ghi là hạn chế nếu có |
 | RK-09 | Tên tệp UTF-8 bị giải mã sai (latin1) khi parse multipart | Thấp | Test bắt buộc với tên tiếng Việt (M2-06) |
@@ -341,7 +341,7 @@ Baseline được viết theo **đề xuất mặc định** cho tới khi owner
 
 | ID | Câu hỏi | Đề xuất mặc định | Chặn |
 |---|---|---|---|
-| OD-01 | Stack React + TS + Vite / Node 24 + Express 5 + Prisma / MySQL 8.4 / MinIO / Docker Compose? | Chấp nhận (ARCHITECTURE §A1) | M1, M3 |
+| OD-01 | Stack React + TS + Vite / Node 24 + Express 5 + Prisma / MySQL 8.4 / MinIO / Docker Compose? | Chấp nhận (ARCHITECTURE §A1); storage local đổi sang SeaweedFS (CR-001) | M1, M3 |
 | OD-02 | 50 MB = 52 428 800 byte? | Có | — |
 | OD-03 | Private của người khác → 404; thao tác trái phép trên Public → 403? | Có | — |
 | OD-04 | Đăng ký xong tự đăng nhập; báo "email đã được sử dụng"? | Có | — |
@@ -351,10 +351,10 @@ Baseline được viết theo **đề xuất mặc định** cho tới khi owner
 | OD-08 | Sửa `.github/workflows/ci.yml` (owner bảo vệ) để chạy integration test? | Đề xuất ở M1-11; owner duyệt PR | — |
 | OD-09 | Metric ASG cho demo: CPU hay `ALBRequestCountPerTarget`? | Quyết định ở M5 sau thử tải | M5 |
 | OD-10 | Giữ trang chi tiết tài liệu (P-04) và bộ lọc loại tệp? | Giữ (rẻ, hỗ trợ chia sẻ bằng link) | — |
-| OD-11 | Ân hạn 120 s trước khi xoá object cũ sau thay thế? | Có | — |
+| OD-11 | Ân hạn 120 s trước khi xoá object cũ sau thay thế? | Không — bỏ theo CR-007: thử xoá ngay sau UPDATE | — |
 | OD-12 | Phiên cố định 7 ngày, không gia hạn trượt? | Có | — |
 | OD-13 | Node.js 24 LTS cho dev, CI (`lts/*`) và EC2? | Có | M1 |
-| OD-14 | Local dùng Docker Desktop hay cài MySQL/MinIO trực tiếp? | Docker Desktop (đơn giản, tái lập được) | M1 |
+| OD-14 | Local dùng Docker Desktop hay cài MySQL/MinIO trực tiếp? | Cả hai: Docker Compose, hoặc `run.bat` với MySQL/SeaweedFS portable (CR-004) | M1 |
 
 ---
 
@@ -367,7 +367,7 @@ NON-FUNCTIONAL:  C5 (M = bắt buộc, P = mục tiêu đề xuất)
 ACTORS:          Guest, User (Owner là vai trò theo từng tài liệu)
 OUT OF SCOPE:    C2.2
 OPEN DECISIONS:  OD-01 … OD-14 (C6.6). OD-05, OD-06, OD-07, OD-09 chuyển sang M5
-STATUS:          PROPOSED — chờ owner duyệt (MILESTONES › OWNER DESIGN APPROVAL)
+STATUS:          APPROVED — owner đã duyệt (MILESTONES › OWNER DESIGN APPROVAL); thay đổi sau đó theo CR-xxx
 ```
 
 Sau khi owner duyệt, mọi thay đổi phạm vi phải ghi vào **Nhật ký thay đổi baseline** (MILESTONES) và được owner chấp thuận trước khi triển khai.

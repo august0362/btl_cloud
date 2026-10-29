@@ -21,6 +21,7 @@ import { documentFixture as doc, pageOf, user } from "./test/fixtures";
 vi.mock("./api/auth", () => ({
   authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
 }));
+vi.mock("./dev/DeveloperAccess", () => ({ default: () => null }));
 vi.mock("./api/documents", () => ({
   documentsApi: {
     searchPublic: vi.fn(),
@@ -62,6 +63,9 @@ async function chooseFile(name = "Đề cương.pdf") {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal("fetch", vi.fn(async (path: string) => new Response(JSON.stringify({ data:
+    path.endsWith("/ready") ? { checks: { database: "ok", storage: "ok" } } : { status: "ok" },
+  }), { headers: { "Content-Type": "application/json" } })));
   auth.me.mockResolvedValue({ user: null });
   auth.login.mockResolvedValue({ user });
   auth.register.mockResolvedValue({ user });

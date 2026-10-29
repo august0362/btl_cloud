@@ -48,6 +48,8 @@ export async function installContractMock(page: Page, signedIn = false) {
           },
         }),
       });
+    if (url.pathname === "/api/health") return ok({ status: "ok" });
+    if (url.pathname === "/api/health/ready") return ok({ status: "ready", checks: { database: "ok", storage: "ok" } });
     if (url.pathname === "/api/auth/me")
       return ok({ user: state.signedIn ? user : null });
     if (

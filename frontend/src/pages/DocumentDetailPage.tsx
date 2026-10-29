@@ -34,11 +34,11 @@ export function DocumentDetailPage() {
     },
     [id, user?.id],
   );
-  const { data, loading, error, reload } = useResource(loader);
+  const { data, loading, error, reload } = useResource(loader, `${id}:${user?.id ?? "guest"}`);
   const download = useDownload();
   const deletion = useDeleteDocument(() => navigate("/me/documents"));
   usePageTitle(data?.title ?? "Chi tiết tài liệu");
-  if (loading)
+  if (loading && !data)
     return (
       <>
         <h1 tabIndex={-1}>Chi tiết tài liệu</h1>
@@ -55,7 +55,7 @@ export function DocumentDetailPage() {
         />
       </>
     );
-  if (error || !data)
+  if (!data)
     return (
       <>
         <h1 tabIndex={-1}>Chi tiết tài liệu</h1>
@@ -69,6 +69,7 @@ export function DocumentDetailPage() {
     );
   return (
     <>
+      {error != null && <Alert tone="info">{errorMessage(error)} Nội dung đã tải được giữ bên dưới.</Alert>}
       <Button
         variant="ghost"
         onClick={() => {
@@ -103,7 +104,7 @@ export function DocumentDetailPage() {
               >
                 Chỉnh sửa
               </Link>
-              <Button variant="danger" onClick={() => deletion.open(data)}>
+              <Button requiresBackend variant="danger" onClick={() => deletion.open(data)}>
                 Xoá
               </Button>
             </>

@@ -25,7 +25,7 @@ export function DownloadAction({
   onDownload: () => void;
 }) {
   return isAuthenticated ? (
-    <Button variant="secondary" onClick={onDownload}>
+    <Button requiresBackend variant="secondary" onClick={onDownload}>
       Tải xuống
     </Button>
   ) : (
@@ -108,13 +108,14 @@ export function MyDocumentList({
 }) {
   const actions = (item: DocumentDto) => (
     <div className="row-actions">
-      <Button variant="ghost" onClick={() => onDownload(item.id)}>
+      <Button requiresBackend variant="ghost" onClick={() => onDownload(item.id)}>
         Tải xuống
       </Button>
       <Link className="button button--ghost" to={`/documents/${item.id}/edit`}>
         Sửa
       </Link>
       <Button
+        requiresBackend
         variant="ghost"
         onClick={() => onDelete(item)}
         aria-label={`Xoá ${item.title}`}

@@ -25,6 +25,16 @@ function buildApp(overrides: Record<string, string> = {}, prismaImpl: Partial<Pr
 }
 
 describe('Envelope lỗi và header chung (§A7.1–§A7.3)', () => {
+  it('production không đăng ký endpoint điều khiển hoặc chẩn đoán local', async () => {
+    const { app } = buildApp({ NODE_ENV: 'production' });
+    for (const path of ['/__local/backend/status', '/__local/backend/start-all', '/__local/backend/stop-all', '/api/dev/traces', '/api/dev/data', '/api/dev/services']) {
+      const read = await request(app).get(path);
+      expect(read.status).toBe(404);
+      const write = await request(app).post(path).set('Origin', 'http://localhost:5173').set('X-CSRF-Protection', '1').set('X-Local-Control', '1');
+      expect(write.status).toBe(404);
+      expect(write.text).not.toContain('local-services.ndjson');
+    }
+  });
   it('đường dẫn /api lạ → 404 ROUTE_NOT_FOUND, details [] và requestId trùng header', async () => {
     const res = await request(buildApp().app).get('/api/khong-co');
     expect(expectError(res, 404, 'ROUTE_NOT_FOUND')).toEqual([]);

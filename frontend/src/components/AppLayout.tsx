@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/context";
 import { Button } from "./ui";
 import styles from "./AppLayout.module.css";
+import { ServiceIndicator, ServiceNotice } from "./ServiceStatus";
+
+const DeveloperAccess = import.meta.env.DEV ? lazy(() => import("../dev/DeveloperAccess")) : null;
 
 export function AppHeader() {
   const { user, status, logout } = useAuth();
@@ -56,7 +59,7 @@ export function AppHeader() {
                 Tải lên
               </NavLink>
               <span className="user-name">{user.displayName}</span>
-              <Button variant="ghost" loading={loggingOut} onClick={signOut}>
+              <Button requiresBackend variant="ghost" loading={loggingOut} onClick={signOut}>
                 Đăng xuất
               </Button>
             </>
@@ -70,6 +73,7 @@ export function AppHeader() {
           )}
         </nav>
         <div className={styles.headerActions}>
+          <ServiceIndicator />
           <button
             type="button"
             className="menu-toggle button button--secondary"
@@ -107,7 +111,9 @@ export function AppLayout() {
     <>
       <SkipLink />
       <AppHeader />
+      {DeveloperAccess && <Suspense fallback={null}><DeveloperAccess /></Suspense>}
       <main id="main-content" className={`container ${styles.main}`}>
+        <ServiceNotice />
         <Outlet />
       </main>
       <AppFooter />

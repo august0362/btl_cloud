@@ -222,6 +222,7 @@ function EditDocumentForm({
           disabled={unavailable}
         />
         <Button
+          requiresBackend
           disabled={unavailable || Boolean(validateFile(file))}
           onClick={() => setDialog("replace")}
         >
@@ -240,6 +241,7 @@ function EditDocumentForm({
         <h2>Vùng nguy hiểm</h2>
         <p>Xoá vĩnh viễn tài liệu và tệp. Không thể hoàn tác.</p>
         <Button
+          requiresBackend
           variant="danger"
           disabled={unavailable}
           onClick={() => deletion.open(document)}
@@ -284,8 +286,8 @@ export function EditDocumentPage() {
     (signal: AbortSignal) => documentsApi.get(id, signal),
     [id],
   );
-  const { data, error, loading, reload } = useResource(loader);
-  if (loading)
+  const { data, error, loading, reload } = useResource(loader, id);
+  if (loading && !data)
     return (
       <>
         <h1 tabIndex={-1}>Chỉnh sửa tài liệu</h1>
@@ -302,7 +304,7 @@ export function EditDocumentPage() {
         />
       </>
     );
-  if (error || !data)
+  if (!data)
     return (
       <>
         <h1 tabIndex={-1}>Chỉnh sửa tài liệu</h1>
@@ -326,6 +328,7 @@ export function EditDocumentPage() {
     );
   return (
     <div className="form-page">
+      {error != null && <Alert tone="info">{errorMessage(error)} Nội dung đang chỉnh sửa vẫn được giữ.</Alert>}
       <EditDocumentForm
         key={`${data.id}:${data.updatedAt}:${data.fileVersion}`}
         initial={data}
