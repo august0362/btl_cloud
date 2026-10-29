@@ -1471,17 +1471,17 @@ Có skip link "Bỏ qua tới nội dung chính"; toast ở góc dưới phải 
 
 ### A8.4 Design token (`styles/tokens.css`)
 
-Một bảng màu xanh duy nhất, sáng/tối tự theo `prefers-color-scheme` (`color-scheme: light dark` và `light-dark()`). Không ThemeProvider, ThemePicker, PNG palette hay localStorage. Token màu và kích thước nằm trong `styles/tokens.css`; component dùng CSS thuần/CSS Modules.
+Một bảng màu nâu taupe, trắng kem và xanh sage, dùng nền sáng theo ảnh tham chiếu (`color-scheme: light`). Token màu và kích thước nằm trong `styles/tokens.css`; component dùng CSS thuần/CSS Modules.
 
 | Nhóm | Giá trị |
 |---|---|
-| Palette | Paper #e3f2fd, accent #2196f3, primary #0d47a1; dark bg #091540, dark accent #abd2fa |
-| Chữ | Light #152b40 / muted #50667b; dark #eef2fc / muted #b7c5d9 |
-| Trạng thái | Danger #b91c1c / dark #fda4af; success #166534 / dark #86efac; warning #92400e / dark #fcd34d |
-| Bề mặt / viền | Trộn palette với trắng hoặc dark bg; định nghĩa cụ thể trong tokens.css |
-| Chữ | Segoe UI, system-ui, sans-serif; cỡ 0.875/1/1.125/1.5/1.875rem |
+| Palette | Paper #f6f3ed, accent #c4d0bd, primary #6a584c |
+| Màu chữ | Chính #3c332d / muted #706257 |
+| Trạng thái | Danger #a14d40; success #506648; warning #84602c |
+| Bề mặt / viền | Surface #fffefb, muted #eee9e1, viền #d9d1c7 |
+| Kiểu chữ | Segoe UI, system-ui, sans-serif; tiêu đề h1/h2 dùng Georgia, serif; cỡ 0.875/1/1.125/1.5/1.875rem |
 | Khoảng cách | 4/8/12/16/24/32/48px |
-| Khác | Radius 10/18px; container 1240px; touch 44px; breakpoint 640/1024px |
+| Khác | Radius 8/16px; container 1240px; touch 44px; breakpoint 640/1024px |
 
 Tương phản và thao tác bàn phím kiểm bằng UI suite (M3-12); xem bằng chứng chạy lại ở M4.
 

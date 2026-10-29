@@ -708,7 +708,7 @@ AuthProvider nạp API-03, giữ user/status trong bộ nhớ. RequireAuth chuy�
 
 ### 11.3 Nguyên tắc UI
 
-Giao diện tiếng Việt, một bảng màu sáng/tối theo hệ thống; token ở styles/tokens.css. Form có validate/lỗi theo trường, upload có tiến độ/huỷ; xoá/thay tệp/Private → Public dùng dialog xác nhận. Có skip link, nhãn, live region, bàn phím và kiểm responsive từ 360 px; chi tiết từng trang/component ở ARCHITECTURE §A8.
+Giao diện tiếng Việt, nền sáng với màu nâu taupe, trắng kem và xanh sage; token ở styles/tokens.css. Form có validate/lỗi theo trường, upload có tiến độ/huỷ; xoá/thay tệp/Private → Public dùng dialog xác nhận. Có skip link, nhãn, live region, bàn phím và kiểm responsive từ 360 px; chi tiết từng trang/component ở ARCHITECTURE §A8.
 
 ## 12. Môi trường local và cấu hình
 
@@ -863,7 +863,7 @@ Giới hạn: object mồ côi sau lỗi/crash, replace last-write-wins, rate li
 
 ## 15. Đồng bộ tài liệu gốc với mã nguồn
 
-Các quyết định đang dùng: SeaweedFS thay MinIO (CR-001), launcher Windows (CR-004), hoãn hai ca M4 (CR-005), một bảng màu sáng/tối (CR-006), best-effort và last-write-wins, bỏ worker/guard (CR-007). Lịch sử thay đổi và phê duyệt được giữ ở MILESTONES/Git.
+Các quyết định đang dùng: SeaweedFS thay MinIO (CR-001), launcher Windows (CR-004), hoãn hai ca M4 (CR-005), best-effort và last-write-wins, bỏ worker/guard (CR-007). Giao diện dùng bảng màu nâu–kem–sage nền sáng; lịch sử bảng màu sáng/tối (CR-006) và các thay đổi khác được giữ ở MILESTONES/Git.
 
 Bản cập nhật này giữ các sơ đồ, hợp đồng API chi tiết, schema và tiêu chí chấp nhận; phần tổng quan dẫn tới nơi tra cứu thay vì sao chép mọi bảng.
 

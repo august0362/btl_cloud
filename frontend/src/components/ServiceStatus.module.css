@@ -1,11 +1,11 @@
 .indicator, .notice {
-  --service-color: #42b8cf;
+  --service-color: var(--service-reconnecting);
   transition: border-color 180ms ease, background-color 180ms ease;
 }
-[data-state="online"] { --service-color: #85c9a2; }
-[data-state="degraded"] { --service-color: #d5a65b; }
-[data-state="offline"] { --service-color: #c96868; }
-[data-state="reconnecting"] { --service-color: #42b8cf; }
+[data-state="online"] { --service-color: var(--service-online); }
+[data-state="degraded"] { --service-color: var(--service-degraded); }
+[data-state="offline"] { --service-color: var(--service-offline); }
+[data-state="reconnecting"] { --service-color: var(--service-reconnecting); }
 .indicator {
   position: relative;
   display: inline-flex;
@@ -26,7 +26,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--service-color);
-  color: #172f35;
+  color: var(--color-on-status);
   font-weight: 700;
   transition: background-color 180ms ease;
 }
