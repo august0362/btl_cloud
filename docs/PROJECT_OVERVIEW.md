@@ -69,7 +69,7 @@ Nguồn: [MILESTONES](MILESTONES.md#quy-tắc-và-milestone). Sửa bảng này 
 
 | Trạng thái | Nội dung |
 |---|---|
-| DONE | M0 thiết kế (owner duyệt); M1–M3 backend, DB, storage, frontend đã triển khai; M4-01…06, M4-09…11 đã kiểm chứng local; E0, E6-01 (chỉ báo mật khẩu), E7-03 (trường log chẩn đoán), E8-03 (quy tắc cập nhật hướng dẫn) |
+| DONE | M0 thiết kế (owner duyệt); M1–M3 backend, DB, storage, frontend đã triển khai; M4-01…06, M4-09…11 đã kiểm chứng local; E0, E1-02 (khung admin local, gitignore), E6-01 (chỉ báo mật khẩu), E7-03 (trường log chẩn đoán), E8-03 (quy tắc cập nhật hướng dẫn) |
 | BLOCKED / chờ | M4-07, M4-08 hoãn (CR-005). M4-12, M4-G chờ owner. M5 chờ M4-G; provisioning AWS chờ M5-G. M1-00, M1-03 (Docker thật) và M3-01 chưa tick. SEC-002 (Prisma CLI) còn mở |
 | NOT STARTED | M5-01…M5-10 |
 | APPROVED, CÒN MỞ | E1–E3, E6–E8 (CR-009, 30/10/2026) còn task/gate; E6-G vẫn chờ owner, các tính năng admin, audit và metrics chưa hoàn thành |

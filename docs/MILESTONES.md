@@ -19,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E6-01, E7-03, E8-03 DONE; E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-02, E6-01, E7-03, E8-03 DONE; E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -316,7 +316,7 @@ flowchart LR
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
 | E1-01 | [ ] NOT STARTED | Migration `last_active_at` + activity tracker | XM-01 | commit | E0-02 | Ghi tối đa 1 lần/5 phút; `updated_at` không đổi | Unit + integration |
-| E1-02 | [ ] NOT STARTED | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | `ADMIN_TEST` |
+| E1-02 | [x] DONE | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | 30/10/2026: `npm --prefix backend exec -- vitest run --config backend/admin/vitest.config.ts` 13/13 PASS (token sai/thiếu 403, `X-Forwarded-For` 403, socket không loopback 403, bind 127.0.0.1:3003, DB/S3 không loopback, `NODE_ENV=production` hoặc thiếu token → thoát); `git check-ignore` khớp 3 thư mục; `git ls-files \| grep -i admin` rỗng; lint/build/test gốc PASS (92 backend, 100 frontend). Phần 401 của E1-AC-03 thuộc controller (E1-03) |
 | E1-03 | [ ] NOT STARTED | Controller khởi động admin nếu có, proxy `/browser/admin/*`; Vite bridge cho `/admin/` | XM-02 | commit | E1-02 | Không phiên → 401; không có thư mục admin → Start All vẫn OK | `node --test backend/dev/` |
 | E1-04 | [ ] NOT STARTED | Chuyển panel developer vào thư mục admin, gỡ khỏi Git; nạp bằng `import.meta.glob`; sửa README/WINDOWS_HOSTING/TEAM_HANDOFF; script `scripts/verify/admin-isolation.mjs` | XM-03, XA-05 | admin + commit | E1-03 | E1-AC-01, 02, 06 | `node scripts/verify/admin-isolation.mjs`; clone sạch |
 | E1-05 | [ ] NOT STARTED | ADM-01: số user, tài liệu, dung lượng logic, dung lượng đĩa SeaweedFS, sức khoẻ | XA-02 | admin | E1-01, E1-03 | E1-AC-04, 05 | `ADMIN_TEST overview` |
