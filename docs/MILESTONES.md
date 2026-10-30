@@ -19,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E1-04, E1-05, E1-06, E2-01, E2-02, E3-01, E6-01, E7-01, E7-02, E7-03, E7-04, E8 DONE (đợt 1–4); E1–E3, E7 còn task; E6 chờ nghiệm thu; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E1-04, E1-05, E1-06, E2-01, E2-02, E2-03, E3-01, E6-01, E7-01, E7-02, E7-03, E7-04, E8 DONE (đợt 1–4); E1–E3, E7 còn task; E6 chờ nghiệm thu; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -330,7 +330,7 @@ flowchart LR
 |---|---|---|---|---|---|---|---|
 | E2-01 | [x] DONE | Migration `deletion_started_at`; app public coi user `DELETING` như không tồn tại | XM-04 | commit | E0-02 | Không đăng nhập được; tài liệu 404, không có trong tìm kiếm | Integration; `node scripts/verify/authz-matrix.mjs`. 30/10/2026, `36db668` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 71, frontend 85); `test:integration` 81/81 (`deleting-user.test.ts` 4/4); `authz-matrix` 82/82 với backend build trỏ DB test (:3010); số dòng không đổi |
 | E2-02 | [x] DONE | ADM-02, 03, 05, 06: tìm, xem, sửa email/tên hiển thị, thu hồi phiên (avatar, bio, username hoãn cùng E4–E5) | XA-03 | admin | E1-05 | E2-AC-01…03 (phần audit kiểm ở E7-06); không có `passwordHash` | `ADMIN_TEST users`. 30/10/2026 (`backend/admin/users.ts`, gitignore; thêm mã `USER_NOT_FOUND` 404, `ACCOUNT_DELETING` 409 vào `errors.ts` theo §A12.5): `ADMIN_TEST users` 5/5 trên DB test (E2-AC-01…03, 404, user `DELETING` → 409, không có `passwordHash`); toàn bộ admin 30/31 (test bind :3003 lỗi vì stack đang chạy); `npm run lint`, backend unit 122/122 |
-| E2-03 | [ ] NOT STARTED | ADM-07 xoá tài khoản theo XSEQ-01 | XA-04 | admin | E2-01, E2-02 | E2-AC-04…06 (dùng `fault-storage`) | `ADMIN_TEST deletion` |
+| E2-03 | [x] DONE | ADM-07 xoá tài khoản theo XSEQ-01 | XA-04 | admin | E2-01, E2-02 | E2-AC-04…06 (dùng `fault-storage`) | `ADMIN_TEST deletion` 4/4. 30/10/2026 (`backend/admin/deletion.ts`, gitignore; thêm `CONFIRMATION_MISMATCH` 400, `ACCOUNT_DELETION_INCOMPLETE` 503 vào `errors.ts` theo §A12.5): E2-AC-04 (2 Public + 2 Private → không còn bản ghi/object/phiên/user, đăng ký lại được), E2-AC-05 (storage lỗi ở object thứ 2 → 503 còn 3, tài liệu còn lại 404 khi xem/tải, tìm 0; bấm lại → COMPLETED), tài liệu chen vào (FK) → 503 rồi bấm lại xong, E2-AC-06 (sai email 400 không đổi gì; bấm liên tiếp và song song → giống bấm một lần). 503 trả envelope lỗi + `remainingDocuments`. Audit `ADMIN_ACCOUNT_DELETE` làm ở E7-06 |
 | E2-04 | [ ] NOT STARTED | Trang danh sách user và chi tiết (sửa, thu hồi phiên, xoá có gõ email, "Tiếp tục xoá") | XA-05 | admin | E1-06, E2-02, E2-03 | Xoá thử trên dữ liệu thử nghiệm | Kiểm tay + RTL |
 | E2-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E2: xoá một tài khoản thử, dừng SeaweedFS giữa chừng rồi tiếp tục | — | — | E2-01…04 | Bucket không còn object của user | Liệt kê bucket (như ACC-09) |
 

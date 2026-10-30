@@ -11,13 +11,15 @@ export type ErrorCode =
   | 'USER_NOT_FOUND'
   | 'EMAIL_ALREADY_EXISTS'
   | 'ACCOUNT_DELETING'
+  | 'CONFIRMATION_MISMATCH'
   | 'PAYLOAD_TOO_LARGE'
   | 'FILE_TOO_LARGE'
   | 'UNSUPPORTED_FILE_TYPE'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
   | 'STORAGE_UNAVAILABLE'
-  | 'SERVICE_UNAVAILABLE';
+  | 'SERVICE_UNAVAILABLE'
+  | 'ACCOUNT_DELETION_INCOMPLETE';
 
 export type IssueCode =
   | 'REQUIRED'
@@ -51,6 +53,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   USER_NOT_FOUND: 404,
   EMAIL_ALREADY_EXISTS: 409,
   ACCOUNT_DELETING: 409,
+  CONFIRMATION_MISMATCH: 400,
   PAYLOAD_TOO_LARGE: 413,
   FILE_TOO_LARGE: 413,
   UNSUPPORTED_FILE_TYPE: 415,
@@ -58,6 +61,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   INTERNAL_ERROR: 500,
   STORAGE_UNAVAILABLE: 503,
   SERVICE_UNAVAILABLE: 503,
+  ACCOUNT_DELETION_INCOMPLETE: 503,
 };
 
 export const ERROR_MESSAGE: Record<ErrorCode, string> = {
@@ -72,6 +76,7 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   USER_NOT_FOUND: 'Không tìm thấy người dùng.',
   EMAIL_ALREADY_EXISTS: 'Email đã được sử dụng.',
   ACCOUNT_DELETING: 'Tài khoản đang được xoá, không thể sửa.',
+  CONFIRMATION_MISMATCH: 'Email xác nhận không khớp.',
   PAYLOAD_TOO_LARGE: 'Dữ liệu gửi lên quá lớn.',
   FILE_TOO_LARGE: 'Tệp vượt quá dung lượng tối đa 50 MB.',
   UNSUPPORTED_FILE_TYPE: 'Chỉ hỗ trợ tệp PDF, DOCX, PPTX.',
@@ -79,6 +84,7 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   INTERNAL_ERROR: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
   STORAGE_UNAVAILABLE: 'Kho lưu trữ tệp tạm thời không khả dụng. Vui lòng thử lại sau.',
   SERVICE_UNAVAILABLE: 'Dịch vụ chưa sẵn sàng.',
+  ACCOUNT_DELETION_INCOMPLETE: 'Xoá tài khoản chưa hoàn tất. Bấm "Tiếp tục xoá" để thử lại.',
 };
 
 export class AppError extends Error {
