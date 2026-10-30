@@ -71,3 +71,40 @@ model Document {
   @@map("documents")
 }
 
+enum AuditActorType {
+  USER
+  DEVELOPER
+  ANONYMOUS
+}
+
+enum AuditTargetType {
+  USER
+  DOCUMENT
+  FRIENDSHIP
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+// E7 (§A12.4, XM-13): bảng chỉ thêm dòng. Không FK để sự kiện còn sau khi đối tượng bị xoá.
+model AuditEvent {
+  id         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  createdAt  DateTime         @map("created_at") @db.DateTime(3)
+  actorType  AuditActorType   @map("actor_type")
+  actorId    String?          @map("actor_id") @db.VarChar(64)
+  action     String           @db.VarChar(40)
+  targetType AuditTargetType? @map("target_type")
+  targetId   String?          @map("target_id") @db.Char(36)
+  outcome    AuditOutcome
+  errorCode  String?          @map("error_code") @db.VarChar(40)
+  requestId  String?          @map("request_id") @db.Char(36)
+  metadata   Json?
+
+  @@index([createdAt], map: "idx_audit_events_created_at")
+  @@index([actorId, createdAt], map: "idx_audit_events_actor_created")
+  @@index([targetId, createdAt], map: "idx_audit_events_target_created")
+  @@index([requestId], map: "idx_audit_events_request_id")
+  @@map("audit_events")
+}

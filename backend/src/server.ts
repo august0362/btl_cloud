@@ -43,6 +43,8 @@ async function main(): Promise<void> {
   } catch (error) {
     logger.warn({ err: error, event: 'sessions.startup_cleanup_failed' }, 'Chưa xoá được phiên hết hạn');
   }
+  // XD-14: xoá sự kiện audit quá hạn; lỗi chỉ WARN `audit.purge_failed`, vẫn khởi động.
+  await services.audit.purgeExpired(config.audit.retentionDays);
   const app = createApp({ config, logger, prisma, storage, services });
 
   const server = app.listen({ port: config.port, host: config.host }, () => {

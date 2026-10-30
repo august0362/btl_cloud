@@ -56,4 +56,13 @@ describe('loadConfig (M1-04, §A10.2)', () => {
     expect(() => loadConfig({ ...minimal, PORT: 'abc' })).toThrow(/PORT/);
     expect(() => loadConfig({ ...minimal, S3_ENDPOINT: 'not a url' })).toThrow(/S3_ENDPOINT/);
   });
+
+  it('AUDIT_RETENTION_DAYS: mặc định 90, cho phép 1–3650 (§A12.7)', () => {
+    expect(loadConfig(minimal).audit.retentionDays).toBe(90);
+    expect(loadConfig({ ...minimal, AUDIT_RETENTION_DAYS: '1' }).audit.retentionDays).toBe(1);
+    expect(loadConfig({ ...minimal, AUDIT_RETENTION_DAYS: '3650' }).audit.retentionDays).toBe(3650);
+    for (const value of ['0', '3651', '1.5', 'abc']) {
+      expect(() => loadConfig({ ...minimal, AUDIT_RETENTION_DAYS: value })).toThrow(/AUDIT_RETENTION_DAYS/);
+    }
+  });
 });

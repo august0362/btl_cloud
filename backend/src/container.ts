@@ -3,6 +3,8 @@ import type { Config } from './config/env.js';
 import { createTransactionRunner } from './db/prisma.js';
 import { systemClock, type Clock } from './lib/clock.js';
 import type { Logger } from './lib/logger.js';
+import { AuditRecorder } from './modules/audit/audit.recorder.js';
+import { AuditRepository } from './modules/audit/audit.repository.js';
 import { AuthService } from './modules/auth/auth.service.js';
 import { SessionRepository } from './modules/auth/session.repository.js';
 import { DocumentRepository } from './modules/documents/document.repository.js';
@@ -18,6 +20,8 @@ export interface Services {
   auth: AuthService;
   documentService: DocumentService;
   activity: ActivityTracker;
+  auditEvents: AuditRepository;
+  audit: AuditRecorder;
   clock: Clock;
 }
 
@@ -42,5 +46,7 @@ export function createServices(deps: {
     deps.logger,
   );
   const activity = new ActivityTracker(users, clock, deps.logger);
-  return { users, sessions, documents, auth, documentService, activity, clock };
+  const auditEvents = new AuditRepository(deps.prisma);
+  const audit = new AuditRecorder(auditEvents, clock, deps.logger);
+  return { users, sessions, documents, auth, documentService, activity, auditEvents, audit, clock };
 }

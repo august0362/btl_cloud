@@ -2,7 +2,7 @@
  * Database schema integration tests.
  *
  * Verifies that the Prisma schema matches the approved ERD in §A4.3:
- * - 3 tables: users, sessions, documents
+ * - 4 tables: users, sessions, documents (+ audit_events từ E7, kiểm chi tiết ở audit.test.ts)
  * - Correct column types, nullability, defaults
  * - Primary keys, foreign keys, unique constraints, indexes
  * - Enum values for visibility, file_type
@@ -265,7 +265,7 @@ describe('Table: documents (§A4.3)', () => {
 });
 
 describe('Relationships', () => {
-  it('should have exactly 3 tables', async () => {
+  it('should have exactly 4 tables (audit_events từ E7-01, §A12.4)', async () => {
     const tables = await prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name AS table_name
       FROM information_schema.tables
@@ -276,11 +276,11 @@ describe('Relationships', () => {
     `;
     const tableNames = tables.map(t => t.table_name);
     expect(tableNames).toEqual(
-      expect.arrayContaining(['users', 'sessions', 'documents'])
+      expect.arrayContaining(['users', 'sessions', 'documents', 'audit_events'])
     );
     // Filter out Prisma internal tables
     const appTables = tableNames.filter(t => !t.startsWith('_prisma'));
-    expect(appTables.length).toBe(3);
+    expect(appTables.length).toBe(4);
   });
 
   it('all tables should use InnoDB engine', async () => {
