@@ -8,7 +8,9 @@ export type ErrorCode =
   | 'FORBIDDEN'
   | 'ROUTE_NOT_FOUND'
   | 'DOCUMENT_NOT_FOUND'
+  | 'USER_NOT_FOUND'
   | 'EMAIL_ALREADY_EXISTS'
+  | 'ACCOUNT_DELETING'
   | 'PAYLOAD_TOO_LARGE'
   | 'FILE_TOO_LARGE'
   | 'UNSUPPORTED_FILE_TYPE'
@@ -46,7 +48,9 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   FORBIDDEN: 403,
   ROUTE_NOT_FOUND: 404,
   DOCUMENT_NOT_FOUND: 404,
+  USER_NOT_FOUND: 404,
   EMAIL_ALREADY_EXISTS: 409,
+  ACCOUNT_DELETING: 409,
   PAYLOAD_TOO_LARGE: 413,
   FILE_TOO_LARGE: 413,
   UNSUPPORTED_FILE_TYPE: 415,
@@ -65,7 +69,9 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
   ROUTE_NOT_FOUND: 'Không tìm thấy đường dẫn API.',
   DOCUMENT_NOT_FOUND: 'Không tìm thấy tài liệu.',
+  USER_NOT_FOUND: 'Không tìm thấy người dùng.',
   EMAIL_ALREADY_EXISTS: 'Email đã được sử dụng.',
+  ACCOUNT_DELETING: 'Tài khoản đang được xoá, không thể sửa.',
   PAYLOAD_TOO_LARGE: 'Dữ liệu gửi lên quá lớn.',
   FILE_TOO_LARGE: 'Tệp vượt quá dung lượng tối đa 50 MB.',
   UNSUPPORTED_FILE_TYPE: 'Chỉ hỗ trợ tệp PDF, DOCX, PPTX.',
