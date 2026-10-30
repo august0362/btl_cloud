@@ -12,7 +12,7 @@ services:
       MYSQL_USER: btl
       MYSQL_PASSWORD: btl_dev_password
     ports:
-      - '3306:3306'
+      - '127.0.0.1:3306:3306'
     volumes:
       - mysql-data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
@@ -32,7 +32,7 @@ services:
       -master.volumeSizeLimitMB=1024 -volume.max=100
       -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
-      - '9000:8333'
+      - '127.0.0.1:9000:8333'
     volumes:
       - seaweedfs-data:/data
       - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro

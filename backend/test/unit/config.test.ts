@@ -36,6 +36,7 @@ describe('loadConfig (M1-04, §A10.2)', () => {
       ...minimal,
       COOKIE_SECURE: 'true',
       PORT: '3001',
+      HOST: '127.0.0.1',
       ALLOWED_ORIGINS: 'http://a.test, http://b.test ,',
       TRUST_PROXY: '1',
       SESSION_COOKIE_NAME: '__Host-sid',
@@ -43,6 +44,7 @@ describe('loadConfig (M1-04, §A10.2)', () => {
     });
     expect(config.cookieSecure).toBe(true);
     expect(config.port).toBe(3001);
+    expect(config.host).toBe('127.0.0.1');
     expect(config.allowedOrigins).toEqual(['http://a.test', 'http://b.test']);
     expect(config.trustProxy).toBe(1);
     expect(config.session.cookieName).toBe('__Host-sid');

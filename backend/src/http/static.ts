@@ -15,6 +15,9 @@ export function serveFrontend(app: Express, distDir: string, logger: Logger): vo
     return;
   }
 
+  // Never send the SPA (or static files) for the local-only control namespace.
+  app.use('/__local', (_req, res) => { res.status(404).type('text/plain').send('Not Found'); });
+
   app.use(
     express.static(root, {
       index: false,

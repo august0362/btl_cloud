@@ -1,9 +1,9 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createServices } from '../../src/container.js';
 import { createLogger } from '../../src/lib/logger.js';
@@ -24,16 +24,31 @@ function buildApp(overrides: Record<string, string> = {}, prismaImpl: Partial<Pr
   return { app: createApp({ config, logger, prisma, storage, services }), storage, prisma };
 }
 
+async function distDir() {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'btl-dist-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  await mkdir(path.join(dir, 'assets'));
+  await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>SPA</title>');
+  await writeFile(path.join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
+  return dir;
+}
+
 describe('Envelope lỗi và header chung (§A7.1–§A7.3)', () => {
   it('production không đăng ký endpoint điều khiển hoặc chẩn đoán local', async () => {
-    const { app } = buildApp({ NODE_ENV: 'production' });
-    for (const path of ['/__local/backend/status', '/__local/backend/start-all', '/__local/backend/stop-all', '/api/dev/traces', '/api/dev/data', '/api/dev/services']) {
-      const read = await request(app).get(path);
-      expect(read.status).toBe(404);
-      const write = await request(app).post(path).set('Origin', 'http://localhost:5173').set('X-CSRF-Protection', '1').set('X-Local-Control', '1');
-      expect(write.status).toBe(404);
-      expect(write.text).not.toContain('local-services.ndjson');
+    const { app } = buildApp({ NODE_ENV: 'production', SERVE_FRONTEND: 'true', FRONTEND_DIST_DIR: await distDir() });
+    const paths = ['session', 'login', 'logout', 'status', 'start', 'stop', 'restart', 'start-all', 'stop-all', 'shutdown'].map((action) => `/__local/backend/${action}`);
+    for (const path of [...paths, '/api/dev/traces', '/api/dev/data', '/api/dev/services']) {
+      for (const method of ['get', 'head', 'post'] as const) {
+        const response = await request(app)[method](path).set('Accept', 'text/html').set('Cookie', 'btl_developer=forged')
+          .set('Origin', 'http://localhost:5173').set('X-CSRF-Protection', '1').set('X-Local-Control', '1');
+        expect(response.status, `${method} ${path}`).toBe(404);
+        expect(response.text ?? '').not.toMatch(/SPA|local-services\.ndjson/);
+      }
     }
+    for (const file of ['/backend/.env', '/backend/tmp/developer-account.json', '/backend/tmp/local-controller.json', '/dev/controller.mjs'])
+      expect((await request(app).get(file).set('Accept', 'application/json')).status).toBe(404);
+    expect((await request(app).get('/').set('Accept', 'text/html')).status).toBe(200);
+    expect((await request(app).get('/api/health')).status).toBe(200);
   });
   it('đường dẫn /api lạ → 404 ROUTE_NOT_FOUND, details [] và requestId trùng header', async () => {
     const res = await request(buildApp().app).get('/api/khong-co');
@@ -174,14 +189,6 @@ describe('Health (M1-08, API-01/02)', () => {
 });
 
 describe('Phục vụ SPA cùng origin (M1-09, §A3.7)', () => {
-  async function distDir() {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'btl-dist-'));
-    await mkdir(path.join(dir, 'assets'));
-    await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>SPA</title>');
-    await writeFile(path.join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
-    return dir;
-  }
-
   it('index, asset immutable, SPA fallback, /api lạ vẫn trả JSON 404', async () => {
     const { app } = buildApp({ SERVE_FRONTEND: 'true', FRONTEND_DIST_DIR: await distDir() });
     const home = await request(app).get('/').set('Accept', 'text/html');

@@ -31,7 +31,7 @@
   --service-reconnecting: #c5b8a9;
   --color-on-status: #3c332d;
   --font-sans: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-  --font-display: Georgia, "Times New Roman", serif;
+  --font-display: var(--font-sans);
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;

@@ -132,6 +132,21 @@ test('refuses to adopt or stop a process already using the backend port', async 
   } finally { await close(external); }
 });
 
+test('local controller can own the built-site mode while frontend workers remain development-only', async () => {
+  for (const name of ['backend', 'frontend']) {
+    const reserve = createServer();
+    const port = await listen(reserve); await close(reserve);
+    const manager = createProcessManager({ name, cwd: fileURLToPath(new URL('..', import.meta.url)), args: ['dev/fixtures/server.mjs'], port,
+      env: { ...process.env, BTL_LOCAL_PRODUCTION: '1', HOST: '127.0.0.1' } });
+    try {
+      await manager.execute('start');
+      assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/environment`)).json(), {
+        nodeEnv: name === 'backend' ? 'production' : 'development', serveFrontend: name === 'backend' ? 'true' : 'false', host: '127.0.0.1',
+      });
+    } finally { await manager.execute('stop'); }
+  }
+});
+
 test('nonzero shutdown exit is reported instead of being silently accepted', async () => {
   const reserve = createServer();
   const port = await listen(reserve); await close(reserve);

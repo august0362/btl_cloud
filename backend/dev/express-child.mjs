@@ -16,4 +16,4 @@ function shutdown() {
 }
 process.on('message', (message) => { if (message === 'local:shutdown') shutdown(); });
 process.on('disconnect', shutdown);
-await import('../src/server.ts');
+await import(process.env.NODE_ENV === 'production' ? '../dist/server.js' : '../src/server.ts');

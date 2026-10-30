@@ -23,7 +23,9 @@ export function createController(manager, token, port = controllerPort, onShutdo
     const reply = (status, data) => { res.writeHead(status); res.end(JSON.stringify(data)); };
     const auth = Buffer.from(req.headers.authorization ?? '');
     const expected = Buffer.from(`Bearer ${token}`);
-    if (req.headers.host !== `127.0.0.1:${port || res.socket.localPort}` || req.headers.origin !== origin ||
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress) ||
+        req.headers.forwarded || req.headers['x-forwarded-for'] ||
+        req.headers.host !== `127.0.0.1:${port || res.socket.localPort}` || req.headers.origin !== origin ||
         auth.length !== expected.length || !timingSafeEqual(auth, expected)) {
       reply(403, { error: 'Không được phép truy cập bộ điều khiển cục bộ.' }); return;
     }

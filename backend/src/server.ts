@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   }
   const app = createApp({ config, logger, prisma, storage, services });
 
-  const server = app.listen(config.port, () => {
+  const server = app.listen({ port: config.port, host: config.host }, () => {
     logger.info({ port: config.port, version: config.version, event: 'server.started' }, 'Backend đã khởi động');
   });
   // §A10.4: upload 50 MB qua mạng chậm; keep-alive lớn hơn ALB idle timeout (120 s).

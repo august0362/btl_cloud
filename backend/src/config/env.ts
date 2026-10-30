@@ -11,6 +11,7 @@ const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(0).max(65535).default(3000),
+  HOST: z.string().min(1).optional(),
   DATABASE_URL: z.string().min(1),
   S3_BUCKET: z.string().min(3),
   S3_REGION: z.string().min(1).default('us-east-1'),
@@ -38,6 +39,7 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export interface Config {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
+  host: string | undefined;
   databaseUrl: string;
   s3: { bucket: string; region: string; endpoint: string | undefined; forcePathStyle: boolean };
   allowedOrigins: string[];
@@ -89,6 +91,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
+    host: e.HOST,
     databaseUrl: e.DATABASE_URL,
     s3: { bucket: e.S3_BUCKET, region: e.S3_REGION, endpoint: e.S3_ENDPOINT, forcePathStyle: e.S3_FORCE_PATH_STYLE },
     allowedOrigins: e.ALLOWED_ORIGINS.split(',')

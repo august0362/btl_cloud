@@ -24,12 +24,35 @@ async function fixture(t, provision = true) {
     await rm(file, { force: true });
     await rmdir(directory);
   });
-  const request = (path, { cookie, body, method = 'GET' } = {}) => fetch(`http://127.0.0.1:${server.address().port}${path}`, {
-    method, headers: { Origin: origin, Authorization: 'Bearer test-capability', 'X-Local-Control': '1', ...(cookie ? { Cookie: cookie } : {}) },
+  const request = (path, { cookie, body, method = 'GET', headers = {} } = {}) => fetch(`http://127.0.0.1:${server.address().port}${path}`, {
+    method, headers: { Origin: origin, Authorization: 'Bearer test-capability', 'X-Local-Control': '1', ...(cookie ? { Cookie: cookie } : {}), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { file, credentials, actions, request, advance: (ms) => { time += ms; } };
+  return { file, credentials, actions, request, server, advance: (ms) => { time += ms; } };
 }
+
+test('remote peers and forwarded requests cannot use even an authenticated developer session', async (t) => {
+  const { request, credentials, actions, server } = await fixture(t);
+  const cookie = (await request('/browser/login', { method: 'POST', body: credentials })).headers.get('set-cookie');
+  assert.ok(cookie);
+  let peer = '192.0.2.1';
+  // Simulate non-loopback transport without opening a listener on a public interface.
+  server.prependListener('request', (req) => Object.defineProperty(req.socket, 'remoteAddress', { configurable: true, get: () => peer }));
+  for (peer of ['192.0.2.1', '::ffff:192.0.2.1', undefined]) {
+    for (const path of ['/status', '/start', '/stop', '/restart', '/start-all', '/stop-all', '/shutdown']) {
+      for (const prefix of ['', '/browser']) {
+        assert.equal((await request(`${prefix}${path}`, { cookie, method: path === '/status' ? 'GET' : 'POST' })).status, 403);
+      }
+    }
+  }
+  peer = '127.0.0.1';
+  for (const headers of [{ 'X-Forwarded-For': '127.0.0.1' }, { Forwarded: 'for=192.0.2.1' }]) {
+    assert.equal((await request('/browser/status', { cookie, headers })).status, 403);
+    assert.equal((await request('/browser/start', { cookie, headers, method: 'POST' })).status, 403);
+  }
+  assert.deepEqual(actions, []);
+  assert.equal((await request('/browser/start', { cookie, method: 'POST' })).status, 200);
+});
 
 test('browser control and diagnostics require a separately provisioned developer session, including with backend OFF', async (t) => {
   const { request, credentials, actions, file } = await fixture(t);
@@ -39,7 +62,7 @@ test('browser control and diagnostics require a separately provisioned developer
   await assert.rejects(provisionDeveloper('other', file), { code: 'EEXIST' });
   assert.deepEqual(await (await request('/browser/session')).json(), { configured: true, user: null });
   for (const path of ['/status', '/start', '/stop', '/restart', '/start-all', '/stop-all']) {
-    const response = await request(`/browser${path}`, { method: path === '/status' ? 'GET' : 'POST', cookie: 'session=ordinary-user; btl_developer=forged' });
+    const response = await request(`/browser${path}`, { method: path === '/status' ? 'GET' : 'POST', cookie: 'sid=ordinary-user; btl_developer=forged' });
     assert.equal(response.status, 401, path);
     assert.ok(!JSON.stringify(await response.json()).includes('private diagnostics'));
   }
