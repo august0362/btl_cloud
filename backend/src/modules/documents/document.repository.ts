@@ -1,6 +1,7 @@
 import { Prisma, type FileType, type PrismaClient, type Visibility } from '@prisma/client';
 
-const ownerSelect = { owner: { select: { id: true, displayName: true } } } as const;
+// deletionStartedAt chỉ dùng cho document.loader (XM-04); không vào DocumentDto.
+const ownerSelect = { owner: { select: { id: true, displayName: true, deletionStartedAt: true } } } as const;
 
 export type DocumentWithOwner = Prisma.DocumentGetPayload<{ include: typeof ownerSelect }>;
 
@@ -55,10 +56,13 @@ export class DocumentRepository {
   /**
    * Tìm kiếm/kho cá nhân (§A4.4). Điều kiện quyền luôn nằm trong SQL: `visibility='PUBLIC'` hoặc
    * `owner_id = ?`. Bước 1 lấy id + tổng bằng SQL thô (LIKE có ESCAPE), bước 2 nạp bản ghi kèm owner.
+   * Tìm kiếm public bỏ tài liệu của user DELETING (XM-04, XBR-06).
    */
   async search(search: DocumentSearch): Promise<{ rows: DocumentWithOwner[]; total: number }> {
     const conditions: Prisma.Sql[] = [
-      search.scope.kind === 'public' ? Prisma.sql`d.visibility = 'PUBLIC'` : Prisma.sql`d.owner_id = ${search.scope.ownerId}`,
+      search.scope.kind === 'public'
+        ? Prisma.sql`d.visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM users u WHERE u.id = d.owner_id AND u.deletion_started_at IS NULL)`
+        : Prisma.sql`d.owner_id = ${search.scope.ownerId}`,
     ];
     if (search.visibility) conditions.push(Prisma.sql`d.visibility = ${search.visibility}`);
     if (search.fileType) conditions.push(Prisma.sql`d.file_type = ${search.fileType}`);

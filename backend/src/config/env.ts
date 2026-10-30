@@ -32,6 +32,8 @@ const envSchema = z.object({
   SERVE_FRONTEND: booleanString.default('false'),
   FRONTEND_DIST_DIR: z.string().min(1).default('../frontend/dist'),
   INSTANCE_ID: z.string().min(1).optional(),
+  // E7 (§A12.7): số ngày giữ sự kiện audit.
+  AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
 });
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -54,6 +56,7 @@ export interface Config {
   frontendDistDir: string;
   instanceId: string;
   version: string;
+  audit: { retentionDays: number };
 }
 
 export class ConfigError extends Error {
@@ -108,5 +111,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     frontendDistDir: e.FRONTEND_DIST_DIR,
     instanceId: e.INSTANCE_ID ?? hostname(),
     version: readAppVersion(),
+    audit: { retentionDays: e.AUDIT_RETENTION_DAYS },
   };
 }

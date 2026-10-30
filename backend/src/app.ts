@@ -9,6 +9,7 @@ import { noStore, requestId, requestLogger } from './http/middleware/request-con
 import { securityHeaders } from './http/middleware/security-headers.js';
 import { serveFrontend } from './http/static.js';
 import type { Logger } from './lib/logger.js';
+import { metricsMiddleware } from './metrics/metrics.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import type { SessionCookieConfig } from './modules/auth/session.cookie.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
@@ -34,6 +35,7 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', config.trustProxy);
 
   app.use(requestId());
+  app.use(metricsMiddleware());
   app.use(requestLogger(logger));
   app.use(securityHeaders({ hstsEnabled: config.hstsEnabled }));
   app.use(express.json({ limit: '16kb' }));
@@ -42,7 +44,7 @@ export function createApp(deps: AppDeps): Express {
   const api = express.Router();
   api.use(noStore());
   api.use(csrfGuard(config.allowedOrigins));
-  api.use(sessionLoader(services.auth, cookie));
+  api.use(sessionLoader(services.auth, cookie, services.activity));
   api.use(
     '/health',
     healthRoutes({
