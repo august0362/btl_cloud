@@ -2205,7 +2205,7 @@ sequenceDiagram
 
 ### A10.1 Local: cổng, URL, Docker Compose
 
-Launcher/controller nằm trong backend/dev, cầu nối Vite trong frontend/dev, UI trong frontend/src/dev. Start.vbs/Stop.vbs hoặc run.bat điều khiển các dịch vụ do launcher tạo; controller listen 127.0.0.1:3001. Hướng dẫn đăng nhập developer ở §A5.9 và README.
+Launcher/controller nằm trong backend/dev, cầu nối Vite trong frontend/dev, UI trong frontend/src/admin (gitignore, XM-03). Start.vbs/Stop.vbs hoặc run.bat điều khiển các dịch vụ do launcher tạo; controller listen 127.0.0.1:3001. Hướng dẫn đăng nhập developer ở §A5.9 và README.
 
 | Thành phần | Địa chỉ |
 |---|---|

@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    exclude: ["src/admin/**", "**/node_modules/**"],
     restoreMocks: true,
     clearMocks: true,
     maxWorkers: 2,

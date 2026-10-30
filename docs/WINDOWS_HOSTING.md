@@ -51,7 +51,7 @@ Readiness phải báo database/storage `ok`. Các cổng trên chỉ được ng
 (`127.0.0.1`/`::1`). Bản Docker tuỳ chọn cũng chỉ publish MySQL/S3 ra `127.0.0.1`;
 container đang tồn tại cần được tạo lại có kế hoạch để áp mapping mới, giữ nguyên volumes.
 
-Mở **http://localhost:5173**, chọn **Đăng nhập nhà phát triển**, dùng tài khoản developer
+Mở **http://localhost:5173/admin** (chỉ máy owner có thư mục admin), chọn **Đăng nhập nhà phát triển**, dùng tài khoản developer
 đã có. Backend ON/OFF, Khởi động lại, Start All, Stop All, Services và log chỉ mở sau
 xác thực developer. Tài khoản web thông thường không cấp quyền này. Backend ON/OFF
 điều khiển chính Express production; Vite vẫn ở localhost để quản trị khi Express tắt.

@@ -21,7 +21,7 @@ import { documentFixture as doc, pageOf, user } from "./test/fixtures";
 vi.mock("./api/auth", () => ({
   authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
 }));
-vi.mock("./dev/DeveloperAccess", () => ({ default: () => null }));
+vi.mock("./adminEntry", () => ({ AdminApp: null }));
 vi.mock("./api/documents", () => ({
   documentsApi: {
     searchPublic: vi.fn(),
@@ -272,6 +272,14 @@ describe("authentication, navigation and public discovery", () => {
       await screen.findByRole("heading", { name: "Khám phá tài liệu học tập" }),
     ).toBeVisible();
     expect(auth.logout).toHaveBeenCalledTimes(1);
+  });
+  it("XM-03: without the gitignored admin folder there is no admin link and /admin is not found", async () => {
+    mount("/admin");
+    expect(
+      screen.getByRole("heading", { name: "Không tìm thấy trang" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Quản trị" })).toBeNull();
+    await waitFor(() => expect(auth.me).toHaveBeenCalled());
   });
   it("renders the unknown route without requesting documents", async () => {
     mount("/khong-ton-tai");

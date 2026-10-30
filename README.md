@@ -46,7 +46,7 @@ Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShel
 
 Controller Node duy nhất tại **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, thu stdout/stderr và giữ các handle/PID nó tạo. Dịch vụ chạy ẩn; cấu hình `.env`, thư mục MySQL, SeaweedFS và tài liệu đã có được giữ. Lần đầu vẫn dùng MySQL 8.4.7 / SeaweedFS 4.48 portable, `npm ci`, migration deploy và tạo bucket như launcher cũ; không reset DB. Biến `DEBUG` được bỏ riêng trong môi trường con của dịch vụ để tránh lỗi SeaweedFS. Backend không có watcher: dùng **Khởi động lại** sau khi sửa mã backend.
 
-Tại **http://localhost:5173**, mở **Đăng nhập nhà phát triển** và dùng tài khoản được cấp để truy cập toàn bộ công cụ local (Backend, Start/Stop All, Services và Developer Mode). Controller kiểm tra phiên cho cả đọc trạng thái/log lẫn thao tác điều khiển; sửa `localStorage` hoặc đăng nhập tài khoản người dùng thông thường không cấp quyền developer. Phiên dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; đăng xuất hoặc khởi động lại controller yêu cầu đăng nhập lại. Đăng nhập developer vẫn hoạt động khi Express/MySQL đang tắt.
+Tại **http://localhost:5173/admin** (link **Quản trị**), mở **Đăng nhập nhà phát triển** và dùng tài khoản được cấp để truy cập toàn bộ công cụ local (Backend, Start/Stop All, Services và Developer Mode). Controller kiểm tra phiên cho cả đọc trạng thái/log lẫn thao tác điều khiển; sửa `localStorage` hoặc đăng nhập tài khoản người dùng thông thường không cấp quyền developer. Phiên dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; đăng xuất hoặc khởi động lại controller yêu cầu đăng nhập lại. Đăng nhập developer vẫn hoạt động khi Express/MySQL đang tắt. Công cụ này nằm trong thư mục admin gitignore (`frontend/src/admin/`, `backend/admin/`), chỉ có trên máy owner; clone không có thư mục này thì web không có link **Quản trị** và Start All vẫn chạy.
 
 Người quản lý cấp **một tài khoản developer cục bộ cho mỗi bản sao dự án** bằng lệnh tại gốc repo:
 
@@ -77,7 +77,8 @@ Kiểm tra:
 ```sh
 node --test backend/dev/*.test.mjs
 npm --prefix frontend test
-npm --prefix frontend exec -- playwright test --config frontend/playwright.local.config.ts
+npm --prefix frontend exec -- playwright test --config frontend/admin-tests/playwright.config.ts   # chỉ máy có admin
+node scripts/verify/admin-isolation.mjs   # sau npm run build
 # Sau npm run build:
 node scripts/verify/local-production.mjs
 ```

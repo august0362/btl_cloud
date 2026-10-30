@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router";
+import { AdminApp } from "./adminEntry";
 import { AuthProvider } from "./auth/AuthProvider";
 import { GuestOnly, RequireAuth } from "./auth/guards";
 import { AppLayout } from "./components/AppLayout";
@@ -27,6 +28,7 @@ export function App() {
                 <Route path="upload" element={<UploadPage />} />
                 <Route path="documents/:id/edit" element={<EditDocumentPage />} />
               </Route>
+              {AdminApp && <Route path="admin/*" element={<AdminApp />} />}
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Routes>

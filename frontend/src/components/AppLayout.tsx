@@ -1,11 +1,10 @@
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
+import { AdminApp } from "../adminEntry";
 import { useAuth } from "../auth/context";
 import { Button } from "./ui";
 import styles from "./AppLayout.module.css";
 import { ServiceIndicator, ServiceNotice } from "./ServiceStatus";
-
-const DeveloperAccess = import.meta.env.DEV ? lazy(() => import("../dev/DeveloperAccess")) : null;
 
 export function AppHeader() {
   const { user, status, logout } = useAuth();
@@ -47,6 +46,7 @@ export function AppHeader() {
           <NavLink to="/" end>
             Khám phá
           </NavLink>
+          {AdminApp && <NavLink to="/admin">Quản trị</NavLink>}
           {status === "loading" ? (
             <span
               className="header-skeleton"
@@ -111,10 +111,11 @@ export function AppLayout() {
     <>
       <SkipLink />
       <AppHeader />
-      {DeveloperAccess && <Suspense fallback={null}><DeveloperAccess /></Suspense>}
       <main id="main-content" className={`container ${styles.main}`}>
         <ServiceNotice />
-        <Outlet />
+        <Suspense fallback={null}>
+          <Outlet />
+        </Suspense>
       </main>
       <AppFooter />
     </>
