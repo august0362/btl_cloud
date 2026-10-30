@@ -10,6 +10,8 @@
 
 Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code owner review. Chỉ tick task sau khi đã kiểm chứng, kèm một dòng bằng chứng. Các ô [OWNER] và FINAL OWNER ACCEPTANCE do owner tự nghiệm thu.
 
+**XBR-28:** Khi một quyết định đã duyệt thay đổi (CR) hoặc trạng thái milestone đổi, cập nhật [PROJECT_OVERVIEW §0](PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút) trong cùng PR (CONTEXT §C8.8; ARCHITECTURE §A12.12).
+
 | Milestone | Phạm vi | Trạng thái |
 |---|---|---|
 | M0 | Thiết kế | Owner đã duyệt |
@@ -17,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0 xong; E1–E3, E6–E8 NOT STARTED; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E6-01, E7-03, E8-03 DONE; E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -393,7 +395,7 @@ Nội dung hướng dẫn đã có sẵn ở [PROJECT_OVERVIEW §0](PROJECT_OVER
 |---|---|---|---|---|---|---|
 | E8-01 | [ ] NOT STARTED | Kiểm §0: mọi link/anchor mở đúng mục; trạng thái khớp phần trên của MILESTONES; phát biểu cache khớp mã; mọi module ở §A3.6/§A12.3 đủ input/output, phụ thuộc, lỗi | docs | E0-02 | E8-AC-02…05 | Danh sách link đã mở; đối chiếu `static.ts`, `request-context.ts` |
 | E8-02 | [ ] NOT STARTED | Diễn tập 10 phút với một người chưa đọc tài liệu, dùng 10 câu hỏi bên dưới; sửa §0 theo chỗ vướng | docs | E8-01 | E8-AC-01 (≥ 8/10 đúng, ≤ 10 phút) | Ghi thời gian, điểm, chỗ vướng vào bằng chứng |
-| E8-03 | [ ] NOT STARTED | Thêm quy tắc XBR-28 ("cập nhật §0 trong cùng PR khi đổi CR/trạng thái") vào [Quy tắc và milestone](#quy-tắc-và-milestone) | docs | E0-02 | Quy tắc có hiệu lực | Review PR |
+| E8-03 | [x] DONE | Thêm quy tắc XBR-28 ("cập nhật §0 trong cùng PR khi đổi CR/trạng thái") vào [Quy tắc và milestone](#quy-tắc-và-milestone) | docs | E0-02 | Quy tắc có hiệu lực | 30/10/2026: đã đối chiếu quy tắc với CONTEXT §C8.8/ARCHITECTURE §A12.12, kiểm anchor §0; cập nhật §0.6 cùng thay đổi trạng thái. Lint/build/test gốc PASS (92 backend, 100 frontend) |
 | E8-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E8 | — | E8-01…03 | Owner tự đọc §0 và thấy đủ để làm việc tiếp | — |
 
 Câu hỏi diễn tập E8-02: (1) Hệ thống giải quyết bài toán gì; Public khác Private thế nào? (2) Một request đi qua những thành phần nào tới MySQL và storage? (3) Phiên đăng nhập lưu ở đâu, vì sao không dùng JWT? (4) Upload ghi object hay DB trước; lỗi giữa chừng thì sao? (5) User khác mở tài liệu Private của tôi nhận mã gì, vì sao? (6) Module nào quyết định quyền tài liệu? (7) Chạy local và kiểm tra sức khoẻ bằng lệnh gì? (8) Lệnh nào chạy giống CI? (9) Milestone hiện tại, việc tiếp theo, việc đang hoãn/chặn? (10) Hiện có cache gì và không có cache gì?
