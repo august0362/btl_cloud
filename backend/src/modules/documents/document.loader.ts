@@ -7,13 +7,14 @@ import type { DocumentRepository, DocumentWithOwner } from './document.repositor
 /**
  * Nạp tài liệu theo `:id` và áp policy TRƯỚC khi đọc body (§A5.5, RK-02).
  * `id` sai định dạng hoặc không tồn tại → 404; Private của người khác → 404; quản lý Public của người khác → 403.
+ * Chủ sở hữu đang bị xoá (DELETING) → 404 như không tồn tại (XM-04).
  */
 export function loadDocument(documents: DocumentRepository, mode: 'view' | 'manage'): RequestHandler {
   return async (req, res, next) => {
     const id = String(req.params.id ?? '');
     if (!isUuid(id)) return next(new AppError('DOCUMENT_NOT_FOUND'));
     const doc = await documents.findById(id);
-    if (!doc) return next(new AppError('DOCUMENT_NOT_FOUND'));
+    if (!doc || doc.owner.deletionStartedAt !== null) return next(new AppError('DOCUMENT_NOT_FOUND'));
 
     let decision: 'ALLOW' | 'NOT_FOUND' | 'FORBIDDEN';
     if (mode === 'view') decision = canView(doc, req.auth);

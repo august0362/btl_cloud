@@ -20,16 +20,18 @@ enum FileType {
 }
 
 model User {
-  id           String     @id @db.Char(36)
-  email        String     @unique(map: "uq_users_email") @db.VarChar(254)
-  passwordHash String     @map("password_hash") @db.VarChar(255)
-  displayName  String     @map("display_name") @db.VarChar(100)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  id                String     @id @db.Char(36)
+  email             String     @unique(map: "uq_users_email") @db.VarChar(254)
+  passwordHash      String     @map("password_hash") @db.VarChar(255)
+  displayName       String     @map("display_name") @db.VarChar(100)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   // E1 (§A12.4): chỉ ghi bằng SQL thô (UserRepository.touchLastActive) để không đổi updated_at.
-  lastActiveAt DateTime?  @map("last_active_at") @db.DateTime(3)
-  sessions     Session[]
-  documents    Document[]
+  lastActiveAt      DateTime?  @map("last_active_at") @db.DateTime(3)
+  // E2 (§A12.4, XBR-06): khác NULL = DELETING; app public coi như user không tồn tại.
+  deletionStartedAt DateTime?  @map("deletion_started_at") @db.DateTime(3)
+  sessions          Session[]
+  documents         Document[]
 
   @@index([lastActiveAt], map: "idx_users_last_active_at")
   @@map("users")

@@ -65,7 +65,8 @@ export class AuthService {
 
   async login(input: { email: string; password: string }, previousToken?: string): Promise<AuthResult> {
     const user = await this.users.findByEmail(input.email);
-    if (!user) {
+    // XBR-06: tài khoản đang bị xoá (DELETING) coi như không tồn tại.
+    if (!user || user.deletionStartedAt !== null) {
       // Vẫn chạy verify với hash giả để thời gian phản hồi tương đương (§A5.1).
       this.dummyHash ??= hashPassword('timing-equalizer-not-a-real-password');
       await verifyPassword(await this.dummyHash, input.password);
@@ -84,7 +85,7 @@ export class AuthService {
     if (token) await this.sessions.delete(hashSessionToken(token));
   }
 
-  /** Trả AuthContext nếu phiên hợp lệ; phiên hết hạn bị xoá ngay (§A5.2). */
+  /** Trả AuthContext nếu phiên hợp lệ; phiên hết hạn bị xoá ngay (§A5.2). User DELETING → không hợp lệ (XM-04). */
   async resolveSession(token: string): Promise<AuthContext | null> {
     const id = hashSessionToken(token);
     const session = await this.sessions.findWithUser(id);
@@ -94,6 +95,7 @@ export class AuthService {
       return null;
     }
     const { user } = session;
+    if (user.deletionStartedAt !== null) return null;
     return {
       userId: user.id,
       sessionId: id,
