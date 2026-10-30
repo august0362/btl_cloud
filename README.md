@@ -104,6 +104,8 @@ node scripts/verify/upload-matrix.mjs
 
 Integration cần MySQL và storage đang chạy; chỉ reset **btl_cloud_test**. E2E và hai script verify cần backend production-like ở :3000; `test:ui` là suite mock riêng. Nếu chạy lặp nhiều suite bị 429, tăng `AUTH_RATE_LIMIT_MAX=1000` chỉ cho process backend của lần kiểm thử, rồi khởi động lại với mặc định.
 
+Thử tải trên DB/bucket riêng (seed, lệnh `autocannon`, kết quả mẫu): [scripts/load/README.md](scripts/load/README.md).
+
 ## Cấu trúc và đóng góp
 
 `backend/`: Express, Prisma, storage adapter, test; `frontend/`: React/Vite, API client, UI/E2E; `docker/` và `docker-compose.yml`: hạ tầng local; `scripts/`: lệnh chung và kiểm chứng; `docs/`: thiết kế và tiến độ. Xem [§A1.3](docs/ARCHITECTURE.md#a13-cấu-trúc-thư-mục-và-người-phụ-trách) và [§A1.4](docs/ARCHITECTURE.md#a14-quy-tắc-phụ-thuộc): controller gọi service; repository dùng Prisma; adapter storage gọi SDK; frontend gọi mạng qua api/.
