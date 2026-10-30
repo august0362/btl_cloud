@@ -19,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E1-04, E1-05, E1-06, E2-01, E2-02, E2-03, E2-04, E3-01, E3-02, E3-03, E6-01, E7-01, E7-02, E7-03, E7-04, E7-05, E7-06, E8 DONE (đợt 1–4); E1–E3, E7 còn task; E6 chờ nghiệm thu; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E1-04, E1-05, E1-06, E2-01, E2-02, E2-03, E2-04, E3-01, E3-02, E3-03, E6-01, E7-01, E7-02, E7-03, E7-04, E7-05, E7-06, E8 DONE (đợt 1–6); còn E1-07 và nghiệm thu E1-G, E2-G, E3-G, E6-G, E7-G của owner; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
