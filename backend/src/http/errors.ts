@@ -80,10 +80,11 @@ export class AppError extends Error {
   readonly status: number;
   readonly details: ValidationIssue[];
   readonly headers: Record<string, string>;
+  readonly stage?: string;
 
   constructor(
     code: ErrorCode,
-    options: { message?: string; details?: ValidationIssue[]; headers?: Record<string, string>; cause?: unknown } = {},
+    options: { message?: string; details?: ValidationIssue[]; headers?: Record<string, string>; cause?: unknown; stage?: string } = {},
   ) {
     super(options.message ?? ERROR_MESSAGE[code], { cause: options.cause });
     this.name = 'AppError';
@@ -91,6 +92,7 @@ export class AppError extends Error {
     this.status = ERROR_STATUS[code];
     this.details = options.details ?? [];
     this.headers = options.headers ?? {};
+    this.stage = options.stage;
   }
 }
 

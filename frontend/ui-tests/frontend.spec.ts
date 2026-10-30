@@ -16,6 +16,35 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
+test("E6 · nhãn, màu, viền và chấm mật khẩu không gọi mạng", async ({ page }) => {
+  await installContractMock(page);
+  await page.goto("/register");
+  await expect(page.getByRole("heading", { name: "Tạo tài khoản" })).toBeVisible();
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (!new URL(request.url()).pathname.startsWith("/api/health")) requests.push(request.url());
+  });
+  const status = page.getByRole("status").filter({ hasText: "Độ mạnh mật khẩu" });
+  await expect(status).toHaveAttribute("aria-live", "polite");
+  for (const [password, level, label, color] of [
+    ["abc", "INVALID", "Quá ngắn", null],
+    ["abcdefgh", "WEAK", "Yếu", "rgb(255, 254, 251)"],
+    ["Abcdefgh!", "MEDIUM", "Trung bình", "rgb(217, 196, 157)"],
+    ["Abcdefgh!xyz1", "STRONG", "Mạnh", "rgb(106, 88, 76)"],
+  ]) {
+    await page.getByLabel("Mật khẩu *", { exact: true }).fill(password!);
+    await expect(status).toContainText(label!);
+    const fill = page.locator(`[data-level="${level}"] [aria-hidden="true"] span`);
+    if (color) await expect(fill).toHaveCSS("background-color", color);
+    if (level === "WEAK") {
+      await expect(fill).toHaveCSS("border-top-width", "1px");
+      await expect(fill).toHaveCSS("border-top-color", "rgb(217, 209, 199)");
+    }
+    await noOverflow(page);
+  }
+  expect(requests).toEqual([]);
+});
+
 for (const width of [360, 768, 1280]) {
   test(`responsive ${width}px · cả tám route và axe WCAG AA (mock API)`, async ({
     page,

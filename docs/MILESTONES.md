@@ -10,6 +10,8 @@
 
 Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code owner review. Chỉ tick task sau khi đã kiểm chứng, kèm một dòng bằng chứng. Các ô [OWNER] và FINAL OWNER ACCEPTANCE do owner tự nghiệm thu.
 
+**XBR-28:** Khi một quyết định đã duyệt thay đổi (CR) hoặc trạng thái milestone đổi, cập nhật [PROJECT_OVERVIEW §0](PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút) trong cùng PR (CONTEXT §C8.8; ARCHITECTURE §A12.12).
+
 | Milestone | Phạm vi | Trạng thái |
 |---|---|---|
 | M0 | Thiết kế | Owner đã duyệt |
@@ -17,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0 xong; E1–E3, E6–E8 NOT STARTED; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-02, E6-01, E7-03, E8-01, E8-03 DONE; E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -314,7 +316,7 @@ flowchart LR
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
 | E1-01 | [ ] NOT STARTED | Migration `last_active_at` + activity tracker | XM-01 | commit | E0-02 | Ghi tối đa 1 lần/5 phút; `updated_at` không đổi | Unit + integration |
-| E1-02 | [ ] NOT STARTED | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | `ADMIN_TEST` |
+| E1-02 | [x] DONE | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | 30/10/2026: `npm --prefix backend exec -- vitest run --config backend/admin/vitest.config.ts` 13/13 PASS (token sai/thiếu 403, `X-Forwarded-For` 403, socket không loopback 403, bind 127.0.0.1:3003, DB/S3 không loopback, `NODE_ENV=production` hoặc thiếu token → thoát); `git check-ignore` khớp 3 thư mục; `git ls-files \| grep -i admin` rỗng; lint/build/test gốc PASS (92 backend, 100 frontend). Phần 401 của E1-AC-03 thuộc controller (E1-03) |
 | E1-03 | [ ] NOT STARTED | Controller khởi động admin nếu có, proxy `/browser/admin/*`; Vite bridge cho `/admin/` | XM-02 | commit | E1-02 | Không phiên → 401; không có thư mục admin → Start All vẫn OK | `node --test backend/dev/` |
 | E1-04 | [ ] NOT STARTED | Chuyển panel developer vào thư mục admin, gỡ khỏi Git; nạp bằng `import.meta.glob`; sửa README/WINDOWS_HOSTING/TEAM_HANDOFF; script `scripts/verify/admin-isolation.mjs` | XM-03, XA-05 | admin + commit | E1-03 | E1-AC-01, 02, 06 | `node scripts/verify/admin-isolation.mjs`; clone sạch |
 | E1-05 | [ ] NOT STARTED | ADM-01: số user, tài liệu, dung lượng logic, dung lượng đĩa SeaweedFS, sức khoẻ | XA-02 | admin | E1-01, E1-03 | E1-AC-04, 05 | `ADMIN_TEST overview` |
@@ -370,7 +372,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E6-01 | [ ] NOT STARTED | Hàm chấm điểm + thanh chỉ báo trên form đăng ký | XM-11 | commit | E0-02 | E6-AC-01, 02 | `npm --prefix frontend test`; `test:ui` |
+| E6-01 | [x] DONE | Hàm chấm điểm + thanh chỉ báo trên form đăng ký | XM-11 | commit | E0-02 | E6-AC-01, 02 | 30/10/2026: 15 unit/RTL mới PASS (bảng E6, Unicode, aria-live, không mạng khi gõ, Yếu vẫn đăng ký); lint/build/test gốc PASS (92 backend, 100 frontend); `npm --prefix frontend run test:ui` 8/8 PASS, gồm màu/viền và axe 360/768/1280 px |
 | E6-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E6 | — | — | E6-01 | Owner xem bốn mức trên điện thoại và máy tính | — |
 
 ### E7 — Audit log và chẩn đoán lỗi
@@ -379,7 +381,7 @@ flowchart LR
 |---|---|---|---|---|---|---|---|
 | E7-01 | [ ] NOT STARTED | Migration `audit_events`; repository + recorder + middleware `audited()`; `AUDIT_RETENTION_DAYS`; xoá quá hạn lúc khởi động | XM-13 | commit | E0-02 | E7-AC-04, 05; allowlist `metadata` | Unit + integration; đếm dòng các bảng cũ trước/sau migration |
 | E7-02 | [ ] NOT STARTED | Gắn `audited()` vào route `auth` và `documents` (MVP) | XM-13 | commit | E7-01 | E7-AC-01…03 | Integration; `authz-matrix` 82/82 và `upload-matrix` 42/42 vẫn PASS |
-| E7-03 | [ ] NOT STARTED | Thêm `module`, `stage`, `code` vào dòng log request; `AppError.stage`; gắn `stage` ở chỗ bọc lỗi storage/DB | XM-14 | commit | E0-02 | Dòng log đủ trường ở 400/404/503/500; redact không đổi | Unit (destination giả); contract test vẫn PASS |
+| E7-03 | [x] DONE | Thêm `module`, `stage`, `code` vào dòng log request; `AppError.stage`; gắn `stage` ở chỗ bọc lỗi storage/DB | XM-14 | commit | E0-02 | Dòng log đủ trường ở 400/404/503/500; redact không đổi | 30/10/2026: 25 unit mới PASS (destination giả, 400/404/503/500, redact, stage storage/DB); lint/build/test gốc PASS (92 backend, 85 frontend). Owner chạy integration/contract sau merge; chưa chạy vì Agent A dùng DB test |
 | E7-04 | [ ] NOT STARTED | ADM-08 Activity; ADM-09 Errors đọc file log; ADM-10 tra `requestId` | XA-06, XA-07 | admin | E7-01, E7-03, E1-03 | E7-AC-06…09 | `ADMIN_TEST activity`, `ADMIN_TEST errors` (file log mẫu) |
 | E7-05 | [ ] NOT STARTED | Trang Activity Logs, Errors; chi tiết user hiện `recentActivity` | XA-05 | admin | E7-04, E1-06 | Lọc, tổng hợp theo module/mã, ô tìm `requestId`, `coverageFrom` | Kiểm tay + RTL |
 | E7-06 | [ ] NOT STARTED | Ghi sự kiện `ADMIN_*` (E2); xoá audit khi xoá tài khoản theo XSEQ-01. Sự kiện E4/E5 làm khi hai giai đoạn đó được làm lại | XM-13, XA-03, XA-04 | commit + admin | E7-02, E2-03 | E2-AC-02 (phần audit), E7-AC-10 | Integration + `ADMIN_TEST deletion` |
@@ -391,9 +393,9 @@ Nội dung hướng dẫn đã có sẵn ở [PROJECT_OVERVIEW §0](PROJECT_OVER
 
 | ID | Trạng thái | Task | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|
-| E8-01 | [ ] NOT STARTED | Kiểm §0: mọi link/anchor mở đúng mục; trạng thái khớp phần trên của MILESTONES; phát biểu cache khớp mã; mọi module ở §A3.6/§A12.3 đủ input/output, phụ thuộc, lỗi | docs | E0-02 | E8-AC-02…05 | Danh sách link đã mở; đối chiếu `static.ts`, `request-context.ts` |
+| E8-01 | [x] DONE | Kiểm §0: mọi link/anchor mở đúng mục; trạng thái khớp phần trên của MILESTONES; phát biểu cache khớp mã; mọi module ở §A3.6/§A12.3 đủ input/output, phụ thuộc, lỗi | docs | E0-02 | E8-AC-02…05 | 30/10/2026: 31/31 link trong §0 trỏ đúng tệp và đúng tiêu đề (CONTEXT §C1, §C3.2, §C4, §C6.6, §C8.9; ARCHITECTURE §A1.2, §A1.4, §A3.6, §A5, §A5.5, §A6, §A7, §A12.3, §A12.12, SEQ-01/02/03/05; MILESTONES › E8, Quy tắc và milestone, Nhật ký thay đổi baseline; §12, §13, README); §0.6 khớp trạng thái M1–M5/E/SEC-002; cache khớp `static.ts` (`/assets/*` `public, max-age=31536000, immutable`, còn lại `no-cache`), `noStore()` trên `/api`, API-13 `private, no-store`; 22 module §A3.6 và 21 thẻ §A12.3 đủ ba mục ("—" là chủ đích: hàm thuần/không lỗi riêng); lệnh §0.7 đều tồn tại. Không có chỗ sai cần sửa |
 | E8-02 | [ ] NOT STARTED | Diễn tập 10 phút với một người chưa đọc tài liệu, dùng 10 câu hỏi bên dưới; sửa §0 theo chỗ vướng | docs | E8-01 | E8-AC-01 (≥ 8/10 đúng, ≤ 10 phút) | Ghi thời gian, điểm, chỗ vướng vào bằng chứng |
-| E8-03 | [ ] NOT STARTED | Thêm quy tắc XBR-28 ("cập nhật §0 trong cùng PR khi đổi CR/trạng thái") vào [Quy tắc và milestone](#quy-tắc-và-milestone) | docs | E0-02 | Quy tắc có hiệu lực | Review PR |
+| E8-03 | [x] DONE | Thêm quy tắc XBR-28 ("cập nhật §0 trong cùng PR khi đổi CR/trạng thái") vào [Quy tắc và milestone](#quy-tắc-và-milestone) | docs | E0-02 | Quy tắc có hiệu lực | 30/10/2026: đã đối chiếu quy tắc với CONTEXT §C8.8/ARCHITECTURE §A12.12, kiểm anchor §0; cập nhật §0.6 cùng thay đổi trạng thái. Lint/build/test gốc PASS (92 backend, 100 frontend) |
 | E8-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E8 | — | E8-01…03 | Owner tự đọc §0 và thấy đủ để làm việc tiếp | — |
 
 Câu hỏi diễn tập E8-02: (1) Hệ thống giải quyết bài toán gì; Public khác Private thế nào? (2) Một request đi qua những thành phần nào tới MySQL và storage? (3) Phiên đăng nhập lưu ở đâu, vì sao không dùng JWT? (4) Upload ghi object hay DB trước; lỗi giữa chừng thì sao? (5) User khác mở tài liệu Private của tôi nhận mã gì, vì sao? (6) Module nào quyết định quyền tài liệu? (7) Chạy local và kiểm tra sức khoẻ bằng lệnh gì? (8) Lệnh nào chạy giống CI? (9) Milestone hiện tại, việc tiếp theo, việc đang hoãn/chặn? (10) Hiện có cache gì và không có cache gì?

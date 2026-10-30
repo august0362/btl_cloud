@@ -8,3 +8,6 @@ tmp/
 frontend/dist/
 *.log
 pdf/
+backend/admin/
+frontend/src/admin/
+frontend/admin-tests/
