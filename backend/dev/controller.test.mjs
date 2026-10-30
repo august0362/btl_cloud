@@ -176,3 +176,39 @@ test('a late readiness response cannot mark an already exited child as running',
   assert.equal(manager.status().state, 'failed');
   assert.equal(manager.status().managed, false);
 });
+
+test('XM-02 admin proxy: 401 without developer session, 404 not installed, 503 stopped, forwards token + actor', async () => {
+  const seen = [];
+  const adminServer = createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      seen.push({ method: req.method, url: req.url, auth: req.headers.authorization, actor: req.headers['x-admin-actor'], body });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"data":{"ok":true}}');
+    });
+  });
+  const adminPort = await listen(adminServer);
+  let admin = { installed: false, running: false, token: 'admin-token', port: adminPort };
+  const manager = { status: () => ({ state: 'running' }), execute: async () => {}, admin: () => admin };
+  const developerAuth = { status: async (cookie) => ({ user: cookie === 'btl_developer=ok' ? { username: 'dev1' } : null }) };
+  const server = createController(manager, 'token', 0, undefined, undefined, developerAuth);
+  const port = await listen(server);
+  const call = (path, cookie = 'btl_developer=ok', init = {}) => fetch(`http://127.0.0.1:${port}/browser${path}`,
+    { ...init, headers: { Origin: origin, Authorization: 'Bearer token', 'X-Local-Control': '1', Cookie: cookie } });
+  try {
+    assert.equal((await call('/admin/overview', '')).status, 401);
+    assert.equal((await call('/admin/overview')).status, 404);
+    admin = { ...admin, installed: true };
+    assert.equal((await call('/admin/overview')).status, 503);
+    admin = { ...admin, running: true };
+    const response = await call('/admin/overview?x=1');
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { data: { ok: true } });
+    assert.equal((await call('/admin/users/u1', 'btl_developer=ok', { method: 'PATCH', body: '{"displayName":"A"}' })).status, 200);
+    assert.equal((await call('/admin/users/u1', 'btl_developer=ok', { method: 'PATCH', body: 'x'.repeat(16_385) })).status, 413);
+    assert.deepEqual(seen, [
+      { method: 'GET', url: '/admin/overview?x=1', auth: 'Bearer admin-token', actor: 'dev1', body: '' },
+      { method: 'PATCH', url: '/admin/users/u1', auth: 'Bearer admin-token', actor: 'dev1', body: '{"displayName":"A"}' },
+    ]);
+  } finally { await close(server); await close(adminServer); }
+});

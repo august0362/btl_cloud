@@ -1,6 +1,6 @@
 /* global process, console, Buffer, setTimeout */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
 import { mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -13,6 +13,36 @@ import { localConfig, runtimeDir, runtimeFile, diagnosticFile, projectId } from 
 export { runtimeFile } from './local-config.mjs';
 export const origin = 'http://localhost:5173';
 const controllerPort = 3001;
+
+async function readBody(req, limit) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size <= limit) chunks.push(chunk);
+  }
+  return size > limit ? null : Buffer.concat(chunks);
+}
+
+// XM-02: chuyển tiếp /browser/admin/* tới admin local kèm token và actor; admin tự kiểm token (XA-01).
+async function proxyAdmin(req, res, reply, admin, actor) {
+  if (!admin?.installed) { reply(404, { error: 'Admin chưa được cài trên máy này.' }); return; }
+  if (!['GET', 'POST', 'PATCH'].includes(req.method)) { reply(405, { error: 'Phương thức không được hỗ trợ.' }); return; }
+  const body = await readBody(req, 16_384);
+  if (!body) { reply(413, { error: 'Yêu cầu quá lớn.' }); return; }
+  if (!admin.running) { reply(503, { error: 'Admin đang tắt. Dùng Start All để khởi động.' }); return; }
+  await new Promise((resolve) => {
+    const upstream = request({ host: '127.0.0.1', port: admin.port, path: req.url, method: req.method,
+      headers: { Authorization: `Bearer ${admin.token}`, 'X-Admin-Actor': actor, 'Content-Type': 'application/json', 'Content-Length': body.length },
+    }, (response) => {
+      res.writeHead(response.statusCode ?? 502, { 'Content-Type': response.headers['content-type'] ?? 'application/json; charset=utf-8' });
+      response.pipe(res);
+      response.once('end', resolve);
+    });
+    upstream.once('error', () => { if (!res.headersSent) reply(503, { error: 'Admin đang tắt. Dùng Start All để khởi động.' }); resolve(); });
+    upstream.end(body);
+  });
+}
 
 export function createController(manager, token, port = controllerPort, onShutdown, onFailure = () => {}, developerAuth = createDeveloperAuth()) {
   let shuttingDown = false;
@@ -30,6 +60,7 @@ export function createController(manager, token, port = controllerPort, onShutdo
       reply(403, { error: 'Không được phép truy cập bộ điều khiển cục bộ.' }); return;
     }
     // Vite can only forward browser requests under /browser. CLI uses the on-disk capability.
+    let actor;
     if (req.url.startsWith('/browser/')) {
       req.url = req.url.slice('/browser'.length);
       try {
@@ -37,15 +68,10 @@ export function createController(manager, token, port = controllerPort, onShutdo
           reply(200, await developerAuth.status(req.headers.cookie)); return;
         }
         if (req.method === 'POST' && req.headers['x-local-control'] === '1' && req.url === '/login') {
-          let size = 0;
-          const chunks = [];
-          for await (const chunk of req) {
-            size += chunk.length;
-            if (size <= 4096) chunks.push(chunk);
-          }
-          if (size > 4096) { reply(413, { error: 'Yêu cầu đăng nhập quá lớn.' }); return; }
+          const body = await readBody(req, 4096);
+          if (!body) { reply(413, { error: 'Yêu cầu đăng nhập quá lớn.' }); return; }
           let input;
-          try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+          try { input = JSON.parse(body.toString('utf8')); }
           catch { reply(400, { error: 'Dữ liệu đăng nhập không hợp lệ.' }); return; }
           const result = await developerAuth.login(input?.username, input?.password, req.headers.cookie);
           if (result.cookie) res.setHeader('Set-Cookie', result.cookie);
@@ -55,10 +81,10 @@ export function createController(manager, token, port = controllerPort, onShutdo
           res.setHeader('Set-Cookie', developerAuth.logout(req.headers.cookie));
           reply(200, { user: null }); return;
         }
-        if (!(await developerAuth.status(req.headers.cookie)).user) {
-          reply(401, { error: 'Vui lòng đăng nhập tài khoản nhà phát triển.' }); return;
-        }
+        actor = (await developerAuth.status(req.headers.cookie)).user?.username;
+        if (!actor) { reply(401, { error: 'Vui lòng đăng nhập tài khoản nhà phát triển.' }); return; }
       } catch { reply(503, { error: 'Không đọc được tài khoản nhà phát triển. Hãy liên hệ người quản lý dự án.' }); return; }
+      if (req.url.startsWith('/admin/')) { await proxyAdmin(req, res, reply, manager.admin?.(), actor); return; }
     }
     if (req.method === 'GET' && req.url === '/status') { reply(200, { ...manager.status(), busy: shuttingDown || manager.status().busy }); return; }
     const allowed = ['/start', '/stop', '/restart', '/start-all', ...(onShutdown ? ['/stop-all', '/shutdown'] : [])];

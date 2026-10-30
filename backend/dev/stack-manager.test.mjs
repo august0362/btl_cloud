@@ -85,3 +85,20 @@ test('recovering Backend reuses prepared schema/storage instead of repeating boo
   assert.equal(f.calls.filter((entry) => entry === 'start:mysql').length, 1);
   assert.equal(f.calls.filter((entry) => entry === 'start:backend').length, 2);
 });
+test('XM-02 admin: absent folder → not-installed and Start All still OK; present → started last, stopped first', async () => {
+  const f = fixture();
+  const absent = createStackManager({ env: {} }, createLogs(), { adapters: f.adapters, prepareDependencies: async () => {}, prepareApplication: async () => {} });
+  await absent.execute('start-all');
+  assert.equal(absent.status().admin.state, 'not-installed');
+  assert.equal(absent.admin().installed, false);
+
+  const g = fixture();
+  let adminState = 'stopped';
+  const admin = { status: () => ({ state: adminState }), async execute(action) { g.calls.push(`${action}:admin`); adminState = action === 'start' ? 'running' : 'stopped'; } };
+  const present = createStackManager({ env: {} }, createLogs(), { adapters: { ...g.adapters, admin }, adminToken: 't', prepareDependencies: async () => {}, prepareApplication: async () => {} });
+  await present.execute('start-all');
+  assert.deepEqual(present.admin(), { installed: true, running: true, token: 't', port: 3003 });
+  await present.execute('stop-all');
+  assert.deepEqual(g.calls, ['start:mysql', 'start:seaweedfs', 'start:backend', 'start:frontend', 'start:admin',
+    'stop:admin', 'stop:backend', 'stop:frontend', 'stop:seaweedfs', 'stop:mysql']);
+});
