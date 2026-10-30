@@ -370,7 +370,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E6-01 | [ ] NOT STARTED | Hàm chấm điểm + thanh chỉ báo trên form đăng ký | XM-11 | commit | E0-02 | E6-AC-01, 02 | `npm --prefix frontend test`; `test:ui` |
+| E6-01 | [x] DONE | Hàm chấm điểm + thanh chỉ báo trên form đăng ký | XM-11 | commit | E0-02 | E6-AC-01, 02 | 30/10/2026: 15 unit/RTL mới PASS (bảng E6, Unicode, aria-live, không mạng khi gõ, Yếu vẫn đăng ký); lint/build/test gốc PASS (92 backend, 100 frontend); `npm --prefix frontend run test:ui` 8/8 PASS, gồm màu/viền và axe 360/768/1280 px |
 | E6-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E6 | — | — | E6-01 | Owner xem bốn mức trên điện thoại và máy tính | — |
 
 ### E7 — Audit log và chẩn đoán lỗi

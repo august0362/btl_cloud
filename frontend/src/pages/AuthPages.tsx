@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { ApiError } from "../api/errors";
 import { useAuth } from "../auth/context";
 import { Alert, Button, PasswordField, TextField } from "../components/ui";
+import { PasswordStrengthMeter } from "../components/PasswordStrengthMeter";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { useToast } from "../hooks/useToast";
 import { errorMessage, fieldErrors } from "../lib/errorMessages";
@@ -149,6 +150,7 @@ function AuthForm({ registration }: { registration: boolean }) {
               }))
             }
           />
+          {registration && <PasswordStrengthMeter password={values.password} />}
           {registration && (
             <PasswordField
               name="confirmPassword"
