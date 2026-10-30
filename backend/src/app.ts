@@ -10,6 +10,7 @@ import { securityHeaders } from './http/middleware/security-headers.js';
 import { serveFrontend } from './http/static.js';
 import type { Logger } from './lib/logger.js';
 import { metricsMiddleware } from './metrics/metrics.js';
+import { createAudited } from './modules/audit/audited.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import type { SessionCookieConfig } from './modules/auth/session.cookie.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
@@ -56,7 +57,8 @@ export function createApp(deps: AppDeps): Express {
       checkStorage: () => storage.checkHealth(),
     }),
   );
-  api.use('/auth', authRoutes(services.auth, cookie, config.authRateLimitMax));
+  const audited = createAudited(services.audit);
+  api.use('/auth', authRoutes(services.auth, cookie, config.authRateLimitMax, audited));
   api.use(
     '/documents',
     documentRoutes({
@@ -64,6 +66,7 @@ export function createApp(deps: AppDeps): Express {
       repository: services.documents,
       upload: createUploadMiddleware(config.upload.tmpDir),
       logger,
+      audited,
     }),
   );
   api.use(apiNotFound);

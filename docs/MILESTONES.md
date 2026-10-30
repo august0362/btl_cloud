@@ -19,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E2-01, E3-01, E6-01, E7-01, E7-03, E8-01, E8-03 DONE (hết đợt 1); E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E2-01, E3-01, E6-01, E7-01, E7-02, E7-03, E8-01, E8-03 DONE (đợt 1; đợt 2 trừ E8-02); E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -380,7 +380,7 @@ flowchart LR
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
 | E7-01 | [x] DONE | Migration `audit_events`; repository + recorder + middleware `audited()`; `AUDIT_RETENTION_DAYS`; xoá quá hạn lúc khởi động | XM-13 | commit | E0-02 | E7-AC-04, 05; allowlist `metadata` | Unit + integration; đếm dòng các bảng cũ trước/sau migration. 30/10/2026, `793341b` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 87, gồm `audit.test.ts` 15/15; frontend 85); `test:integration` 86/86 (`audit.test.ts` 5/5: E7-AC-04, E7-AC-05 khởi động lại backend thật, allowlist); áp cả 3 migration bằng `migrate deploy`: users 3/3, sessions 2/2, documents 3/3; DB test ↔ schema không lệch |
-| E7-02 | [ ] NOT STARTED | Gắn `audited()` vào route `auth` và `documents` (MVP) | XM-13 | commit | E7-01 | E7-AC-01…03 | Integration; `authz-matrix` 82/82 và `upload-matrix` 42/42 vẫn PASS |
+| E7-02 | [x] DONE | Gắn `audited()` vào route `auth` và `documents` (MVP) | XM-13 | commit | E7-01 | E7-AC-01…03 | Integration; `authz-matrix` 82/82 và `upload-matrix` 42/42 vẫn PASS. 30/10/2026 (`TAV_branch`): `test:integration` 89/89 (`audit.test.ts`: E7-AC-01…05); `authz-matrix` 82/82, `upload-matrix` 42/42 với backend trỏ DB test (:3010); lint, `tsc`, unit PASS (backend 122, frontend 101). Đăng xuất khi chưa đăng nhập không tạo sự kiện |
 | E7-03 | [x] DONE | Thêm `module`, `stage`, `code` vào dòng log request; `AppError.stage`; gắn `stage` ở chỗ bọc lỗi storage/DB | XM-14 | commit | E0-02 | Dòng log đủ trường ở 400/404/503/500; redact không đổi | 30/10/2026: 25 unit mới PASS (destination giả, 400/404/503/500, redact, stage storage/DB); lint/build/test gốc PASS (92 backend, 85 frontend). Owner chạy integration/contract sau merge; chưa chạy vì Agent A dùng DB test |
 | E7-04 | [ ] NOT STARTED | ADM-08 Activity; ADM-09 Errors đọc file log; ADM-10 tra `requestId` | XA-06, XA-07 | admin | E7-01, E7-03, E1-03 | E7-AC-06…09 | `ADMIN_TEST activity`, `ADMIN_TEST errors` (file log mẫu) |
 | E7-05 | [ ] NOT STARTED | Trang Activity Logs, Errors; chi tiết user hiện `recentActivity` | XA-05 | admin | E7-04, E1-06 | Lọc, tổng hợp theo module/mã, ô tìm `requestId`, `coverageFrom` | Kiểm tay + RTL |

@@ -20,7 +20,7 @@ export function auditEventFor(action: AuditAction, req: Request, res: Response, 
   const isAuthAction = action === 'AUTH_LOGIN' || action === 'AUTH_REGISTER';
   let actorId = stringOrNull(res.locals.auditActorId) ?? req.auth?.userId ?? null;
   if (!success && isAuthAction) actorId = null;
-  else if (!success && actorId === null) return null;
+  else if (actorId === null && !isAuthAction) return null; // Guest (vd. đăng xuất khi chưa đăng nhập) không tạo sự kiện
 
   const { targetType } = AUDIT_ACTIONS[action];
   let targetId = stringOrNull(res.locals.auditTargetId) ?? paramId ?? (targetType === 'USER' ? actorId : null);

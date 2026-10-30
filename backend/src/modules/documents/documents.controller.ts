@@ -51,6 +51,8 @@ export function createDocumentsController(service: DocumentService, logger: Logg
       if (issues.length > 0 || !fields.success || !req.file) throw validationError(issues);
       const inspected = await inspectFile(req.file.path, req.file.originalname, req.file.size);
       const dto = await service.create(user.userId, fields.data, inspected);
+      res.locals.auditTargetId = dto.id;
+      res.locals.auditMetadata = { visibility: dto.visibility, fileType: dto.fileType, sizeBytes: dto.sizeBytes };
       res.status(201).location(`/api/documents/${dto.id}`).json({ data: dto });
     } finally {
       await removeFileQuietly(req.file?.path);
@@ -61,7 +63,9 @@ export function createDocumentsController(service: DocumentService, logger: Logg
   const update: RequestHandler = async (req, res) => {
     const user = requireUser(req);
     const patch = parseOrThrow(patchSchema, req.body ?? {});
-    res.json({ data: await service.updateMetadata(loadedDocument(res), patch, user.userId) });
+    const dto = await service.updateMetadata(loadedDocument(res), patch, user.userId);
+    res.locals.auditMetadata = { fields: Object.keys(patch), visibility: dto.visibility };
+    res.json({ data: dto });
   };
 
   /** API-12 (loader đã áp canManage trước khi multer đọc body) */
@@ -72,7 +76,9 @@ export function createDocumentsController(service: DocumentService, logger: Logg
       const issues = multipartIssues(req, fields.success ? [] : fields.issues);
       if (issues.length > 0 || !req.file) throw validationError(issues);
       const inspected = await inspectFile(req.file.path, req.file.originalname, req.file.size);
-      res.json({ data: await service.replaceFile(loadedDocument(res), inspected, user.userId) });
+      const dto = await service.replaceFile(loadedDocument(res), inspected, user.userId);
+      res.locals.auditMetadata = { fileType: dto.fileType, sizeBytes: dto.sizeBytes, fileVersion: dto.fileVersion };
+      res.json({ data: dto });
     } finally {
       await removeFileQuietly(req.file?.path);
     }

@@ -2,13 +2,10 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express, { type Express, type RequestHandler } from 'express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuditAction } from '../../src/modules/audit/audit.recorder.js';
-import { createAudited } from '../../src/modules/audit/audited.js';
 import { TEST_ENV } from '../helpers/config.js';
-import { CSRF, createTestContext, registerUser, resetDatabase, uploadRequest, type TestContext, type TestUser } from './context.js';
+import { CSRF, createTestContext, registerUser, resetDatabase, uploadRequest, type TestContext } from './context.js';
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -26,25 +23,6 @@ beforeEach(async () => {
   await ctx.prisma.$executeRawUnsafe('DELETE FROM audit_events');
   ctx.logs.length = 0;
 });
-
-/**
- * E7-01 chưa gắn audited() vào route nào (việc của E7-02) → test bọc app thật bằng một app ngoài
- * gắn audited() đúng đường dẫn; req/res đi tiếp vào app thật như khi gắn trong router.
- */
-function auditedApp(method: 'post' | 'get', route: string, action: AuditAction, before: RequestHandler[] = []): Express {
-  const outer = express();
-  outer[method](route, ...before, createAudited(ctx.services.audit)(action));
-  outer.use(ctx.app);
-  return outer;
-}
-
-/** Đăng nhập qua app bọc ngoài để agent giữ cookie phiên của app đó. */
-async function loginOn(app: Express, user: TestUser): Promise<TestUser> {
-  const agent = request.agent(app);
-  const res = await agent.post('/api/auth/login').set(CSRF).send({ email: user.email, password: 'matkhau123' });
-  expect(res.status).toBe(200);
-  return { ...user, agent };
-}
 
 async function waitFor<T>(read: () => Promise<T>, done: (value: T) => boolean): Promise<T> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -94,26 +72,22 @@ describe('Migration audit_events (§A12.4)', () => {
 });
 
 describe('Audit recorder qua app thật (E7-01)', () => {
-  it('ghi sự kiện SUCCESS với actor, requestId trùng X-Request-Id; metadata chỉ giữ khoá trong allowlist', async () => {
+  it('upload qua route thật: SUCCESS với actor, đối tượng, requestId trùng X-Request-Id; metadata chỉ gồm khoá allowlist', async () => {
     const a = await registerUser(ctx.app);
-    const injectMetadata: RequestHandler = (_req, res, next) => {
-      res.locals.auditMetadata = { visibility: 'PUBLIC', title: 'Tiêu đề bí mật XYZ', email: a.email, originalFilename: 'bi-mat.pdf' };
-      next();
-    };
-    const app = auditedApp('post', '/api/documents', 'DOCUMENT_UPLOAD', [injectMetadata]);
-    const res = await uploadRequest(await loginOn(app, a), { title: 'Tiêu đề bí mật XYZ', visibility: 'PUBLIC' });
+    const res = await uploadRequest(a, { title: 'Tiêu đề bí mật XYZ', visibility: 'PUBLIC', filename: 'bi-mat.pdf' });
     expect(res.status).toBe(201);
 
-    const rows = await waitFor(() => ctx.prisma.auditEvent.findMany(), (found) => found.length > 0);
+    const rows = await waitFor(() => ctx.prisma.auditEvent.findMany({ where: { action: 'DOCUMENT_UPLOAD' } }), (found) => found.length > 0);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       actorType: 'USER',
       actorId: a.id,
-      action: 'DOCUMENT_UPLOAD',
+      targetType: 'DOCUMENT',
+      targetId: res.body.data.id,
       outcome: 'SUCCESS',
       errorCode: null,
       requestId: res.headers['x-request-id'],
-      metadata: { visibility: 'PUBLIC' },
+      metadata: { visibility: 'PUBLIC', fileType: 'PDF', sizeBytes: res.body.data.sizeBytes },
     });
     const leaked = await ctx.prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT COUNT(*) AS n FROM audit_events
@@ -141,10 +115,11 @@ describe('Audit recorder qua app thật (E7-01)', () => {
 
   it('E7-AC-04: ghi audit lỗi → upload vẫn 201, tài liệu tồn tại, log ERROR audit.write_failed kèm requestId', async () => {
     const a = await registerUser(ctx.app);
+    // Đợi AUTH_REGISTER ghi xong để lần lỗi giả rơi đúng vào DOCUMENT_UPLOAD.
+    await waitFor(() => ctx.prisma.auditEvent.count(), (n) => n === 1);
     const spy = vi.spyOn(ctx.services.auditEvents, 'insert').mockRejectedValueOnce(new Error('audit_events không ghi được'));
     try {
-      const app = auditedApp('post', '/api/documents', 'DOCUMENT_UPLOAD');
-      const res = await uploadRequest(await loginOn(app, a), { title: 'AC-04', visibility: 'PRIVATE' });
+      const res = await uploadRequest(a, { title: 'AC-04', visibility: 'PRIVATE' });
       expect(res.status).toBe(201);
       expect(await ctx.prisma.document.count({ where: { id: res.body.data.id } })).toBe(1);
 
@@ -155,7 +130,7 @@ describe('Audit recorder qua app thật (E7-01)', () => {
       );
       expect(line).toMatchObject({ level: 50, event: 'audit.write_failed', action: 'DOCUMENT_UPLOAD', requestId: requestIdHeader });
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(await ctx.prisma.auditEvent.count()).toBe(0);
+      expect(await ctx.prisma.auditEvent.count({ where: { action: 'DOCUMENT_UPLOAD' } })).toBe(0);
     } finally {
       spy.mockRestore();
     }
@@ -220,5 +195,65 @@ describe('E7-AC-05: retention lúc khởi động', () => {
     expect(rows).toHaveLength(1);
     expect(Date.now() - (rows[0]?.createdAt.getTime() ?? 0)).toBeLessThan(DAY_MS);
     expect(output).not.toContain('audit.purge_failed');
+  });
+});
+
+describe('E7-02: audited() trên route auth và documents', () => {
+  const events = (where: Record<string, unknown> = {}) => ctx.prisma.auditEvent.findMany({ where, orderBy: { id: 'asc' } });
+
+  it('E7-AC-01: đăng nhập, tải lên, tải xuống, xoá, đăng xuất → 5 sự kiện SUCCESS đúng thứ tự, actor, đối tượng, requestId', async () => {
+    const a = await registerUser(ctx.app);
+    const agent = request.agent(ctx.app);
+    const requests = [await agent.post('/api/auth/login').set(CSRF).send({ email: a.email, password: 'matkhau123' })];
+    const upload = await uploadRequest({ ...a, agent }, { title: 'AC-01', visibility: 'PRIVATE' });
+    const id = upload.body.data.id as string;
+    requests.push(upload, await agent.get(`/api/documents/${id}/download`), await agent.delete(`/api/documents/${id}`).set(CSRF),
+      await agent.post('/api/auth/logout').set(CSRF));
+    expect(requests.map((r) => r.status)).toEqual([200, 201, 200, 204, 204]);
+
+    const rows = await waitFor(() => events({ action: { not: 'AUTH_REGISTER' } }), (found) => found.length === 5);
+    expect(rows.map((r) => [r.action, r.outcome, r.actorType, r.actorId, r.targetType, r.targetId, r.requestId])).toEqual([
+      ['AUTH_LOGIN', 'SUCCESS', 'USER', a.id, 'USER', a.id, requests[0]?.headers['x-request-id']],
+      ['DOCUMENT_UPLOAD', 'SUCCESS', 'USER', a.id, 'DOCUMENT', id, requests[1]?.headers['x-request-id']],
+      ['DOCUMENT_DOWNLOAD', 'SUCCESS', 'USER', a.id, 'DOCUMENT', id, requests[2]?.headers['x-request-id']],
+      ['DOCUMENT_DELETE', 'SUCCESS', 'USER', a.id, 'DOCUMENT', id, requests[3]?.headers['x-request-id']],
+      ['AUTH_LOGOUT', 'SUCCESS', 'USER', a.id, 'USER', a.id, requests[4]?.headers['x-request-id']],
+    ]);
+  });
+
+  it('E7-AC-02: đăng nhập sai → FAILURE ẩn danh không email; B tải Private của A → FAILURE DOCUMENT_NOT_FOUND, actor B', async () => {
+    const a = await registerUser(ctx.app);
+    const b = await registerUser(ctx.app, 'Trần Thị B');
+    const wrong = await request(ctx.app).post('/api/auth/login').set(CSRF).send({ email: a.email, password: 'sai-mat-khau' });
+    expect(wrong.status).toBe(401);
+    const doc = await uploadRequest(a, { title: 'Riêng của A', visibility: 'PRIVATE' });
+    expect((await b.agent.get(`/api/documents/${doc.body.data.id}/download`)).status).toBe(404);
+
+    const rows = await waitFor(() => events({ outcome: 'FAILURE' }), (found) => found.length === 2);
+    expect(rows.map((r) => [r.action, r.actorType, r.actorId, r.targetType, r.targetId, r.errorCode, r.metadata])).toEqual([
+      ['AUTH_LOGIN', 'ANONYMOUS', null, null, null, 'INVALID_CREDENTIALS', null],
+      ['DOCUMENT_DOWNLOAD', 'USER', b.id, 'DOCUMENT', doc.body.data.id, 'DOCUMENT_NOT_FOUND', null],
+    ]);
+  });
+
+  it('E7-AC-03: xem, tìm, chi tiết, /auth/me, health, Guest 401 không tạo sự kiện; bảng không chứa mật khẩu, email, tiêu đề', async () => {
+    const a = await registerUser(ctx.app);
+    const doc = await uploadRequest(a, { title: 'Tiêu đề QWERTY', visibility: 'PUBLIC' });
+    await waitFor(() => ctx.prisma.auditEvent.count(), (n) => n === 2);
+    const guest = request(ctx.app);
+    const id = doc.body.data.id as string;
+    const statuses = [
+      (await guest.get('/api/documents?q=QWERTY')).status, (await guest.get(`/api/documents/${id}`)).status,
+      (await a.agent.get('/api/documents/mine')).status, (await a.agent.get('/api/auth/me')).status,
+      (await guest.get('/api/health')).status, (await guest.get(`/api/documents/${id}/download`)).status,
+      (await guest.post('/api/auth/logout').set(CSRF)).status,
+    ];
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 401, 204]);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect((await events()).map((r) => r.action)).toEqual(['AUTH_REGISTER', 'DOCUMENT_UPLOAD']);
+
+    const dump = JSON.stringify(await ctx.prisma.$queryRaw`SELECT * FROM audit_events`, (_key, value: unknown) =>
+      typeof value === 'bigint' ? value.toString() : value);
+    for (const secret of ['matkhau123', a.email, 'QWERTY']) expect(dump).not.toContain(secret);
   });
 });

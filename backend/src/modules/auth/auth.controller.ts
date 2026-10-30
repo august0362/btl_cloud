@@ -20,6 +20,7 @@ export function createAuthController(auth: AuthService, cookie: SessionCookieCon
   const register: RequestHandler = async (req, res) => {
     const input = parseOrThrow(registerSchema, req.body ?? {});
     const result = await auth.register(input, currentToken(req.cookies));
+    res.locals.auditActorId = result.user.id;
     setSessionCookie(res, cookie, result.token);
     res.status(201).json({ data: { user: result.user } });
   };
@@ -28,6 +29,7 @@ export function createAuthController(auth: AuthService, cookie: SessionCookieCon
   const login: RequestHandler = async (req, res) => {
     const input = parseOrThrow(loginSchema, req.body ?? {});
     const result = await auth.login(input, currentToken(req.cookies));
+    res.locals.auditActorId = result.user.id;
     setSessionCookie(res, cookie, result.token);
     res.status(200).json({ data: { user: result.user } });
   };
