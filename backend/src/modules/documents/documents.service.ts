@@ -11,8 +11,12 @@ import { canView, type Viewer } from './document.policy.js';
 import type { DocumentRepository, DocumentWithOwner } from './document.repository.js';
 import type { CreateFields, MineQuery, PatchInput, PublicQuery } from './documents.schemas.js';
 
-function storageUnavailable(error: unknown): AppError {
-  return new AppError('STORAGE_UNAVAILABLE', { cause: error });
+function storageUnavailable(error: unknown, stage: 'storage.put' | 'storage.get'): AppError {
+  return new AppError('STORAGE_UNAVAILABLE', { cause: error, stage });
+}
+
+function databaseError(error: unknown): AppError {
+  return error instanceof AppError ? error : new AppError('INTERNAL_ERROR', { cause: error, stage: 'db' });
 }
 
 export class DocumentService {
@@ -49,7 +53,7 @@ export class DocumentService {
     try {
       await this.storage.deleteObject(storageKey);
     } catch (error) {
-      this.logger.warn({ err: error, event: 'storage.orphan', storageKey }, 'Không xoá được object');
+      this.logger.warn({ err: error, event: 'storage.orphan', stage: 'storage.delete', storageKey }, 'Không xoá được object');
     }
   }
 
@@ -60,7 +64,7 @@ export class DocumentService {
     try {
       await this.storage.putObject({ key: storageKey, filePath: file.tmpPath, contentType: file.mimeType, contentLength: file.sizeBytes });
     } catch (error) {
-      throw storageUnavailable(error);
+      throw storageUnavailable(error, 'storage.put');
     }
     const now = this.clock.now();
     try {
@@ -72,7 +76,7 @@ export class DocumentService {
       });
     } catch (error) {
       await this.deleteObjectBestEffort(storageKey);
-      throw error;
+      throw databaseError(error);
     }
     return this.reload(documentId, ownerId);
   }
@@ -87,8 +91,8 @@ export class DocumentService {
       const updated = await this.documents.updateMetadata(doc.id, data, this.clock.now());
       return toDocumentDto(updated, viewerUserId);
     } catch (error) {
-      if (isRecordNotFound(error)) throw new AppError('DOCUMENT_NOT_FOUND');
-      throw error;
+      if (isRecordNotFound(error)) throw new AppError('DOCUMENT_NOT_FOUND', { stage: 'db' });
+      throw databaseError(error);
     }
   }
 
@@ -98,17 +102,17 @@ export class DocumentService {
     try {
       await this.storage.putObject({ key: newKey, filePath: file.tmpPath, contentType: file.mimeType, contentLength: file.sizeBytes });
     } catch (error) {
-      throw storageUnavailable(error);
+      throw storageUnavailable(error, 'storage.put');
     }
     try {
       const changed = await this.documents.updateFile(doc.id, {
         storageKey: newKey, fileType: file.fileType, mimeType: file.mimeType,
         originalFilename: file.sanitizedFilename, sizeBytes: file.sizeBytes,
       }, this.clock.now());
-      if (changed === 0) throw new AppError('DOCUMENT_NOT_FOUND');
+      if (changed === 0) throw new AppError('DOCUMENT_NOT_FOUND', { stage: 'db' });
     } catch (error) {
       await this.deleteObjectBestEffort(newKey);
-      throw error;
+      throw databaseError(error);
     }
     await this.deleteObjectBestEffort(doc.storageKey);
     return this.reload(doc.id, viewerUserId);
@@ -120,8 +124,8 @@ export class DocumentService {
     try {
       deleted = await this.documents.delete(doc.id);
     } catch (error) {
-      if (isRecordNotFound(error)) throw new AppError('DOCUMENT_NOT_FOUND');
-      throw error;
+      if (isRecordNotFound(error)) throw new AppError('DOCUMENT_NOT_FOUND', { stage: 'db' });
+      throw databaseError(error);
     }
     await this.deleteObjectBestEffort(deleted.storageKey);
   }
@@ -132,9 +136,9 @@ export class DocumentService {
       return await this.storage.getObject(doc.storageKey);
     } catch (error) {
       if (error instanceof StorageError && error.kind === 'NOT_FOUND') {
-        this.logger.error({ event: 'download.object_missing', documentId: doc.id, storageKey: doc.storageKey }, 'Object của tài liệu không tồn tại');
+        this.logger.error({ event: 'download.object_missing', stage: 'storage.get', documentId: doc.id, storageKey: doc.storageKey }, 'Object của tài liệu không tồn tại');
       }
-      throw storageUnavailable(error);
+      throw storageUnavailable(error, 'storage.get');
     }
   }
 }

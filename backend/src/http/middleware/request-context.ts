@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from '../../lib/logger.js';
+import { moduleOf } from '../../lib/module-of.js';
 import type { AuthContext } from '../../modules/auth/auth.service.js';
 
 declare module 'express-serve-static-core' {
@@ -31,6 +32,18 @@ export function requestLogger(logger: Logger): RequestHandler {
     customProps: (req) => ({
       requestId: (req as unknown as { id: string }).id,
       userId: (req as unknown as { auth: AuthContext | null }).auth?.userId ?? null,
+    }),
+    customSuccessObject: (req, res, value) => ({
+      ...value,
+      module: moduleOf((req as Request).originalUrl),
+      code: (res as Response).locals.errorCode ?? null,
+      stage: (res as Response).locals.errorStage ?? null,
+    }),
+    customErrorObject: (req, res, _error, value) => ({
+      ...value,
+      module: moduleOf((req as Request).originalUrl),
+      code: (res as Response).locals.errorCode ?? null,
+      stage: (res as Response).locals.errorStage ?? null,
     }),
     customLogLevel: (_req, res, error) => (error || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
     serializers: {
