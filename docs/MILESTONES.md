@@ -19,7 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
-| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-02, E6-01, E7-03, E8-01, E8-03 DONE; E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E2-01, E3-01, E6-01, E7-01, E7-03, E8-01, E8-03 DONE (hết đợt 1); E1–E3, E6–E8 còn task/gate; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -315,7 +315,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E1-01 | [ ] NOT STARTED | Migration `last_active_at` + activity tracker | XM-01 | commit | E0-02 | Ghi tối đa 1 lần/5 phút; `updated_at` không đổi | Unit + integration |
+| E1-01 | [x] DONE | Migration `last_active_at` + activity tracker | XM-01 | commit | E0-02 | Ghi tối đa 1 lần/5 phút; `updated_at` không đổi | Unit + integration. 30/10/2026, `8610c9f` (`feature/wave1-a`, đã merge vào `TAV_branch`): `npm run lint && npm run build && npm test` PASS (backend unit 71, frontend 85); `test:integration` 77/77 (`activity.test.ts` 3/3); `migrate deploy` lên DB test có dữ liệu: số dòng users/sessions/documents không đổi |
 | E1-02 | [x] DONE | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | 30/10/2026: `npm --prefix backend exec -- vitest run --config backend/admin/vitest.config.ts` 13/13 PASS (token sai/thiếu 403, `X-Forwarded-For` 403, socket không loopback 403, bind 127.0.0.1:3003, DB/S3 không loopback, `NODE_ENV=production` hoặc thiếu token → thoát); `git check-ignore` khớp 3 thư mục; `git ls-files \| grep -i admin` rỗng; lint/build/test gốc PASS (92 backend, 100 frontend). Phần 401 của E1-AC-03 thuộc controller (E1-03) |
 | E1-03 | [ ] NOT STARTED | Controller khởi động admin nếu có, proxy `/browser/admin/*`; Vite bridge cho `/admin/` | XM-02 | commit | E1-02 | Không phiên → 401; không có thư mục admin → Start All vẫn OK | `node --test backend/dev/` |
 | E1-04 | [ ] NOT STARTED | Chuyển panel developer vào thư mục admin, gỡ khỏi Git; nạp bằng `import.meta.glob`; sửa README/WINDOWS_HOSTING/TEAM_HANDOFF; script `scripts/verify/admin-isolation.mjs` | XM-03, XA-05 | admin + commit | E1-03 | E1-AC-01, 02, 06 | `node scripts/verify/admin-isolation.mjs`; clone sạch |
@@ -328,7 +328,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E2-01 | [ ] NOT STARTED | Migration `deletion_started_at`; app public coi user `DELETING` như không tồn tại | XM-04 | commit | E0-02 | Không đăng nhập được; tài liệu 404, không có trong tìm kiếm | Integration; `node scripts/verify/authz-matrix.mjs` |
+| E2-01 | [x] DONE | Migration `deletion_started_at`; app public coi user `DELETING` như không tồn tại | XM-04 | commit | E0-02 | Không đăng nhập được; tài liệu 404, không có trong tìm kiếm | Integration; `node scripts/verify/authz-matrix.mjs`. 30/10/2026, `36db668` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 71, frontend 85); `test:integration` 81/81 (`deleting-user.test.ts` 4/4); `authz-matrix` 82/82 với backend build trỏ DB test (:3010); số dòng không đổi |
 | E2-02 | [ ] NOT STARTED | ADM-02, 03, 05, 06: tìm, xem, sửa email/tên hiển thị, thu hồi phiên (avatar, bio, username hoãn cùng E4–E5) | XA-03 | admin | E1-05 | E2-AC-01…03 (phần audit kiểm ở E7-06); không có `passwordHash` | `ADMIN_TEST users` |
 | E2-03 | [ ] NOT STARTED | ADM-07 xoá tài khoản theo XSEQ-01 | XA-04 | admin | E2-01, E2-02 | E2-AC-04…06 (dùng `fault-storage`) | `ADMIN_TEST deletion` |
 | E2-04 | [ ] NOT STARTED | Trang danh sách user và chi tiết (sửa, thu hồi phiên, xoá có gõ email, "Tiếp tục xoá") | XA-05 | admin | E1-06, E2-02, E2-03 | Xoá thử trên dữ liệu thử nghiệm | Kiểm tay + RTL |
@@ -338,7 +338,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E3-01 | [ ] NOT STARTED | Đo request/CPU/RAM/event loop trong backend; ghi file snapshot từ `express-child.mjs` | XM-05 | commit | E0-02 | E3-AC-02; file cập nhật mỗi 5 s | Unit; `node --test backend/dev/` |
+| E3-01 | [x] DONE | Đo request/CPU/RAM/event loop trong backend; ghi file snapshot từ `express-child.mjs` | XM-05 | commit | E0-02 | E3-AC-02; file cập nhật mỗi 5 s | Unit; `node --test backend/dev/`. 30/10/2026, `8e47070` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 97, gồm `metrics.test.ts` 10/10; frontend 85); `node --test backend/dev/*.test.mjs` 34/34 (gồm `express-child.test.mjs`); `test:integration` 86/86 |
 | E3-02 | [ ] NOT STARTED | ADM-01 thêm `metrics`; phần Hiệu năng trên Dashboard | XA-02, XA-05 | admin | E3-01, E1-06 | E3-AC-01, 03 | `ADMIN_TEST overview` + kiểm tay |
 | E3-03 | [ ] NOT STARTED | Seed DB thử tải + README lệnh `autocannon`; chạy 3 kịch bản; báo cáo điểm nghẽn và nhận xét có cần cache không | XM-12 | commit | E3-02 | E3-AC-04 | Báo cáo trong bằng chứng task |
 | E3-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E3 | — | — | E3-01…03 | Owner xem dashboard khi đang thử tải | — |
@@ -379,7 +379,7 @@ flowchart LR
 
 | ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
 |---|---|---|---|---|---|---|---|
-| E7-01 | [ ] NOT STARTED | Migration `audit_events`; repository + recorder + middleware `audited()`; `AUDIT_RETENTION_DAYS`; xoá quá hạn lúc khởi động | XM-13 | commit | E0-02 | E7-AC-04, 05; allowlist `metadata` | Unit + integration; đếm dòng các bảng cũ trước/sau migration |
+| E7-01 | [x] DONE | Migration `audit_events`; repository + recorder + middleware `audited()`; `AUDIT_RETENTION_DAYS`; xoá quá hạn lúc khởi động | XM-13 | commit | E0-02 | E7-AC-04, 05; allowlist `metadata` | Unit + integration; đếm dòng các bảng cũ trước/sau migration. 30/10/2026, `793341b` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 87, gồm `audit.test.ts` 15/15; frontend 85); `test:integration` 86/86 (`audit.test.ts` 5/5: E7-AC-04, E7-AC-05 khởi động lại backend thật, allowlist); áp cả 3 migration bằng `migrate deploy`: users 3/3, sessions 2/2, documents 3/3; DB test ↔ schema không lệch |
 | E7-02 | [ ] NOT STARTED | Gắn `audited()` vào route `auth` và `documents` (MVP) | XM-13 | commit | E7-01 | E7-AC-01…03 | Integration; `authz-matrix` 82/82 và `upload-matrix` 42/42 vẫn PASS |
 | E7-03 | [x] DONE | Thêm `module`, `stage`, `code` vào dòng log request; `AppError.stage`; gắn `stage` ở chỗ bọc lỗi storage/DB | XM-14 | commit | E0-02 | Dòng log đủ trường ở 400/404/503/500; redact không đổi | 30/10/2026: 25 unit mới PASS (destination giả, 400/404/503/500, redact, stage storage/DB); lint/build/test gốc PASS (92 backend, 85 frontend). Owner chạy integration/contract sau merge; chưa chạy vì Agent A dùng DB test |
 | E7-04 | [ ] NOT STARTED | ADM-08 Activity; ADM-09 Errors đọc file log; ADM-10 tra `requestId` | XA-06, XA-07 | admin | E7-01, E7-03, E1-03 | E7-AC-06…09 | `ADMIN_TEST activity`, `ADMIN_TEST errors` (file log mẫu) |
