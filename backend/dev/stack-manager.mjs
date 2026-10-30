@@ -25,7 +25,7 @@ export function createStackManager(config, logs, overrides = {}) {
   const native = (name, port, ready, timeout) => createProcessManager({
     name, port, cwd: backendDir, logs, ready, startTimeout: timeout,
     env: { ...config.env, BTL_LOCAL_SERVICE: name },
-    args: name === 'backend' ? ['--env-file-if-exists=.env', '--import', 'tsx', 'dev/express-child.mjs'] : ['dev/service-child.mjs'],
+    args: name === 'backend' ? ['--env-file-if-exists=.env', ...(config.env.BTL_LOCAL_PRODUCTION === '1' ? [] : ['--import', 'tsx']), 'dev/express-child.mjs'] : ['dev/service-child.mjs'],
   });
   services.backend = adapters?.backend ?? native('backend', 3000, () => httpReady('http://127.0.0.1:3000/api/health', 'ok'), 30_000);
   services.frontend = adapters?.frontend ?? native('frontend', 5173, () => httpReady('http://localhost:5173'), 30_000);

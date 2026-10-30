@@ -53,8 +53,11 @@ export function createProcessManager({ cwd, args, port = 3000, env = process.env
     lastError = null;
     expectedExit = false;
     transition('starting', 'Đang khởi động dịch vụ.');
+    // The localhost controller may own a built production backend; Vite stays local/dev.
+    const production = name === 'backend' && env.BTL_LOCAL_PRODUCTION === '1';
     const owned = spawn(process.execPath, args, {
-      cwd, env: { ...env, NODE_ENV: 'development', PORT: String(port), SERVE_FRONTEND: 'false' },
+      cwd, env: { ...env, NODE_ENV: production ? 'production' : 'development', PORT: String(port),
+        SERVE_FRONTEND: production ? 'true' : 'false', ...(name === 'backend' ? { HOST: '127.0.0.1' } : {}) },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true, detached: true,
     });
     child = owned;

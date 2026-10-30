@@ -45,6 +45,14 @@ for (const width of [360, 768, 1280]) {
           exact: true,
         }),
       ).toBeVisible();
+      expect(await page.evaluate(() => {
+        const family = getComputedStyle(document.body).fontFamily;
+        return family.includes("Segoe UI") && Array.from(document.querySelectorAll(
+          "h1, h2, .metadata, .document-meta, .navigation, button, input, textarea, select",
+        )).every((element) => getComputedStyle(element).fontFamily === family);
+      })).toBe(true);
+      await expect(page.getByText("Đăng nhập nhà phát triển", { exact: true })).toHaveCount(0);
+      await expect(page.getByRole("switch", { name: "Backend", exact: true })).toHaveCount(0);
       if (route === "/")
         await expect(
           page.getByRole("link", { name: documentFixture.title, exact: true }),

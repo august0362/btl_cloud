@@ -33,11 +33,15 @@ Trong PowerShell, có thể dùng `Copy-Item` thay `cp`. Vào `/register` tạo 
 
 Production-like: `npm run build`, đặt biến **của process** `SERVE_FRONTEND=true`, chạy `npm --prefix backend start`; SPA và API cùng http://localhost:3000. PowerShell: `$env:SERVE_FRONTEND='true'`; cmd: `set SERVE_FRONTEND=true`.
 
+**Host trên PC Windows cho người dùng từ xa:** xem [WINDOWS_HOSTING](docs/WINDOWS_HOSTING.md).
+`BTL_LOCAL_PRODUCTION=1` cho launcher quản lý Express đã build tại `127.0.0.1:3000`;
+quản trị qua Vite localhost bằng tài khoản developer hiện tại, người dùng truy cập website qua HTTPS.
+
 ## Launcher Windows và Development Tools
 
 **Thành viên mới cần tài khoản developer:** sau khi clone, mở terminal ở gốc repo, chạy `npm ci`, rồi `npm --prefix backend run dev:account -- ten_cua_ban`. Lưu mật khẩu được in ra, mở Start.vbs và chọn **Đăng nhập nhà phát triển** trên web. Chỉ cấp một lần mỗi bản sao; những lần sau dùng lại tài khoản. Hướng dẫn chi tiết và lệnh cấp lại nằm bên dưới.
 
-Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShell. Nếu dịch vụ đã chạy, bấm Start lần nữa sẽ mở lại web và giữ các dịch vụ hiện có. Các yêu cầu Start trùng trong lúc đang khởi động được gộp lại. **Stop.vbs** dừng toàn bộ. Trong terminal dùng `run.bat` / `run.bat start`, `run.bat stop`; `run.bat restart` dừng rồi bật lại. Nếu Start đang chạy, Stop/Restart chờ lượt để thực hiện; `run.bat status` vẫn đọc được trạng thái và log đã lọc bí mật. Không dùng launcher trên AWS/production.
+Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShell. Nếu dịch vụ đã chạy, bấm Start lần nữa sẽ mở lại web và giữ các dịch vụ hiện có. Các yêu cầu Start trùng trong lúc đang khởi động được gộp lại. **Stop.vbs** dừng toàn bộ. Trong terminal dùng `run.bat` / `run.bat start`, `run.bat stop`; `run.bat restart` dừng rồi bật lại. Nếu Start đang chạy, Stop/Restart chờ lượt để thực hiện; `run.bat status` vẫn đọc được trạng thái và log đã lọc bí mật. Không dùng launcher trên AWS hoặc chạy controller với NODE_ENV=production; chế độ host trên PC dùng tùy chọn ở hướng dẫn trên.
 
 Controller Node duy nhất tại **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, thu stdout/stderr và giữ các handle/PID nó tạo. Dịch vụ chạy ẩn; cấu hình `.env`, thư mục MySQL, SeaweedFS và tài liệu đã có được giữ. Lần đầu vẫn dùng MySQL 8.4.7 / SeaweedFS 4.48 portable, `npm ci`, migration deploy và tạo bucket như launcher cũ; không reset DB. Biến `DEBUG` được bỏ riêng trong môi trường con của dịch vụ để tránh lỗi SeaweedFS. Backend không có watcher: dùng **Khởi động lại** sau khi sửa mã backend.
 

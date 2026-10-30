@@ -25,7 +25,9 @@ export function localBackendPlugin(): Plugin {
         };
         const read = req.method === "GET" && ["/status", "/session"].includes(req.url ?? "");
         const write = req.method === "POST" && ["/login", "/logout", "/start", "/stop", "/restart", "/start-all", "/stop-all"].includes(req.url ?? "");
-        if (req.headers.host !== "localhost:5173" ||
+        if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress ?? "") ||
+            req.headers.forwarded || req.headers["x-forwarded-for"] ||
+            req.headers.host !== "localhost:5173" ||
             (req.headers.origin && req.headers.origin !== origin) ||
             (req.headers["sec-fetch-site"] && req.headers["sec-fetch-site"] !== "same-origin") ||
             (!read && !(write && req.headers.origin === origin && req.headers["x-local-control"] === "1"))) {
