@@ -9,7 +9,7 @@ const doc: DocumentWithOwner = {
   id: 'document', ownerId: 'owner', title: 'title', description: null, visibility: 'PUBLIC',
   fileType: 'PDF', mimeType: 'application/pdf', originalFilename: 'file.pdf', sizeBytes: 1,
   storageKey: 'old-key', fileVersion: 1, createdAt: now, updatedAt: now, fileUpdatedAt: now,
-  owner: { id: 'owner', displayName: 'Owner' },
+  owner: { id: 'owner', displayName: 'Owner', deletionStartedAt: null },
 };
 const file = { fileType: 'PDF' as const, mimeType: 'application/pdf', extension: 'pdf', sanitizedFilename: 'file.pdf', sizeBytes: 1, tmpPath: 'unused' };
 const fields = { title: 'title', visibility: 'PUBLIC' as const };
