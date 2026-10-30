@@ -42,7 +42,7 @@ export function createApp(deps: AppDeps): Express {
   const api = express.Router();
   api.use(noStore());
   api.use(csrfGuard(config.allowedOrigins));
-  api.use(sessionLoader(services.auth, cookie));
+  api.use(sessionLoader(services.auth, cookie, services.activity));
   api.use(
     '/health',
     healthRoutes({

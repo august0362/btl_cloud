@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import type { AuthService } from '../../modules/auth/auth.service.js';
 import { clearSessionCookie, type SessionCookieConfig } from '../../modules/auth/session.cookie.js';
+import type { ActivityTracker } from '../../modules/users/activity-tracker.js';
 import { AppError } from '../errors.js';
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -21,8 +22,11 @@ export function csrfGuard(allowedOrigins: string[]): RequestHandler {
   };
 }
 
-/** Nạp phiên từ cookie (§A5.2). Cookie không hợp lệ/hết hạn → xoá cookie, phục vụ như Guest. */
-export function sessionLoader(auth: AuthService, cookie: SessionCookieConfig): RequestHandler {
+/**
+ * Nạp phiên từ cookie (§A5.2). Cookie không hợp lệ/hết hạn → xoá cookie, phục vụ như Guest.
+ * Phiên hợp lệ → ghi hoạt động gần nhất (XM-01), không chờ.
+ */
+export function sessionLoader(auth: AuthService, cookie: SessionCookieConfig, activity: ActivityTracker): RequestHandler {
   return async (req, res, next) => {
     const token: unknown = req.cookies?.[cookie.name];
     if (typeof token !== 'string' || token.length === 0) {
@@ -30,7 +34,8 @@ export function sessionLoader(auth: AuthService, cookie: SessionCookieConfig): R
       return next();
     }
     req.auth = await auth.resolveSession(token);
-    if (!req.auth) clearSessionCookie(res, cookie);
+    if (req.auth) activity.touch(req.auth.userId);
+    else clearSessionCookie(res, cookie);
     next();
   };
 }

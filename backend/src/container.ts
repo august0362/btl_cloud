@@ -7,6 +7,7 @@ import { AuthService } from './modules/auth/auth.service.js';
 import { SessionRepository } from './modules/auth/session.repository.js';
 import { DocumentRepository } from './modules/documents/document.repository.js';
 import { DocumentService } from './modules/documents/documents.service.js';
+import { ActivityTracker } from './modules/users/activity-tracker.js';
 import { UserRepository } from './modules/users/user.repository.js';
 import type { ObjectStorage } from './storage/object-storage.js';
 
@@ -16,6 +17,7 @@ export interface Services {
   documents: DocumentRepository;
   auth: AuthService;
   documentService: DocumentService;
+  activity: ActivityTracker;
   clock: Clock;
 }
 
@@ -39,5 +41,6 @@ export function createServices(deps: {
     clock,
     deps.logger,
   );
-  return { users, sessions, documents, auth, documentService, clock };
+  const activity = new ActivityTracker(users, clock, deps.logger);
+  return { users, sessions, documents, auth, documentService, activity, clock };
 }
