@@ -8,7 +8,7 @@
 >
 > `BASELINE_VERSION: 1.0` · `CONTRACT_STATUS: APPROVED` · `OWNER_APPROVAL: APPROVED` (MILESTONES › OWNER DESIGN APPROVAL) · cập nhật theo CR-001…CR-008
 
-**Mục lục:** [A1 Quyết định](#a1-quyết-định-kiến-trúc) · [A2 Use Case](#a2-ngữ-cảnh-và-use-case) · [A3 Kiến trúc ứng dụng](#a3-kiến-trúc-ứng-dụng) · [A4 Cơ sở dữ liệu](#a4-cơ-sở-dữ-liệu) · [A5 Xác thực, phân quyền](#a5-xác-thực-và-phân-quyền) · [A6 Storage, vòng đời](#a6-object-storage-và-vòng-đời-tài-liệu) · [A7 API Contract](#a7-rest-api-contract) · [A8 Frontend UX/UI](#a8-frontend-uxui) · [A9 Sơ đồ tuần tự](#a9-sơ-đồ-tuần-tự) · [A10 Local và AWS](#a10-local-và-aws) · [A11 Kiểm tra nhất quán](#a11-kiểm-tra-nhất-quán)
+**Mục lục:** [A1 Quyết định](#a1-quyết-định-kiến-trúc) · [A2 Use Case](#a2-ngữ-cảnh-và-use-case) · [A3 Kiến trúc ứng dụng](#a3-kiến-trúc-ứng-dụng) · [A4 Cơ sở dữ liệu](#a4-cơ-sở-dữ-liệu) · [A5 Xác thực, phân quyền](#a5-xác-thực-và-phân-quyền) · [A6 Storage, vòng đời](#a6-object-storage-và-vòng-đời-tài-liệu) · [A7 API Contract](#a7-rest-api-contract) · [A8 Frontend UX/UI](#a8-frontend-uxui) · [A9 Sơ đồ tuần tự](#a9-sơ-đồ-tuần-tự) · [A10 Local và AWS](#a10-local-và-aws) · [A11 Kiểm tra nhất quán](#a11-kiểm-tra-nhất-quán) · [A12 Mở rộng đề xuất E1–E8 (PROPOSED)](#a12-mở-rộng-đề-xuất-e1e8)
 
 ## A1. Quyết định kiến trúc
 
@@ -55,6 +55,8 @@ Giữ nguyên stack owner ưu tiên; chỉ thêm thư viện nhỏ khi có lý d
 | D-16 | Root `package.json` không dependency; `backend/`, `frontend/` có lockfile riêng | Tránh xung đột lockfile; tương thích `ci.yml` hiện có |
 | D-17 | Cấu hình qua biến môi trường, validate bằng zod khi khởi động | Cùng artifact chạy local và AWS |
 | D-18 | Log JSON ra stdout | Chuẩn cho mọi cách thu log |
+
+Quyết định cho phần mở rộng E1–E8 (CR-009; E4–E5 hoãn) ở §A12.1 dùng ID `XD-xx`, không thay D-01…D-18.
 
 ### A1.3 Cấu trúc thư mục và người phụ trách
 
@@ -704,6 +706,8 @@ ASG tối thiểu 2 / mong muốn 2 / tối đa 4 instance (theo S3) trên 2 pri
 | `lib/logger` | Log JSON pino, redact bí mật (§A5.8) | sự kiện → stdout | pino | — |
 | `http/static` | Phục vụ SPA khi `SERVE_FRONTEND=true` (§A3.7) | GET không thuộc `/api` → file | express.static | Thiếu dist → cảnh báo, chỉ phục vụ API |
 
+Module của phần mở rộng E1–E8 (đã duyệt, chưa có trong mã; E4–E5 hoãn) ở §A12.3, cùng mẫu input/output · phụ thuộc · lỗi (§A12.12).
+
 **Frontend** (Owner: CODEX_FRONTEND). Hàm cụ thể xem §A3.3.2.
 
 | Module | Trách nhiệm | Input → Output | Phụ thuộc | Lỗi |
@@ -884,6 +888,7 @@ Vòng đời object: PutObject → được `documents` tham chiếu → thay/xo
 - Test: `prisma migrate reset --force` trên `btl_cloud_test` trong global setup; giữa các test xoá dữ liệu theo thứ tự `sessions`, `documents`, `users`.
 - Production: `npm --prefix backend run prisma:deploy` (= `prisma migrate deploy`) chạy một lần trước khi rollout (Prisma có advisory lock). Migration phải tương thích ngược (expand → deploy → contract), vì ASG chạy song song phiên bản cũ và mới.
 - Nếu Prisma major mới yêu cầu driver adapter cho MySQL: làm theo hướng dẫn chính thức và ghi vào bằng chứng M1-05; schema logic không đổi.
+- Migration cho phần mở rộng (cột `users`, bảng `audit_events`; `friendships` và cột hồ sơ/username hoãn cùng E4–E5) và cách áp không reset DB: §A12.4. Chưa có migration nào được tạo.
 
 ## A5. Xác thực và phân quyền
 
@@ -1148,6 +1153,8 @@ Thành công (2xx, trừ 204): `{ "data": … }`. Lỗi (4xx/5xx; API-13 sau khi
 | `SERVICE_UNAVAILABLE` | 503 | API-02: một thành phần phụ thuộc lỗi | Dịch vụ chưa sẵn sàng. |
 
 Mã chỉ có ở client: `NETWORK_ERROR` (fetch/XHR thất bại, `status = 0`), `ABORTED` (người dùng huỷ upload).
+
+Mã lỗi và endpoint cho E4/E5 (contract 1.1, đang hoãn) ở §A12.5; bảng trên vẫn là contract 1.0 đang có hiệu lực.
 
 `ValidationIssue.issue` ∈ `REQUIRED`, `INVALID_TYPE`, `INVALID_FORMAT`, `TOO_SHORT`, `TOO_LONG`, `OUT_OF_RANGE`, `INVALID_ENUM`, `UNKNOWN_FIELD`, `EMPTY_FILE`, `TOO_MANY_FILES`, `NO_CHANGES`, `UNAVAILABLE`. `field` là tên trường, `"body"` (lỗi cả body, ví dụ `NO_CHANGES`), hoặc tên thành phần (`database`, `storage`) với `SERVICE_UNAVAILABLE`.
 
@@ -2336,7 +2343,7 @@ Một artifact cho mọi instance (§A3.7); instance giống hệt nhau, statele
 }
 ```
 
-Gắn thêm tuỳ OD-06/07: `CloudWatchAgentServerPolicy`, `AmazonSSMManagedInstanceCore`, `s3:GetObject` trên bucket artifact, `ssm:GetParameter` + `kms:Decrypt`.
+Gắn thêm tuỳ OD-06/07: `CloudWatchAgentServerPolicy`, `AmazonSSMManagedInstanceCore`, `s3:GetObject` trên bucket artifact, `ssm:GetParameter` + `kms:Decrypt`. Nếu E4 (đang hoãn) được làm và đưa lên AWS: thêm `avatars/*` vào `Resource` của `DocumentObjects` (§A12.10); task M5 không đổi.
 
 **Security group:**
 
@@ -2384,6 +2391,8 @@ Không đưa con số giá; M5-09 tra bằng AWS Pricing Calculator.
 | FR-07 | UC-09, 10 | API-11 | P-07 | AC-07.1–07.3 | M2-10, M3-11, M4-05 |
 | FR-08 | UC-11 | API-12 | P-07 | AC-08.1–08.3 | M2-11, M2-13, M3-11, M4-07 |
 | FR-09 | UC-12 | API-14 | P-04, P-05, P-07 | AC-09.1–09.3 | M2-12, M2-13, M3-09, M3-11, M4-07 |
+
+Truy vết cho yêu cầu mở rộng đề xuất E1–E8: §A12.13.
 
 ### A11.2 Use Case → API → hành động UI
 
@@ -2436,3 +2445,727 @@ OWNER_APPROVAL: APPROVED (MILESTONES › OWNER DESIGN APPROVAL)
 - Chuyển sang M5 (không chặn M1–M4): OD-05, 06, 07, 09; U-01…U-08.
 
 Sau khi owner phê duyệt, tài liệu này là baseline đóng băng cho triển khai. Agent thiết kế **không** tự xác nhận phê duyệt.
+
+Phần mở rộng ở §A12 được thêm qua CR-009 (owner 30/10/2026); E4–E5 hoãn.
+
+## A12. Mở rộng đề xuất (E1–E8)
+
+> **APPROVED — E1–E3, E6–E8 (CR-009, 30/10/2026). E4–E5: DEFERRED.** Thiết kế cho yêu cầu ở [CONTEXT §C8](CONTEXT.md#c8-mở-rộng-đề-xuất-e1e8); task ở [MILESTONES › E1–E8](MILESTONES.md#e1e8--mở-rộng-đề-xuất). Chưa có trong mã nguồn. Các module XM-06…XM-10, migration hồ sơ/username/`friendships`, API-15…27 và phần avatar/username/bạn bè trong XA-02…04 (ADM-04, `hasAvatar`, `friendCount`, sửa/tìm username) **hoãn cùng E4–E5** (XOD-21).
+>
+> **Dùng lại, không chép lại:** modular monolith (D-01), quy tắc phụ thuộc §A1.4, policy tài liệu §A5.5, giao thức DB ↔ storage §A6 (D-07…D-09), envelope và quy ước API §A7.1–§A7.3, log §A5.8, môi trường test §A10.6.
+
+**Mục lục §A12:** [12.1 Quyết định](#a121-quyết-định) · [12.2 Ranh giới](#a122-ranh-giới-admin-local--public) · [12.3 Module](#a123-module) · [12.4 CSDL](#a124-csdl-và-migration) · [12.5 API](#a125-api) · [12.6 Hiệu năng, cache](#a126-giám-sát-hiệu-năng-thử-tải-cache) · [12.7 Audit, lỗi](#a127-audit-log-và-chẩn-đoán-lỗi-e7) · [12.8 Sơ đồ tuần tự](#a128-sơ-đồ-tuần-tự) · [12.9 Dữ liệu](#a129-sở-hữu-và-vòng-đời-dữ-liệu) · [12.10 AWS](#a1210-tương-thích-aws) · [12.11 Kiểm thử](#a1211-kiểm-thử) · [12.12 Khôi phục ngữ cảnh](#a1212-khôi-phục-ngữ-cảnh-và-điều-hướng-kiến-trúc-e8) · [12.13 Truy vết](#a1213-truy-vết) · [12.14 Rủi ro](#a1214-rủi-ro)
+
+### A12.1 Quyết định
+
+Ứng dụng public giữ nguyên modular monolith. Admin là **công cụ local** chạy cạnh controller hiện có (§A5.9).
+
+| ID | Quyết định | Lý do · đánh đổi |
+|---|---|---|
+| XD-01 | Admin là tiến trình Node riêng (`backend/admin/main.ts`, chạy bằng `tsx`) trên `127.0.0.1:3003`. Controller khởi động nó **nếu thư mục tồn tại** | XOD-02 · admin có kết nối DB/storage riêng |
+| XD-02 | Trình duyệt → Vite `/__local/backend/admin/*` → controller (kiểm phiên developer) → admin (kiểm token) | Dùng lại cookie `btl_developer` và capability đã có |
+| XD-03 | `.gitignore` gồm `backend/admin/`, `frontend/src/admin/`, `frontend/admin-tests/`. Mã commit **không bao giờ import** mã admin: controller chỉ `spawn`; frontend nạp bằng `import.meta.glob` (thư mục vắng → không có gì, build không lỗi) | XOD-03 · admin không có lịch sử Git/CI (XR-01) |
+| XD-04 | Số liệu hiệu năng đo trong Express, không có endpoint. `express-child.mjs` (chỉ dev) ghi `backend/tmp/metrics-snapshot.json` mỗi 5 s; admin đọc file | Không mở cổng mới · trễ tối đa 5 s |
+| XD-05 | Mọi sự kiện audit (user và admin) ghi vào **một** bảng MySQL `audit_events` | XOD-15 · lọc, phân trang, retention, chạy nhiều instance · bảng có cả trên RDS |
+| XD-06 | Xoá tài khoản: đánh dấu `DELETING` → xoá object rồi xoá bản ghi → xoá user. Mọi bước chạy lại an toàn | Thử lại không cần hàng đợi; FK `RESTRICT` sẵn có chặn xoá user khi còn tài liệu |
+| XD-07 | Avatar: `sharp` vừa kiểm (định dạng, kích thước) vừa mã hoá lại thành WebP 512×512 | XOD-07 · không tự viết bộ đọc header ảnh |
+| XD-08 | Thay avatar giống thay tệp tài liệu: ghi mới → UPDATE → xoá cũ best-effort | Như D-08/D-09; thay đồng thời có thể để lại object mồ côi (log `storage.orphan`) |
+| XD-09 | Bạn bè: một bảng, cặp lưu theo thứ tự (`user_low_id < user_high_id`) + UNIQUE | Một quan hệ mỗi cặp; DB tự chặn trùng khi đồng thời |
+| XD-10 | Username cho tài khoản cũ sinh bằng **một câu SQL** trong migration (`'u'` + 20 ký tự hex của id) | Không cần script backfill; không lộ email |
+| XD-11 | Không thêm cache | Chưa có số đo cho thấy cần (§A12.6) |
+| XD-12 | Audit ghi bằng middleware theo route `audited(action)`. Ghi khi response đóng (`close`), không chung transaction, không chờ; lỗi → log ERROR | XBR-22 · một cơ chế cho mọi route; sự kiện ghi được dù thao tác lỗi |
+| XD-13 | Lỗi chẩn đoán là **dòng log Pino sẵn có**, thêm ba trường `module`, `stage`, `code`. Admin đọc file log của controller; không có bảng lỗi | XOD-17 · không thu thập trùng · local chỉ giữ khoảng 2 × 2 MB log |
+| XD-14 | Retention audit: xoá sự kiện quá `AUDIT_RETENTION_DAYS` lúc khởi động backend | Như D-10, không worker |
+| XD-15 | E3 đếm trong bộ nhớ, E7 đọc bản ghi. Không có middleware dùng chung cho cả hai | XBR-26 · hai module độc lập, thay một bên không ảnh hưởng bên kia |
+| XD-16 | Hướng dẫn khôi phục ngữ cảnh nằm ở PROJECT_OVERVIEW §0. Mọi module dùng chung mẫu mô tả ở §A12.12 | XOD-20 · không thêm file tài liệu |
+
+**Đã cắt để tránh overengineering:** file audit riêng cho admin, bảng lỗi, cờ `force` và khoá khi xoá tài khoản, vòng lặp tự thử lại, khoá dòng khi thay avatar, bộ đọc header ảnh tự viết, ETag avatar, số liệu theo route, histogram, nhiều cửa sổ thời gian cho E3, script backfill username + migration hai bước, trang Metrics/Audit riêng, endpoint riêng cho từ chối và huỷ lời mời, worker dọn audit, tracing phân tán.
+
+### A12.2 Ranh giới admin local ↔ public
+
+```mermaid
+flowchart LR
+  user["Người dùng Internet"] -->|"HTTPS tunnel hoặc ALB"| pub
+  subgraph host["Máy owner"]
+    subgraph loop["Chỉ 127.0.0.1"]
+      dev["Trình duyệt /admin"] --> vite["Vite :5173"] --> ctrl["Controller :3001"] --> adm["Admin :3003<br/>gitignore"]
+    end
+    pub["Public app :3000"]
+    snap[("metrics-snapshot.json")]
+    logf[("local-services.ndjson")]
+    db[("MySQL<br/>gồm audit_events")]
+    s3[("SeaweedFS")]
+  end
+  pub --> db
+  pub --> s3
+  pub -->|"ghi 5 s"| snap
+  pub -->|"stdout"| ctrl
+  ctrl -->|"ghi log"| logf
+  adm -->|"đọc"| snap
+  adm -->|"đọc"| logf
+  adm --> db
+  adm --> s3
+```
+
+| Ranh giới | Bảo vệ |
+|---|---|
+| Internet → `:3000` | Public app không có mã hay route admin; `/api/admin/*` → 404. Không endpoint nào đọc audit hay log |
+| Internet → `:3003` | Chỉ bind `127.0.0.1`; từ chối địa chỉ không phải loopback và header `X-Forwarded-For`; tunnel chỉ trỏ `:3000` |
+| Trang web khác → Vite | Kiểm `Host`, `Origin`, `Sec-Fetch-Site`, header `X-Local-Control` (đã có) |
+| Vite → controller → admin | Phiên developer (đã có) + token ngẫu nhiên 32 byte do controller sinh mỗi lần chạy, chỉ truyền cho admin qua biến môi trường. Controller gửi kèm `X-Admin-Actor` = username developer |
+| Admin → AWS | Admin dùng `localConfig()` sẵn có: từ chối DB/S3 không phải loopback và `NODE_ENV=production` |
+
+### A12.3 Module
+
+`[commit]` vào repo, chạy CI. `[admin]` thư mục gitignore, chỉ trên máy owner. Tên hàm là gợi ý; input/output, phụ thuộc và hành vi lỗi là ràng buộc. Mỗi thẻ theo mẫu §A12.12.
+
+```mermaid
+flowchart LR
+  subgraph commit["Commit"]
+    pubApp["Public app<br/>XM-01, 04, 05, 06, 07, 08, 09, 13, 14"]
+    repos["Repositories + ObjectStorage"]
+    ctrl["Controller XM-02"]
+    ui["Frontend XM-03, 10, 11"]
+  end
+  subgraph admin["Admin (gitignore)"]
+    xa1["XA-01 Admin process"]
+    xa2["XA-02 Overview"]
+    xa3["XA-03 User admin"]
+    xa4["XA-04 Xoá tài khoản"]
+    xa6["XA-06 Activity"]
+    xa7["XA-07 Errors"]
+    xa5["XA-05 Admin UI"]
+  end
+  logf[("local-services.ndjson")]
+  pubApp --> repos
+  ctrl -.->|"spawn + proxy"| xa1
+  ctrl -->|"ghi"| logf
+  ui -.->|"import.meta.glob"| xa5
+  xa1 --> xa2
+  xa1 --> xa3
+  xa1 --> xa6
+  xa1 --> xa7
+  xa3 --> xa4
+  xa2 --> repos
+  xa3 --> repos
+  xa4 --> repos
+  xa6 --> repos
+  xa7 --> logf
+  xa7 --> xa6
+```
+
+Quy tắc: mũi tên chỉ đi từ admin sang mã commit (admin được import `backend/src/**`), không bao giờ ngược lại. `document.policy.ts` không biết gì về bạn bè.
+
+#### Module commit
+
+**XM-01 Activity tracker — E1**
+
+| | |
+|---|---|
+| Vị trí | `backend/src/modules/users/activity-tracker.ts` [mới]; `http/middleware/auth.ts` [sửa: `sessionLoader` gọi `touch`] |
+| Input → Output | `userId` → không trả gì (không chờ) |
+| Phụ thuộc | Prisma (`$executeRaw`), logger |
+| Dữ liệu | `users.last_active_at`; trong bộ nhớ `Map<userId, lần ghi cuối>` (xoá sạch khi > 10 000 mục) |
+| Lỗi | Chỉ ghi khi lần ghi cuối > 5 phút, bằng SQL thô để không đổi `updated_at`. Lỗi chỉ log, không ảnh hưởng request |
+| Test | Unit: 2 request trong 5 phút → 1 lần ghi. Integration: `updated_at` không đổi |
+
+**XM-02 Controller, stack manager, Vite bridge — E1**
+
+| | |
+|---|---|
+| Vị trí | `backend/dev/controller.mjs`, `stack-manager.mjs`, `frontend/dev/local-backend.ts` [sửa] |
+| Input → Output | `GET/POST/PATCH /__local/backend/admin/*` (JSON ≤ 16 KB) → phản hồi của admin. Khởi động dịch vụ `admin` nếu có `backend/admin/main.ts`, truyền env `ADMIN_LOCAL_TOKEN`, `BTL_LOCAL_MODE`; truyền `BTL_LOCAL_METRICS_FILE` cho backend; thu stdout của admin vào file log như các dịch vụ khác |
+| Phụ thuộc | developer auth, process manager, file log hiện có |
+| Lỗi | Không có mã admin → trạng thái `not-installed`, proxy trả 404 "Admin chưa được cài trên máy này", Start All vẫn chạy. Admin tắt → 503 |
+| Test | `node:test`: không phiên → 401; có phiên → chuyển tiếp kèm token và actor; không có thư mục admin → Start All OK |
+
+**XM-03 Nạp admin ở frontend — E1**
+
+| | |
+|---|---|
+| Vị trí | `frontend/src/App.tsx`, `components/AppLayout.tsx` [sửa]; chuyển `src/dev/*` → `src/admin/dev/*`, `local-tests/*` + `playwright.local.config.ts` → `admin-tests/` và gỡ khỏi Git (`git rm --cached`); cập nhật README, WINDOWS_HOSTING, TEAM_HANDOFF |
+| Input → Output | `import.meta.glob('./admin/AdminApp.tsx')` khi `import.meta.env.DEV` → route `/admin/*` và link "Quản trị" nếu có file; không có file → không có gì |
+| Phụ thuộc | Vite, react-router |
+| Lỗi | File commit nào còn dùng chung (`ServiceStatus`, hooks…) thì giữ ở chỗ cũ; không file commit nào import thư mục admin |
+| Test | Test `App` khi glob rỗng: không có route/link admin; build clone sạch PASS |
+
+**XM-04 Trạng thái `DELETING` ở app public — E2**
+
+| | |
+|---|---|
+| Vị trí | `auth.service.ts` (login, `resolveSession`), `document.repository.ts` (truy vấn public), `document.loader.ts` [sửa] |
+| Input → Output | User có `deletion_started_at` ≠ NULL → đăng nhập báo sai thông tin; phiên không hợp lệ; tài liệu của họ → 404 và không có trong tìm kiếm |
+| Phụ thuộc | UserRepository, DocumentRepository |
+| Lỗi | Không có lỗi mới; dùng mã sẵn có (`INVALID_CREDENTIALS`, `UNAUTHENTICATED`, `DOCUMENT_NOT_FOUND`) |
+| Test | Integration + `authz-matrix` vẫn 100% PASS |
+
+**XM-05 Metrics — E3**
+
+| | |
+|---|---|
+| Vị trí | `backend/src/metrics/metrics.ts` [mới]; `src/app.ts` (middleware sau `requestId`), `src/server.ts` (bật/tắt lấy mẫu) [sửa]; `backend/dev/express-child.mjs` [sửa: ghi file snapshot] |
+| Input → Output | Sự kiện kết thúc response; mẫu CPU/RAM mỗi 5 s → `getMetricsSnapshot()` → file `backend/tmp/metrics-snapshot.json` (chỉ khi có `BTL_LOCAL_METRICS_FILE`) |
+| Phụ thuộc | `node:os`, `node:perf_hooks`; không phụ thuộc logger hay XM-13/14 |
+| Lỗi | Không bao giờ ném lỗi vào request; ghi file lỗi → bỏ qua lượt đó. Không có endpoint HTTP |
+| Test | Unit: rate, P50/P95, bộ nhớ không tăng; `node:test`: file được ghi |
+
+**XM-06 Hồ sơ và avatar — E4**
+
+| | |
+|---|---|
+| Vị trí | `backend/src/modules/users/profile.routes.ts`, `profile.service.ts`, `avatar.service.ts` [mới]; `files/upload.middleware.ts` [sửa: nhận tên field và giới hạn]; `user.mapper.ts` [sửa]; `backend/package.json` [sửa: `sharp`, ghim phiên bản] |
+| Input → Output | API-15 `{ displayName?, bio? }`, API-16 multipart `avatar`, API-17, API-18 → `UserDto`; ảnh WebP |
+| Phụ thuộc | UserRepository, ObjectStorage, `sharp`, upload middleware |
+| Dữ liệu | `users.display_name`, `bio`, `avatar_key`, `avatar_size_bytes`; object `avatars/{userId}/{uuid}.webp` |
+| Phân quyền | API-15/16/17: User, CSRF, chỉ sửa chính mình (không nhận id). API-18: công khai; user `DELETING` → 404 |
+| Lỗi | `sharp(file).metadata()`: định dạng ∉ jpeg/png/webp hoặc không đọc được → 415; cạnh ngoài 64–4096 → 400; > 1 MiB → 413. Mã hoá `.rotate().resize(512, 512, { fit: 'cover' }).webp()` (mặc định bỏ metadata), `limitInputPixels` = 4096². Storage lỗi → 503, avatar cũ giữ nguyên. Luôn xoá tệp tạm |
+| Test | Unit ảnh thật/giả/có EXIF; integration E4-AC-01…05 |
+
+**XM-07 Username — E5**
+
+| | |
+|---|---|
+| Vị trí | `modules/users/username.ts` [mới]; `auth.schemas.ts`, `auth.service.ts` (đăng ký), `profile.service.ts` (đổi username), `document.mapper.ts` (`OwnerDto.username`) [sửa] |
+| Input → Output | `username` ở API-04, API-15 → lưu chữ thường |
+| Phụ thuộc | UserRepository |
+| Dữ liệu | `users.username`, `users.username_changed_at` |
+| Lỗi | Trùng → 409 `USERNAME_TAKEN` (bắt lỗi UNIQUE của DB). Sai định dạng/từ cấm → 400. Đổi khi chưa đủ 7 ngày → 409 `USERNAME_CHANGE_COOLDOWN` kèm ngày được đổi. Điều kiện nằm trong câu `UPDATE … WHERE username_changed_at IS NULL OR username_changed_at <= NOW(3) - INTERVAL 7 DAY`, nên hai request cùng lúc không vượt được |
+| Test | Unit quy tắc; integration E5-AC-01…03 |
+
+**XM-08 Hồ sơ public và tìm user — E5**
+
+| | |
+|---|---|
+| Vị trí | `modules/users/public-profile.service.ts` [mới]; `document.repository.ts` [sửa: lọc tài liệu Public theo owner] |
+| Input → Output | API-19 `q` → danh sách user; API-20 username → hồ sơ; API-21 id → tài liệu Public |
+| Phụ thuộc | UserRepository, DocumentRepository, XM-09 (trường `relationship`) |
+| Phân quyền | API-19: User. API-20/21: công khai. API-21 luôn chỉ Public, kể cả với owner hay bạn bè |
+| Lỗi | User không tồn tại / `DELETING` → 404 `USER_NOT_FOUND` |
+| Test | Integration E5-AC-02, 05, 06 |
+
+**XM-09 Bạn bè — E5**
+
+| | |
+|---|---|
+| Vị trí | `backend/src/modules/friends/` (`routes`, `service`, `repository`) [mới]; `src/app.ts` [sửa] |
+| Input → Output | API-22…27 → `RelationshipDto`, danh sách |
+| Phụ thuộc | Prisma (`friendships`), UserRepository |
+| Phân quyền | User + CSRF; chỉ thao tác trên quan hệ có mình |
+| Lỗi | Tự mời → 400; đã là bạn → 409; không tồn tại/không phải của mình → 404. INSERT trùng cặp (đồng thời) → đọc lại dòng đang có rồi áp XBR-18 |
+| Test | Integration E5-AC-04…06; `authz-matrix` thêm ca bạn bè × Private |
+
+**XM-10 Giao diện public mới — E4, E5**
+
+| | |
+|---|---|
+| Vị trí | `pages/ProfilePage.tsx` (`/me/profile`), `PublicProfilePage.tsx` (`/u/:username`), `PeoplePage.tsx` (`/people`), `FriendsPage.tsx` (`/me/friends`); `components/Avatar.tsx`, `AvatarCropper.tsx`, `FriendButton.tsx`; `api/users.ts`, `api/friends.ts` [mới]; `AuthPages.tsx`, `AppLayout.tsx`, `documents.tsx` [sửa] |
+| Input → Output | Thao tác người dùng → gọi API-15…27 → trang |
+| Phụ thuộc | `api/client.ts`, `auth/*`, component dùng chung (§A8.5) |
+| Lỗi | Lỗi API hiển thị theo §A8.9. Cắt ảnh: đọc tệp bằng data URL (CSP hiện cho phép `data:`), vẽ canvas 512×512, gửi WebP (hoặc PNG nếu trình duyệt không hỗ trợ); không dùng thư viện cắt ảnh |
+| Test | RTL + UI test (axe, 360 px) + E2E |
+
+**XM-11 Chỉ báo mật khẩu — E6**
+
+| | |
+|---|---|
+| Vị trí | `frontend/src/lib/passwordStrength.ts`, `components/PasswordStrengthMeter.tsx` [mới]; `AuthPages.tsx`, `styles/tokens.css` [sửa] |
+| Input → Output | `password` → `{ level: 'INVALID' \| 'WEAK' \| 'MEDIUM' \| 'STRONG', criteria }` |
+| Phụ thuộc | Không (hàm thuần) |
+| Lỗi | Không có; không gọi mạng |
+| Test | Unit theo bảng E6-AC-01; RTL nhãn + `aria-live` |
+
+```ts
+// Hợp đồng hàm (minh hoạ)
+const len = [...pw].length;
+const criteria = { upper: /\p{Lu}/u.test(pw), special: /[^\p{L}\p{N}]/u.test(pw), long: len > 12 };
+const score = Object.values(criteria).filter(Boolean).length;
+level = len < 8 ? 'INVALID' : score === 0 ? 'WEAK' : score < 3 ? 'MEDIUM' : 'STRONG';
+```
+
+Màu: Yếu = `--color-surface` + viền `--color-border`; Trung bình = `#d9c49d`; Mạnh = `--color-primary` (`#6a584c`).
+
+**XM-12 Script thử tải — E3**
+
+| | |
+|---|---|
+| Vị trí | `scripts/load/seed.mjs`, `scripts/load/README.md` [mới] |
+| Input → Output | Seed 50 user, 500 tài liệu vào DB `btl_cloud_load` + bucket `btl-cloud-documents-load`; README liệt kê lệnh `npx autocannon` cho từng kịch bản |
+| Phụ thuộc | Prisma, ObjectStorage, `npx autocannon` (không thêm dependency) |
+| Lỗi | Seed từ chối chạy nếu DB không phải `btl_cloud_load` hoặc không phải loopback |
+| Test | Chạy seed hai lần không lỗi; báo cáo mẫu E3-AC-04 |
+
+**XM-13 Audit recorder — E7**
+
+| | |
+|---|---|
+| Vị trí | `backend/src/modules/audit/` (`audit.repository.ts`, `audit.recorder.ts`, `audited.ts`) [mới]; `config/env.ts` (`AUDIT_RETENTION_DAYS`), `server.ts` (xoá quá hạn lúc khởi động), `container.ts` [sửa]; route của `auth`, `documents` (và `users`, `friends` khi có E4/E5) [sửa: gắn `audited(action)`] |
+| Input | `AuditEventInput { actorType, actorId, action, targetType, targetId, outcome, errorCode, requestId, metadata }`. Middleware tự lấy actor từ `req.auth` (hoặc `res.locals.auditActorId` sau đăng ký/đăng nhập), target từ `req.params.id` (hoặc `res.locals.auditTargetId` khi id mới được tạo), outcome từ status, mã lỗi từ `res.locals.errorCode` |
+| Output | Một dòng `audit_events`; hàm trả `void`, request không chờ |
+| Phụ thuộc | Prisma, logger, `req.id`, `req.auth`; `res.locals.errorCode` do XM-14 đặt |
+| Phân quyền | Nội bộ, không có endpoint |
+| Lỗi | INSERT lỗi → log ERROR `audit.write_failed` `{ action, requestId }`, response không đổi (XBR-22). Khoá `metadata` ngoài allowlist (§A12.7) bị bỏ; > 1 KB → `{ "truncated": true }`. Xoá quá hạn lỗi → WARN `audit.purge_failed`, backend vẫn khởi động |
+| Test | Unit allowlist, quy tắc ghi `FAILURE`; integration E7-AC-01…06 |
+
+**XM-14 Trường chẩn đoán trong log — E7**
+
+| | |
+|---|---|
+| Vị trí | `http/errors.ts` (`AppError` thêm `stage?`), `http/middleware/error-handler.ts` (đặt `res.locals.errorCode`, `res.locals.errorStage`; dòng ERROR thêm `module`, `stage`), `http/middleware/request-context.ts` (dòng log kết thúc request thêm `module`, `code`, `stage`), `lib/module-of.ts` [mới: đường dẫn → module]; `documents.service.ts`, `avatar.service.ts` [sửa: gắn `stage` khi bọc lỗi storage/DB] |
+| Input → Output | Request + lỗi → **một** dòng JSON khi request kết thúc: `time, level, instanceId, requestId, module, stage, code, req.method, req.url, res.statusCode, durationMs, userId` |
+| Phụ thuộc | `pino-http` (ví dụ `customSuccessObject`/`customErrorObject`), logger. Không phụ thuộc XM-05 |
+| Lỗi | Không ném lỗi; thiếu `stage` → `null`. Redact giữ nguyên §A5.8 |
+| Test | Unit: log ra destination giả, kiểm đủ trường với 400/404/503/500; không có cookie/mật khẩu |
+
+#### Module admin (gitignore)
+
+```text
+backend/admin/          main.ts, app.ts, overview.ts, users.ts, deletion.ts, activity.ts, errors.ts, log-reader.ts, test/
+frontend/src/admin/     AdminApp.tsx, DashboardPage.tsx, UsersPage.tsx, UserDetailPage.tsx, ActivityPage.tsx, ErrorsPage.tsx, api.ts, dev/ (panel cũ)
+frontend/admin-tests/   Playwright của panel cũ
+```
+
+**XA-01 Admin process — E1**
+
+| | |
+|---|---|
+| Input → Output | Env `ADMIN_LOCAL_TOKEN`, `BTL_LOCAL_MODE`; HTTP từ controller → envelope JSON như §A7.2 (mỗi request có `requestId` riêng) |
+| Phụ thuộc | `localConfig()`, Prisma, `S3ObjectStorage`, logger từ mã commit |
+| Lỗi | Sai token, không phải loopback, có `X-Forwarded-For` → 403. Config không phải loopback → thoát |
+| Test | Token sai → 403; config AWS → thoát |
+
+**XA-02 Overview — E1, E3**
+
+| | |
+|---|---|
+| Input → Output | ADM-01 → `OverviewDto` (§A12.5) |
+| Phụ thuộc | Prisma, ObjectStorage, file snapshot (XM-05), `docker` CLI nếu chạy Docker |
+| Dữ liệu | `COUNT` user/tài liệu; `SUM(size_bytes)` + `SUM(avatar_size_bytes)`. Dung lượng đĩa SeaweedFS: portable → tổng kích thước tệp trong `%LOCALAPPDATA%\btl-cloud-services\seaweedfs-data`; Docker → `docker compose exec -T seaweedfs du -sk /data`. `SELECT 1` và `checkHealth()` (timeout 2 s) |
+| Lỗi | Mỗi phần lỗi độc lập (ô đó báo "Không đo được"); snapshot cũ > 15 s → "backend đang tắt" |
+| Test | `ADMIN_TEST overview`: E1-AC-04, 05 |
+
+Dung lượng đĩa thường **lớn hơn** dung lượng logic: SeaweedFS chỉ giải phóng chỗ của tệp đã xoá khi nén volume (vacuum). UI ghi chú điều này.
+
+**XA-03 Quản lý user — E2**
+
+| | |
+|---|---|
+| Input → Output | ADM-02…06 → DTO §A12.5 |
+| Phụ thuộc | Prisma (`users`, `sessions`, `documents`, `friendships`), XM-13 (ghi sự kiện `ADMIN_*` với actor `DEVELOPER` = `X-Admin-Actor`), XA-06 (20 sự kiện gần nhất) |
+| Lỗi | Email sai → 400; trùng → 409 `EMAIL_ALREADY_EXISTS`; username trùng → 409; sửa user `DELETING` → 409 `ACCOUNT_DELETING`. Không bao giờ trả `passwordHash` |
+| Test | `ADMIN_TEST users`: E2-AC-01…03 |
+
+**XA-04 Xoá tài khoản — E2 (E4 thêm avatar, E7 thêm audit)**
+
+| | |
+|---|---|
+| Input → Output | ADM-07 `{ confirmEmail }` → `{ status: "COMPLETED", deletedDocuments }` hoặc 503 `ACCOUNT_DELETION_INCOMPLETE` + `remainingDocuments` |
+| Phụ thuộc | Prisma, ObjectStorage, XM-13 |
+| Dữ liệu | Theo XSEQ-01 |
+| Lỗi | Email xác nhận sai → 400 `CONFIRMATION_MISMATCH`. Storage lỗi → dừng, trả "chưa hoàn tất". Object không tồn tại = đã xoá. Tài liệu mới chen vào lúc xoá user (FK chặn) → "chưa hoàn tất", bấm lại là xong |
+| Test | DB test + `fault-storage`: E2-AC-04…06, E7-AC-10 |
+
+**XA-05 Admin UI — E1, E2, E3, E7**
+
+| | |
+|---|---|
+| Trang | `/admin` Dashboard (số liệu, hiệu năng, dịch vụ/log của panel cũ) · `/admin/users`, `/admin/users/:id` (hồ sơ đầy đủ, sửa, thu hồi phiên, xoá, 20 sự kiện gần nhất) · `/admin/activity` (Activity Logs) · `/admin/errors` (Errors: tổng hợp, danh sách, ô tìm `requestId`) |
+| Input → Output | Thao tác developer → ADM-01…10 → trang |
+| Phụ thuộc | XA-01 qua `/__local/backend/admin/*`; component dùng chung của frontend |
+| Lỗi | Gate đăng nhập developer; tự làm mới 10 s khi tab đang mở (trừ Activity/Errors: làm mới bằng tay); nút xoá khoá khi đang chạy; lỗi API hiện tại chỗ, các trang khác vẫn dùng được |
+| Test | RTL + kiểm tay |
+
+**XA-06 Activity — E7**
+
+| | |
+|---|---|
+| Input → Output | ADM-08 bộ lọc → `Page<AuditEventDto>`; hàm `recentForUser(id, 20)` cho ADM-03; `byRequestId(id)` cho ADM-10 |
+| Phụ thuộc | Prisma (`audit_events`) |
+| Lỗi | Tham số sai → 400; DB lỗi → 503 `SERVICE_UNAVAILABLE` (trang Errors vẫn chạy vì không cần DB) |
+| Test | `ADMIN_TEST activity`: E7-AC-06 |
+
+**XA-07 Errors — E7**
+
+| | |
+|---|---|
+| Input → Output | ADM-09 → `{ summary, items }`; ADM-10 → dòng lỗi + sự kiện audit của một `requestId` |
+| Phụ thuộc | File `backend/tmp/local-services.ndjson` và `.1` (controller ghi, §A12.7); XA-06 cho phần audit của ADM-10 |
+| Lỗi | Không có file → danh sách rỗng + ghi chú "Chưa có log". Dòng không parse được → bỏ qua. Mỗi lần đọc tối đa hai file (≤ 4 MB). DB lỗi → ADM-10 vẫn trả phần log, `auditUnavailable: true` |
+| Test | `ADMIN_TEST errors` với file log mẫu: tổng hợp đúng theo cửa sổ, tìm `requestId`, dòng hỏng bị bỏ qua; E7-AC-07, 08 |
+
+### A12.4 CSDL và migration
+
+| Migration | Thay đổi | Giai đoạn |
+|---|---|---|
+| `…_user_last_active` | `users.last_active_at DATETIME(3) NULL` + index | E1 |
+| `…_user_deletion` | `users.deletion_started_at DATETIME(3) NULL` | E2 |
+| `…_user_profile` | `users.bio VARCHAR(300) NULL`, `avatar_key VARCHAR(512) NULL UNIQUE`, `avatar_size_bytes INT UNSIGNED NULL` | E4 |
+| `…_username` | Thêm `username VARCHAR(30) NULL`, `username_changed_at DATETIME(3) NULL` → `UPDATE users SET username = CONCAT('u', LEFT(REPLACE(id,'-',''),20)) WHERE username IS NULL` → đổi `username` thành `NOT NULL` + UNIQUE | E5 |
+| `…_friendships` | Bảng `friendships(id CHAR(36) PK, user_low_id, user_high_id, requester_id, status ENUM('PENDING','ACCEPTED'), created_at)`; UNIQUE `(user_low_id, user_high_id)`; FK hai cột → `users.id ON DELETE CASCADE` | E5 |
+| `…_audit_events` | Bảng `audit_events` (bên dưới); **không** có FK, để sự kiện tồn tại sau khi đối tượng bị xoá | E7 |
+
+`audit_events`: `id BIGINT UNSIGNED AUTO_INCREMENT PK` (bảng chỉ thêm dòng; khác D-11 vì cần thứ tự và index nhỏ) · `created_at DATETIME(3) NOT NULL` · `actor_type ENUM('USER','DEVELOPER','ANONYMOUS') NOT NULL` · `actor_id VARCHAR(64) NULL` (id user hoặc username developer) · `action VARCHAR(40) NOT NULL` · `target_type ENUM('USER','DOCUMENT','FRIENDSHIP') NULL` · `target_id CHAR(36) NULL` · `outcome ENUM('SUCCESS','FAILURE') NOT NULL` · `error_code VARCHAR(40) NULL` · `request_id CHAR(36) NULL` · `metadata JSON NULL`. Index: `(created_at)`, `(actor_id, created_at)`, `(target_id, created_at)`, `(request_id)`.
+
+```mermaid
+erDiagram
+  users ||--o{ friendships : "low"
+  users ||--o{ friendships : "high"
+  users {
+    datetime3 last_active_at "E1"
+    datetime3 deletion_started_at "E2"
+    varchar300 bio "E4"
+    varchar512 avatar_key "E4"
+    int avatar_size_bytes "E4"
+    varchar30 username "E5, duy nhất"
+    datetime3 username_changed_at "E5"
+  }
+  friendships {
+    char36 id PK
+    char36 user_low_id FK
+    char36 user_high_id FK
+    char36 requester_id
+    enum status
+    datetime3 created_at
+  }
+  audit_events {
+    bigint id PK
+    datetime3 created_at
+    enum actor_type
+    varchar64 actor_id "không FK"
+    varchar40 action
+    enum target_type
+    char36 target_id "không FK"
+    enum outcome
+    varchar40 error_code
+    char36 request_id
+    json metadata
+  }
+```
+
+Cách áp: (1) sao lưu `mysqldump` + thư mục dữ liệu SeaweedFS; (2) sinh migration bằng `prisma migrate dev --create-only` trên DB **test**, sửa SQL tay nếu cần (migration username); (3) áp lên DB dev bằng `npm --prefix backend run prisma:deploy`; **không** chạy `prisma migrate dev` trên DB có dữ liệu thật (có thể đòi reset); (4) đếm số dòng các bảng trước và sau.
+
+Username tự cấp có dạng `u3f2b6c1e8a4d4f7e9c2a` (21 ký tự, 80 bit ngẫu nhiên từ UUID, gần như không thể trùng; nếu trùng, migration lỗi ở bước UNIQUE → khôi phục bản sao lưu và sửa tay). Đăng ký mới đặt `username_changed_at` = thời điểm tạo; tài khoản cũ để `NULL` nên đổi được ngay.
+
+### A12.5 API
+
+Theo quy ước §A7.1–§A7.3 (envelope, CSRF cho request ghi, trường lạ → 400). E4/E5 nâng contract lên 1.1; chỉ API-04 thay đổi phá tương thích (thêm `username` bắt buộc). E7 không thêm endpoint public.
+
+#### Admin (`/__local/backend/admin/*` → `127.0.0.1:3003/admin/*`, chỉ developer)
+
+| ID | Method · Path | Input | Output (`data`) | Mã |
+|---|---|---|---|---|
+| ADM-01 | `GET /admin/overview` | — | `OverviewDto` | 200 |
+| ADM-02 | `GET /admin/users` | `q`, `page`, `pageSize` (20) | `Page<AdminUserDto>` | 200; 400 |
+| ADM-03 | `GET /admin/users/{id}` | — | `AdminUserDetailDto` | 200; 404 |
+| ADM-04 | `GET /admin/users/{id}/avatar` | — | ảnh WebP | 200; 404 |
+| ADM-05 | `PATCH /admin/users/{id}` | `{ email?, displayName?, bio?, username? }` | `AdminUserDetailDto` | 200; 400; 404; 409 `EMAIL_ALREADY_EXISTS`, `USERNAME_TAKEN`, `ACCOUNT_DELETING` |
+| ADM-06 | `POST /admin/users/{id}/sessions/revoke` | — | `{ revoked }` | 200; 404 |
+| ADM-07 | `POST /admin/users/{id}/deletion` | `{ confirmEmail }` | `{ status, deletedDocuments }` | 200; 400 `CONFIRMATION_MISMATCH`; 404; 503 `ACCOUNT_DELETION_INCOMPLETE` |
+| ADM-08 | `GET /admin/activity` | `actorId?`, `action?`, `targetId?`, `outcome?`, `from?`, `to?`, `page`, `pageSize` (50, tối đa 100) | `Page<AuditEventDto>` | 200; 400; 503 |
+| ADM-09 | `GET /admin/errors` | `window` (`15m`/`1h`/`24h`, mặc định `1h`), `module?`, `code?`, `minStatus?` (mặc định 500), `page` | `{ summary: ErrorSummaryDto, items: Page<ErrorEventDto> }` | 200; 400 |
+| ADM-10 | `GET /admin/requests/{requestId}` | — | `{ errors: ErrorEventDto[], audit: AuditEventDto[], auditUnavailable }` | 200; 400 (không phải UUID) |
+
+| DTO | Trường |
+|---|---|
+| `OverviewDto` | `users { registered, active15m, active24h, active7d, deleting }` · `documents { total, public, private }` · `storage { logicalBytes, diskBytes }` · `health { database, storage, backend }` (mỗi cái `{ ok, latencyMs }`) · `metrics` (§A12.6, hoặc `null`) · `generatedAt` |
+| `AdminUserDto` | `id, email, displayName, username, status, createdAt, lastActiveAt, documentCount, storageBytes` |
+| `AdminUserDetailDto` | `AdminUserDto` + `bio, hasAvatar, publicDocuments, privateDocuments, activeSessions, friendCount, deletionStartedAt, recentActivity: AuditEventDto[]` (20 sự kiện gần nhất có actor hoặc target là user) |
+| `AuditEventDto` | `id, at, actorType, actorId, action, targetType, targetId, outcome, errorCode, requestId, metadata` |
+| `ErrorEventDto` | `at, level (WARN/ERROR), service (backend/admin), module, stage, event, code, status, method, path (bỏ query), durationMs, requestId, userId, message, stack` (≤ 2 000 ký tự, chỉ 5xx) |
+| `ErrorSummaryDto` | `window, from, to, coverageFrom` (dòng log cũ nhất đọc được) `, total, byModule [{ module, count }], byCode [{ code, status, count, lastAt }]` |
+
+ADM-09 `minStatus` chỉ lọc dòng có status; dòng không gắn với request (vd. `storage.orphan`, `audit.write_failed`) luôn được tính.
+
+#### Public
+
+| ID | Method · Path | Quyền | Input | Output | Mã |
+|---|---|---|---|---|---|
+| API-03/05 | (sửa) | như cũ | — | `UserDto` thêm trường | như cũ |
+| API-04 | `POST /api/auth/register` (sửa) | Công khai | thêm `username` | `UserDto` | 201; 409 `USERNAME_TAKEN` |
+| API-15 | `PATCH /api/me/profile` | User | `{ displayName?, bio?, username? }` | `UserDto` | 200; 400; 401; 409 `USERNAME_TAKEN`, `USERNAME_CHANGE_COOLDOWN` |
+| API-16 | `PUT /api/me/avatar` | User | multipart `avatar` | `UserDto` | 200; 400; 401; 413; 415; 503 |
+| API-17 | `DELETE /api/me/avatar` | User | — | — | 204 |
+| API-18 | `GET /api/users/{id}/avatar` | Công khai | — | ảnh WebP (`Cache-Control: private, max-age=86400`) | 200; 404 |
+| API-19 | `GET /api/users` | User | `q` (1–100), `page` | `Page<UserSummaryDto>` | 200; 400; 401 |
+| API-20 | `GET /api/users/by-username/{username}` | Công khai | — | `ProfileDto` | 200; 404 |
+| API-21 | `GET /api/users/{id}/documents` | Công khai | `page`, `sort` | `Page<DocumentDto>` (chỉ Public) | 200; 404 |
+| API-22 | `GET /api/friends` | User | `page` | `Page<FriendDto>` | 200; 401 |
+| API-23 | `GET /api/friends/requests` | User | — | `FriendRequestDto[]` (cả đến và đi) | 200; 401 |
+| API-24 | `POST /api/friends/requests` | User | `{ userId }` | `RelationshipDto` | 201 mới; 200 đã có/thành bạn; 400; 404; 409 `ALREADY_FRIENDS` |
+| API-25 | `POST /api/friends/requests/{id}/accept` | Người nhận | — | `RelationshipDto` | 200; 404 |
+| API-26 | `DELETE /api/friends/requests/{id}` | Người gửi (huỷ) hoặc người nhận (từ chối) | — | — | 204; 404 |
+| API-27 | `DELETE /api/friends/{userId}` | User | — | — | 204 |
+
+| DTO | Trường |
+|---|---|
+| `UserDto` | `id, email, displayName, username, bio, avatarUrl, usernameChangeAvailableAt, createdAt` (chỉ cho chính mình) |
+| `OwnerDto` | `id, displayName, username` (không email) |
+| `UserSummaryDto` | `id, username, displayName, avatarUrl` |
+| `ProfileDto` | `UserSummaryDto` + `bio, publicDocumentCount, relationship` (`SELF`/`NONE`/`PENDING_OUTGOING`/`PENDING_INCOMING`/`FRIENDS`; `null` với Guest) |
+| `RelationshipDto` | `userId, status, requestId` (id lời mời, không phải `X-Request-Id`) |
+| `FriendRequestDto` | `id, direction (INCOMING/OUTGOING), user: UserSummaryDto, createdAt` |
+| `FriendDto` | `user: UserSummaryDto, since` |
+
+`avatarUrl = /api/users/{id}/avatar?v={uuid trong key}` (đổi ảnh thì URL đổi). Mã lỗi mới: `USER_NOT_FOUND` 404, `AVATAR_NOT_FOUND` 404, `FRIEND_REQUEST_NOT_FOUND` 404, `CANNOT_FRIEND_SELF` 400, `CONFIRMATION_MISMATCH` 400, `USERNAME_TAKEN` 409, `USERNAME_CHANGE_COOLDOWN` 409, `ALREADY_FRIENDS` 409, `ACCOUNT_DELETING` 409, `IMAGE_TOO_LARGE` 413, `UNSUPPORTED_IMAGE_TYPE` 415, `ACCOUNT_DELETION_INCOMPLETE` 503.
+
+### A12.6 Giám sát hiệu năng, thử tải, cache
+
+**Cách đo (E3, XM-05)**
+
+| Số liệu | Cách làm | Bộ nhớ |
+|---|---|---|
+| Request/giây, 4xx, 5xx | 30 ô × 10 giây (5 phút), mỗi ô 3 bộ đếm | 90 số |
+| Đang xử lý | Bộ đếm +1 khi vào, −1 khi xong/huỷ | 1 số |
+| P50/P95 | Mảng vòng 1 000 thời gian phản hồi gần nhất; sắp xếp khi đọc | 1 000 số |
+| CPU, RAM | Mỗi 5 s: `process.cpuUsage()`, `process.memoryUsage()`, `os.cpus()`, `os.freemem()/totalmem()` | vài số |
+| Event loop | `perf_hooks.monitorEventLoopDelay` (P99) | — |
+| DB, storage | Admin tự gọi khi mở dashboard | — |
+
+Chỉ đo tổng, không chia theo route. Số liệu theo từng tiến trình backend, mất khi khởi động lại. Trên AWS dùng CloudWatch như §A10.9; phần đo này vẫn chạy nhưng không ai đọc. Không dùng Prometheus/Grafana/Redis vì phải thêm dịch vụ trong khi chỉ có một backend local và chỉ cần số liệu 5 phút gần nhất. Dashboard có link "Xem lỗi" sang Errors (E7) cùng cửa sổ thời gian; E3 không giữ chi tiết lỗi.
+
+**Thử tải (XM-12).** Chạy backend production-like trỏ DB `btl_cloud_load` + bucket riêng, `LOG_LEVEL=warn`. Ba kịch bản, mỗi kịch bản tăng dần 1 → 10 → 50 kết nối, 60 giây mỗi bậc:
+
+| Kịch bản | Lệnh mẫu | Thường nghẽn ở |
+|---|---|---|
+| Tìm kiếm | `npx autocannon -c 10 -d 60 "http://localhost:3000/api/documents?q=giai"` | MySQL (`LIKE` quét bảng) |
+| Tải xuống 1 MiB | thêm `-H "Cookie: sid=…"` vào URL download | SeaweedFS / đĩa |
+| Đăng nhập | `-m POST` + body JSON; nâng `AUTH_RATE_LIMIT_MAX` chỉ trong lần chạy này | CPU (argon2id) |
+
+Đọc kết quả cùng dashboard: CPU backend ~100% + event loop trễ → nghẽn CPU; CPU thấp nhưng P95 tăng và DB chậm → nghẽn MySQL; tải xuống chậm, CPU thấp → nghẽn storage; 429 là do rate limit, bỏ qua. Khi thử tải có E7, mỗi lần đăng nhập/tải xuống ghi một dòng audit; báo cáo ghi rõ đo khi có audit. Số đo local không suy ra cho AWS (giống M5-08).
+
+**Cache.** Hiện trạng ở [CONTEXT §C8.9](CONTEXT.md#c89-ảnh-hưởng-tới-baseline-và-hiện-trạng-cache): chỉ có cache tài nguyên tĩnh production; API là `no-store`; không có Redis hay cache phía server. Chỉ đề xuất cache (bằng CR riêng) khi số đo cho thấy **cả ba**: (1) một endpoint đọc cụ thể chậm hơn mục tiêu owner đặt; (2) đã thử sửa truy vấn/index mà không đủ; (3) dữ liệu đọc nhiều, ít đổi. Thứ tự thử: cache trong bộ nhớ thời gian ngắn → Redis chỉ khi chạy nhiều instance và cache lệch nhau gây lỗi. Không bao giờ cache dữ liệu phụ thuộc quyền (Private).
+
+### A12.7 Audit log và chẩn đoán lỗi (E7)
+
+**Phân vai E3 ↔ E7 (XBR-26)**
+
+| | E3 Hiệu năng | E7 Audit | E7 Lỗi chẩn đoán |
+|---|---|---|---|
+| Câu hỏi | Hệ thống chịu tải ra sao? | Ai đã làm gì? | Lỗi ở module nào, bước nào, request nào? |
+| Thu thập | XM-05 đếm khi response kết thúc | XM-13 ghi từng sự kiện có ý nghĩa | XM-14 thêm trường vào dòng log sẵn có |
+| Lưu ở | Bộ nhớ (5 phút) | MySQL `audit_events` (theo retention) | stdout → file log controller (local) / CloudWatch Logs (AWS, OD-06) |
+| Đọc ở | Dashboard (ADM-01) | Activity (ADM-08), chi tiết user (ADM-03) | Errors (ADM-09, ADM-10) |
+
+**Danh mục sự kiện.** `metadata` chỉ nhận đúng các khoá ghi ở đây; mọi khoá khác bị bỏ.
+
+| `action` | `target_type` | `metadata` cho phép | Có từ |
+|---|---|---|---|
+| `AUTH_REGISTER`, `AUTH_LOGIN`, `AUTH_LOGOUT` | `USER` (`null` khi thất bại) | — | E7 (route MVP) |
+| `DOCUMENT_UPLOAD` | `DOCUMENT` | `visibility`, `fileType`, `sizeBytes` | E7 |
+| `DOCUMENT_DOWNLOAD`, `DOCUMENT_DELETE` | `DOCUMENT` | — | E7 |
+| `DOCUMENT_UPDATE` | `DOCUMENT` | `fields` (tên trường đã đổi), `visibility` | E7 |
+| `DOCUMENT_REPLACE` | `DOCUMENT` | `fileType`, `sizeBytes`, `fileVersion` | E7 |
+| `PROFILE_UPDATE` | `USER` | `fields` | E4, E5 |
+| `AVATAR_UPDATE`, `AVATAR_DELETE` | `USER` | — | E4 |
+| `FRIEND_REQUEST_SEND`, `FRIEND_REQUEST_ACCEPT`, `FRIEND_REQUEST_DELETE` | `FRIENDSHIP` | — | E5 |
+| `FRIEND_REMOVE` | `USER` | — | E5 |
+| `ADMIN_USER_UPDATE` | `USER` | `fields` | E2 |
+| `ADMIN_SESSIONS_REVOKE` | `USER` | `revoked` | E2 |
+| `ADMIN_ACCOUNT_DELETE` | `USER` | `maskedEmail`, `deletedDocuments`, `remainingDocuments` | E2 |
+
+**Quy tắc ghi**
+- `SUCCESS` khi status 2xx. `FAILURE` khi status ≥ 400 **và** biết actor, hoặc khi hành động là `AUTH_LOGIN`/`AUTH_REGISTER` (actor `ANONYMOUS`, không email). Guest bị 401 ở route khác không tạo sự kiện. Request bị chặn trước route (CSRF, 404 route) không tạo sự kiện.
+- Tải xuống bị client ngắt giữa chừng (`res.writableFinished = false` khi `close`) → `FAILURE`, `error_code = CLIENT_ABORTED`.
+- `request_id` = `req.id`, trùng `X-Request-Id` và `error.requestId`.
+
+**Trường chẩn đoán (XM-14).** `module` lấy theo tiền tố đường dẫn: `/api/auth` → `auth`, `/api/documents` → `documents`, `/api/me` và `/api/users` → `users`, `/api/friends` → `friends`, `/api/health` → `health`, còn lại → `http`. Các dòng không gắn request dùng quy ước `event = "<module>.<stage>"` sẵn có (`storage.orphan`, `server.shutdown`…), thêm `audit.write_failed`, `audit.purge_failed`. Giá trị `stage`:
+
+| `stage` | Đặt ở |
+|---|---|
+| `validate` | Lỗi zod, JSON, kích thước |
+| `authorize` | `requireAuth`, `document.loader`, CSRF |
+| `inspect` | FileInspector, kiểm ảnh (`sharp.metadata`) |
+| `encode` | Mã hoá avatar |
+| `storage.put` / `storage.get` / `storage.delete` | Bọc `StorageError` trong service |
+| `db` | Lỗi Prisma không lường trước |
+| `null` | Không xác định (lỗi lạ → 500) |
+
+**Đọc lỗi (XA-07).** Controller đã ghi mỗi dòng stdout thành `{ id, at, service, level, kind, message }` vào `backend/tmp/local-services.ndjson` (đã lọc bí mật, tối đa 2 000 ký tự/dòng, xoay file ở 2 MB, giữ `.1`). XA-07 đọc hai file, lấy dòng của dịch vụ `backend`/`admin` có `message` là JSON với `level ≥ 40` (pino-http ghi 4xx là WARN, 5xx là ERROR), rồi lọc theo cửa sổ thời gian và nhóm theo `module`, `code`. `coverageFrom` cho biết log cũ nhất còn đọc được. Trên AWS không có admin; nếu OD-06 cho phép CloudWatch Logs, tra bằng Logs Insights, ví dụ `fields @timestamp, module, stage, code, res.statusCode, durationMs | filter requestId = "<id>"`.
+
+**Quyền riêng tư và vòng đời**
+- Không ghi các mục trong XBR-21. Log giữ nguyên redact §A5.8; `ErrorEventDto.path` bỏ query string.
+- Retention: `AUDIT_RETENTION_DAYS` (mặc định 90, cho phép 1–3650). Khi khởi động: `DELETE … WHERE created_at < NOW(3) - INTERVAL ? DAY LIMIT 10000`, lặp tới khi hết. Log local tự mất theo vòng xoay file; trên AWS đặt retention cho log group khi làm CloudWatch Logs (không đổi M5).
+- Xoá tài khoản: theo XBR-24, thực hiện trong XSEQ-01.
+
+### A12.8 Sơ đồ tuần tự
+
+#### XSEQ-01 Xoá tài khoản (có lỗi giữa chừng)
+
+```mermaid
+sequenceDiagram
+  participant A as Admin UI
+  participant S as XA-04
+  participant D as MySQL
+  participant O as SeaweedFS
+  A->>S: ADM-07 confirmEmail
+  S->>D: Kiểm email, SET deletion_started_at, DELETE sessions
+  loop Từng tài liệu của user
+    S->>O: deleteObject(storage_key)
+    alt Storage lỗi
+      S->>D: INSERT audit ADMIN_ACCOUNT_DELETE FAILURE
+      S-->>A: 503 chưa hoàn tất, còn N
+    else OK hoặc object không tồn tại
+      S->>D: DELETE documents WHERE id = ? AND storage_key = ?
+    end
+  end
+  S->>O: deleteObject(avatar_key) nếu có
+  S->>D: DELETE audit_events WHERE actor_type = 'USER' AND actor_id = ?
+  S->>D: DELETE users (sessions, friendships tự xoá theo FK)
+  alt Còn tài liệu mới chen vào (FK chặn)
+    S-->>A: 503 chưa hoàn tất
+  else
+    S->>D: INSERT audit ADMIN_ACCOUNT_DELETE SUCCESS + maskedEmail
+    S-->>A: 200 COMPLETED
+  end
+  Note over A,S: Bấm lại = chạy lại từ đầu, các bước đã xong được bỏ qua tự nhiên
+```
+
+Nếu tài liệu vừa được thay tệp trong lúc xoá, `DELETE … AND storage_key = ?` không khớp dòng nào; lần bấm lại sẽ xoá theo key mới.
+
+#### XSEQ-02 Thay avatar
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant R as API-16
+  participant O as SeaweedFS
+  participant D as MySQL
+  U->>R: PUT /api/me/avatar
+  R->>R: CSRF, đăng nhập, ≤ 1 MiB
+  R->>R: sharp kiểm định dạng, kích thước, mã hoá WebP 512
+  alt Ảnh không hợp lệ
+    R-->>U: 400 / 413 / 415
+  end
+  R->>O: putObject(avatars/userId/uuid.webp)
+  alt Storage lỗi
+    R-->>U: 503, giữ avatar cũ
+  end
+  R->>D: UPDATE users SET avatar_key = mới (đọc key cũ trước)
+  alt DB lỗi
+    R->>O: xoá object mới (best-effort)
+    R-->>U: 500, giữ avatar cũ
+  else
+    R->>O: xoá object cũ (lỗi thì log storage.orphan)
+    R-->>U: 200 UserDto
+  end
+```
+
+#### XSEQ-03 Lỗi storage khi upload → audit → tra cứu
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant B as Backend
+  participant D as MySQL
+  participant C as Controller log
+  participant X as Admin Errors
+  U->>B: POST /api/documents
+  B->>B: putObject lỗi → AppError STORAGE_UNAVAILABLE, stage storage.put
+  B->>B: errorHandler đặt res.locals.errorCode, errorStage
+  B-->>U: 503 + requestId
+  B->>C: dòng log: requestId, module documents, stage, code, 503, durationMs
+  B->>D: INSERT audit DOCUMENT_UPLOAD FAILURE (sau close, không chờ)
+  alt INSERT lỗi
+    B->>C: ERROR audit.write_failed + requestId
+  end
+  X->>C: ADM-09 đọc file, nhóm theo module, code
+  X->>D: ADM-10 audit theo requestId
+```
+
+### A12.9 Sở hữu và vòng đời dữ liệu
+
+| Dữ liệu | Ai sửa | Bị xoá khi | Ai xem |
+|---|---|---|---|
+| Email, mật khẩu (hash) | User đăng ký; admin sửa email | Xoá tài khoản | Email: chính user, admin |
+| Tên hiển thị, bio, username, avatar | User; admin | Xoá tài khoản; avatar cũ khi thay | Công khai |
+| `last_active_at` | Hệ thống | Xoá tài khoản | Admin |
+| Tài liệu + object | Owner | Owner xoá; xoá tài khoản | Theo §C3.2 (không đổi) |
+| `friendships` | Hai bên | Huỷ/từ chối; xoá tài khoản (cascade) | Hai bên |
+| `audit_events` | Hệ thống (chỉ thêm) | Quá `AUDIT_RETENTION_DAYS`; sự kiện có actor là user khi xoá tài khoản | Admin |
+| Dòng log lỗi | Hệ thống | Vòng xoay file (local); retention log group (AWS) | Admin (local) |
+| Metrics | Hệ thống | Khởi động lại backend | Admin |
+
+Trạng thái tài khoản: `ACTIVE` → (ADM-07) `DELETING` → (hết tài liệu và avatar) bị xoá. Không có đường quay lại.
+
+### A12.10 Tương thích AWS
+
+| Hạng mục | Kết luận |
+|---|---|
+| Admin | Không có trong repo và bản build; không chạy được với DB/S3 không phải loopback. M5 không đổi. Hệ quả: không quản lý user, không xem Activity/Errors trên AWS (chấp nhận) |
+| Metrics | Chạy trong backend nhưng không có endpoint; AWS dùng CloudWatch |
+| `last_active_at`, hồ sơ, username, bạn bè | Chỉ dùng RDS/S3, chạy được nhiều instance |
+| Avatar | Thêm `avatars/*` vào IAM policy §A10.9 khi deploy E4. `sharp` có bản dựng sẵn cho Linux x64; thử trên AL2023 trước khi deploy |
+| Migration username | Có bước `NOT NULL` ngay trong migration → deploy E5 lên AWS phải dừng hết instance cũ trước (không rolling) |
+| Audit | Mọi instance ghi chung `audit_events` trên RDS; mỗi instance xoá quá hạn khi khởi động (câu `DELETE` chạy trùng vẫn an toàn). Đọc trên AWS chỉ bằng SQL client trong VPC |
+| Lỗi chẩn đoán | Trường mới nằm trong log JSON stdout; dùng được với CloudWatch Logs nếu OD-06 cho phép (metric filter `level ≥ 50` ở §A10.9 không đổi) |
+
+### A12.11 Kiểm thử
+
+| Loại | Chạy ở đâu | Nội dung mới |
+|---|---|---|
+| Backend unit + integration | Commit, CI | Activity, metrics, `DELETING`, hồ sơ/avatar, username, hồ sơ public, bạn bè, audit recorder (allowlist, `FAILURE`, lỗi ghi không đổi response, retention), trường log chẩn đoán; hồi quy API-01…14 |
+| `node:test` dev | Commit, CI | Proxy admin, `not-installed`, file snapshot, stdout của admin vào file log |
+| Frontend unit, UI test, E2E | Commit, CI | Trang mới, chỉ báo mật khẩu, `App` khi không có admin |
+| `scripts/verify/` | Commit | `authz-matrix` thêm bạn bè × Private; mới `admin-isolation.mjs` (`:3000/api/admin/*` 404, build không có admin, `git ls-files` sạch, `:3003` chỉ loopback) |
+| Test admin (`ADMIN_TEST`) | Chỉ máy owner | Guard, overview, sửa user, xoá tài khoản với lỗi storage, Activity, Errors với file log mẫu |
+| Clone sạch | Máy owner | `git clone` sang thư mục tạm → `npm ci && npm run lint && npm run build && npm test` PASS |
+| Tài liệu (E8) | Máy owner | Kiểm link/anchor; đối chiếu trạng thái §0 với MILESTONES; diễn tập 10 phút |
+
+### A12.12 Khôi phục ngữ cảnh và điều hướng kiến trúc (E8)
+
+**Mẫu mô tả module.** Mọi module, cả MVP (§A3.6) và mở rộng (§A12.3), phải trả lời ba câu tự kiểm tra:
+
+| Câu hỏi | Cột/dòng trả lời |
+|---|---|
+| Input và output là gì? | §A3.6 "Input → Output" · thẻ §A12.3 "Input → Output" |
+| Phụ thuộc vào gì? | §A3.6 "Phụ thuộc" · thẻ "Phụ thuộc"; chiều phụ thuộc theo §A1.4 |
+| Lỗi thì chuyện gì xảy ra? | §A3.6 "Lỗi" · thẻ "Lỗi"; ma trận lỗi §A6.9 |
+
+**Điều hướng**
+- Tiền tố ID cho biết tài liệu chứa nó: `FR/BR/AC/NFR/OD/RK` và `E<n>-FR/AC`, `XBR`, `XOD` ở CONTEXT; `D/UC/API/P/SEQ/U/INV` và `XD/XM/XA/ADM/XSEQ/XR` ở ARCHITECTURE; `M<n>-xx`, `E<n>-xx`, `CR`, `ACC` ở MILESTONES. ID không được dùng lại; đổi tên phải ghi CR.
+- Từ log tới mã: `event = "<module>.<stage>"` và trường `module` trùng tên thư mục `backend/src/modules/*` hoặc `http`, `storage`, `server`, `audit`.
+- Từ yêu cầu tới task: §A11.1 (MVP) và §A12.13 (mở rộng).
+
+**Khi quyết định thay đổi.** Ghi CR ở MILESTONES → sửa đúng một mục nguồn (CONTEXT cho yêu cầu, ARCHITECTURE cho thiết kế, MILESTONES cho task) → nếu chạm trạng thái, bất biến hay lệnh chạy thì sửa PROJECT_OVERVIEW §0 trong **cùng PR** (XBR-28) → các tài liệu khác chỉ dẫn link, không chép.
+
+### A12.13 Truy vết
+
+| Yêu cầu | Module | API | Task |
+|---|---|---|---|
+| E1-FR-01, 02, 05 | XA-01, XA-05, XM-02, XM-03 | `/admin` | E1-02, E1-03, E1-04, E1-06 |
+| E1-FR-03 | XA-02 | ADM-01 | E1-05 |
+| E1-FR-04 | XM-01 | — | E1-01 |
+| E2-FR-01…04 | XA-03, XA-05 | ADM-02…06 | E2-02, E2-04 |
+| E2-FR-07 | XM-13, XA-03, XA-06 | ADM-03 | E7-06, E7-05 |
+| E2-FR-05, 06 | XA-04, XM-04 | ADM-07 | E2-01, E2-03 |
+| E3-FR-01…04 | XM-05, XA-02 | ADM-01 | E3-01, E3-02 |
+| E3-FR-05, 06 | XM-12, §A12.6 | — | E3-03 |
+| E4-FR-01…04 | XM-06, XM-10 | API-15…18 | E4-01, E4-02, E4-03, E4-04 |
+| E5-FR-01…03 | XM-07, XM-10 | API-04, 15 | E5-01 |
+| E5-FR-04, 05 | XM-08, XM-10 | API-19…21 | E5-02, E5-04 |
+| E5-FR-06 | XM-09, XM-10 | API-22…27 | E5-03, E5-04, E5-05 |
+| E5-FR-07 (loại trừ) | — | — | E5-G kiểm không có chat/gợi ý |
+| E6-FR-01…04 | XM-11 | — | E6-01 |
+| E7-FR-01, 02, 04 | XM-13 | — | E7-01, E7-02, E7-06 |
+| E7-FR-03 | XA-06, XA-05 | ADM-08 | E7-04, E7-05 |
+| E7-FR-05 | XM-14 | — | E7-03 |
+| E7-FR-06, 07 | XA-07, XA-06 | ADM-09, ADM-10 | E7-04, E7-05 |
+| E7-FR-08 | XA-05 | ADM-08…10 | E7-05 |
+| E8-FR-01, 02, 05 | PROJECT_OVERVIEW §0 | — | E8-01, E8-02 |
+| E8-FR-03 | §A3.6, §A12.3, §A12.12 | — | E8-01 |
+| E8-FR-04 | CONTEXT §C8.9 | — | E8-01 |
+
+### A12.14 Rủi ro
+
+| ID | Rủi ro | Giảm thiểu |
+|---|---|---|
+| XR-01 | Mã admin không có trong Git: mất máy là mất mã, không có CI, thành viên khác không có | Owner sao lưu thư mục admin ra ngoài máy (E1-07); chạy test admin trước mỗi thay đổi |
+| XR-02 | File commit lỡ import mã admin → clone sạch hỏng | Chỉ `spawn`/`import.meta.glob`; kiểm clone sạch ở các task E1 |
+| XR-03 | Tunnel public trỏ nhầm `:3003`/`:5173` | Admin vẫn đòi token và loopback; `admin-isolation.mjs` kiểm |
+| XR-04 | `sharp` là thư viện native (lỗ hổng, cài đặt) | Ghim phiên bản, `npm audit`; giới hạn 1 MiB và số pixel |
+| XR-05 | Xoá tài khoản dở dang khi storage hỏng lâu | Tài khoản bị khoá và ẩn; bấm "Tiếp tục xoá" khi storage chạy lại |
+| XR-06 | API-04 đổi làm hỏng test/E2E cũ | Sửa FE, BE, test trong cùng một task (E5-01) |
+| XR-07 | Bạn bè tưởng thấy được tài liệu riêng tư | UI ghi rõ; test E5-AC-05 |
+| XR-08 | Dữ liệu cá nhân lọt vào `metadata` audit | Allowlist theo `action` (§A12.7); test E7-AC-03 |
+| XR-09 | Ghi audit thêm tải cho DB khi thử tải | Một INSERT nhỏ, không chờ; báo cáo E3-03 ghi rõ có audit |
+| XR-10 | Log local quá ngắn, lỗi cũ đã bị xoay mất | `coverageFrom` hiện trên UI; sự kiện quan trọng vẫn có trong `audit_events` |
+| XR-11 | Hướng dẫn 10 phút lỗi thời | XBR-28; E8-01 kiểm link và trạng thái |

@@ -3,6 +3,7 @@
 Lưu trữ và chia sẻ PDF, DOCX, PPTX (tối đa 50 MiB), với tài khoản, kho cá nhân, tìm kiếm và chế độ Công khai/Riêng tư. Hiện là **local prototype**; M4-07/08 hoãn (CR-005), M5 (AWS) chưa làm.
 Tiến độ: [MILESTONES](docs/MILESTONES.md). Tổng quan kiến trúc, đặc tả và sơ đồ: [PROJECT_OVERVIEW](docs/PROJECT_OVERVIEW.md).
 Bàn giao cho thành viên nhóm theo hai PDF: [TEAM_HANDOFF](docs/TEAM_HANDOFF.md).
+Quay lại dự án sau một thời gian: [hướng dẫn 10 phút](docs/PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút). Mở rộng tuỳ chọn E1–E8 (E1–E3, E6–E8 đã duyệt, chưa triển khai; E4–E5 hoãn): [yêu cầu](docs/CONTEXT.md#c8-mở-rộng-đề-xuất-e1e8) · [thiết kế](docs/ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8) · [kế hoạch](docs/MILESTONES.md#e1e8--mở-rộng-đề-xuất).
 
 ## Yêu cầu và chạy nhanh
 
