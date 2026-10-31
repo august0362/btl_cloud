@@ -20,15 +20,20 @@ enum FileType {
 }
 
 model User {
-  id           String     @id @db.Char(36)
-  email        String     @unique(map: "uq_users_email") @db.VarChar(254)
-  passwordHash String     @map("password_hash") @db.VarChar(255)
-  displayName  String     @map("display_name") @db.VarChar(100)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
-  sessions     Session[]
-  documents    Document[]
+  id                String     @id @db.Char(36)
+  email             String     @unique(map: "uq_users_email") @db.VarChar(254)
+  passwordHash      String     @map("password_hash") @db.VarChar(255)
+  displayName       String     @map("display_name") @db.VarChar(100)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  // E1 (§A12.4): chỉ ghi bằng SQL thô (UserRepository.touchLastActive) để không đổi updated_at.
+  lastActiveAt      DateTime?  @map("last_active_at") @db.DateTime(3)
+  // E2 (§A12.4, XBR-06): khác NULL = DELETING; app public coi như user không tồn tại.
+  deletionStartedAt DateTime?  @map("deletion_started_at") @db.DateTime(3)
+  sessions          Session[]
+  documents         Document[]
 
+  @@index([lastActiveAt], map: "idx_users_last_active_at")
   @@map("users")
 }
 
@@ -66,3 +71,40 @@ model Document {
   @@map("documents")
 }
 
+enum AuditActorType {
+  USER
+  DEVELOPER
+  ANONYMOUS
+}
+
+enum AuditTargetType {
+  USER
+  DOCUMENT
+  FRIENDSHIP
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+// E7 (§A12.4, XM-13): bảng chỉ thêm dòng. Không FK để sự kiện còn sau khi đối tượng bị xoá.
+model AuditEvent {
+  id         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  createdAt  DateTime         @map("created_at") @db.DateTime(3)
+  actorType  AuditActorType   @map("actor_type")
+  actorId    String?          @map("actor_id") @db.VarChar(64)
+  action     String           @db.VarChar(40)
+  targetType AuditTargetType? @map("target_type")
+  targetId   String?          @map("target_id") @db.Char(36)
+  outcome    AuditOutcome
+  errorCode  String?          @map("error_code") @db.VarChar(40)
+  requestId  String?          @map("request_id") @db.Char(36)
+  metadata   Json?
+
+  @@index([createdAt], map: "idx_audit_events_created_at")
+  @@index([actorId, createdAt], map: "idx_audit_events_actor_created")
+  @@index([targetId, createdAt], map: "idx_audit_events_target_created")
+  @@index([requestId], map: "idx_audit_events_request_id")
+  @@map("audit_events")
+}

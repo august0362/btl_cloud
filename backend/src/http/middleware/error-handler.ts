@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { removeFileQuietly } from '../../cleanup/tmp-sweeper.js';
 import type { Logger } from '../../lib/logger.js';
+import { moduleOf } from '../../lib/module-of.js';
 import { AppError } from '../errors.js';
 
 export const apiNotFound: RequestHandler = (_req, _res, next) => next(new AppError('ROUTE_NOT_FOUND'));
@@ -24,17 +25,21 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
   return (error, req, res, _next) => {
     void removeFileQuietly(req.file?.path);
 
-    if (res.headersSent) {
-      logger.error({ err: error, requestId: req.id, event: 'response.aborted' }, 'Lỗi sau khi đã gửi header');
-      res.destroy();
-      return;
-    }
-
     let appError: AppError;
     if (error instanceof AppError) appError = error;
     else appError = fromBodyParser(error) ?? new AppError('INTERNAL_ERROR', { cause: error });
 
-    if (appError.status >= 500) logger.error({ err: error, requestId: req.id, code: appError.code }, 'Lỗi xử lý request');
+    res.locals.errorCode = appError.code;
+    res.locals.errorStage = appError.stage ?? null;
+    const diagnostic = { requestId: req.id, module: moduleOf(req.originalUrl), code: appError.code, stage: appError.stage ?? null };
+
+    if (res.headersSent) {
+      logger.error({ err: error, ...diagnostic, event: 'response.aborted' }, 'Lỗi sau khi đã gửi header');
+      res.destroy();
+      return;
+    }
+
+    if (appError.status >= 500) logger.error({ err: error, ...diagnostic }, 'Lỗi xử lý request');
 
     if (!req.complete) {
       res.setHeader('Connection', 'close');

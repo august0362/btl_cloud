@@ -6,6 +6,7 @@ import { createServices } from './container.js';
 import { createPrismaClient } from './db/prisma.js';
 import { createShutdown } from './lifecycle.js';
 import { createLogger } from './lib/logger.js';
+import { metrics } from './metrics/metrics.js';
 import { S3ObjectStorage } from './storage/s3-object-storage.js';
 
 const SHUTDOWN_TIMEOUT_MS = 30_000;
@@ -43,7 +44,10 @@ async function main(): Promise<void> {
   } catch (error) {
     logger.warn({ err: error, event: 'sessions.startup_cleanup_failed' }, 'Chưa xoá được phiên hết hạn');
   }
+  // XD-14: xoá sự kiện audit quá hạn; lỗi chỉ WARN `audit.purge_failed`, vẫn khởi động.
+  await services.audit.purgeExpired(config.audit.retentionDays);
   const app = createApp({ config, logger, prisma, storage, services });
+  metrics.start();
 
   const server = app.listen({ port: config.port, host: config.host }, () => {
     logger.info({ port: config.port, version: config.version, event: 'server.started' }, 'Backend đã khởi động');
@@ -55,7 +59,10 @@ async function main(): Promise<void> {
 
   const shutdown = createShutdown({
     logger,
-    closeServer: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    closeServer: () => {
+      metrics.stop();
+      return new Promise<void>((resolve) => server.close(() => resolve()));
+    },
     disconnectDatabase: () => prisma.$disconnect(),
     destroyStorage: () => storage.destroy(),
     exit: (code) => process.exit(code),

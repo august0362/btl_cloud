@@ -48,3 +48,20 @@ it.each(["127.0.0.1", "::1", "::ffff:127.0.0.1"])("preserves local access from %
   expect(res.statusCode).toBe(503);
   expect(request).not.toHaveBeenCalled();
 });
+
+it("XM-02 lets /admin/* reach the controller only as GET, or POST/PATCH with the local-control header", async () => {
+  const handle = await middleware();
+  const send = async (method: string, extra: Record<string, string> = {}) => {
+    const res = { setHeader: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+    await handle({ url: "/admin/users/u1", method, socket: { remoteAddress: "127.0.0.1" },
+      headers: { host: "localhost:5173", ...extra } } as unknown as IncomingMessage, res);
+    return res.statusCode;
+  };
+  vi.mocked(readFile).mockClear();
+  for (const method of ["PATCH", "DELETE", "PUT"]) expect(await send(method, { origin: "http://localhost:5173" })).toBe(403);
+  expect(readFile).not.toHaveBeenCalled();
+  vi.mocked(readFile).mockRejectedValue(new Error("fixture controller offline"));
+  expect(await send("GET")).toBe(503);
+  expect(await send("PATCH", { origin: "http://localhost:5173", "x-local-control": "1" })).toBe(503);
+  expect(readFile).toHaveBeenCalledTimes(2);
+});

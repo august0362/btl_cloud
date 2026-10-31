@@ -15,4 +15,9 @@ export class UserRepository {
   create(data: { id: string; email: string; passwordHash: string; displayName: string }, db: Db = this.prisma): Promise<User> {
     return db.user.create({ data });
   }
+
+  /** XM-01: SQL thô để Prisma không tự đặt `updated_at` (@updatedAt). */
+  async touchLastActive(id: string, at: Date): Promise<void> {
+    await this.prisma.$executeRaw`UPDATE users SET last_active_at = ${at} WHERE id = ${id}`;
+  }
 }

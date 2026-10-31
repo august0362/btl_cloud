@@ -3,6 +3,7 @@
 Lưu trữ và chia sẻ PDF, DOCX, PPTX (tối đa 50 MiB), với tài khoản, kho cá nhân, tìm kiếm và chế độ Công khai/Riêng tư. Hiện là **local prototype**; M4-07/08 hoãn (CR-005), M5 (AWS) chưa làm.
 Tiến độ: [MILESTONES](docs/MILESTONES.md). Tổng quan kiến trúc, đặc tả và sơ đồ: [PROJECT_OVERVIEW](docs/PROJECT_OVERVIEW.md).
 Bàn giao cho thành viên nhóm theo hai PDF: [TEAM_HANDOFF](docs/TEAM_HANDOFF.md).
+Quay lại dự án sau một thời gian: [hướng dẫn 10 phút](docs/PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút). Mở rộng tuỳ chọn E1–E8 (E1–E3, E6–E8 đã duyệt, chưa triển khai; E4–E5 hoãn): [yêu cầu](docs/CONTEXT.md#c8-mở-rộng-đề-xuất-e1e8) · [thiết kế](docs/ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8) · [kế hoạch](docs/MILESTONES.md#e1e8--mở-rộng-đề-xuất).
 
 ## Yêu cầu và chạy nhanh
 
@@ -45,7 +46,7 @@ Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShel
 
 Controller Node duy nhất tại **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, thu stdout/stderr và giữ các handle/PID nó tạo. Dịch vụ chạy ẩn; cấu hình `.env`, thư mục MySQL, SeaweedFS và tài liệu đã có được giữ. Lần đầu vẫn dùng MySQL 8.4.7 / SeaweedFS 4.48 portable, `npm ci`, migration deploy và tạo bucket như launcher cũ; không reset DB. Biến `DEBUG` được bỏ riêng trong môi trường con của dịch vụ để tránh lỗi SeaweedFS. Backend không có watcher: dùng **Khởi động lại** sau khi sửa mã backend.
 
-Tại **http://localhost:5173**, mở **Đăng nhập nhà phát triển** và dùng tài khoản được cấp để truy cập toàn bộ công cụ local (Backend, Start/Stop All, Services và Developer Mode). Controller kiểm tra phiên cho cả đọc trạng thái/log lẫn thao tác điều khiển; sửa `localStorage` hoặc đăng nhập tài khoản người dùng thông thường không cấp quyền developer. Phiên dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; đăng xuất hoặc khởi động lại controller yêu cầu đăng nhập lại. Đăng nhập developer vẫn hoạt động khi Express/MySQL đang tắt.
+Tại **http://localhost:5173/admin** (link **Quản trị**), mở **Đăng nhập nhà phát triển** và dùng tài khoản được cấp để truy cập toàn bộ công cụ local (Backend, Start/Stop All, Services và Developer Mode). Controller kiểm tra phiên cho cả đọc trạng thái/log lẫn thao tác điều khiển; sửa `localStorage` hoặc đăng nhập tài khoản người dùng thông thường không cấp quyền developer. Phiên dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; đăng xuất hoặc khởi động lại controller yêu cầu đăng nhập lại. Đăng nhập developer vẫn hoạt động khi Express/MySQL đang tắt. Công cụ này nằm trong thư mục admin gitignore (`frontend/src/admin/`, `backend/admin/`), chỉ có trên máy owner; clone không có thư mục này thì web không có link **Quản trị** và Start All vẫn chạy.
 
 Người quản lý cấp **một tài khoản developer cục bộ cho mỗi bản sao dự án** bằng lệnh tại gốc repo:
 
@@ -76,7 +77,8 @@ Kiểm tra:
 ```sh
 node --test backend/dev/*.test.mjs
 npm --prefix frontend test
-npm --prefix frontend exec -- playwright test --config frontend/playwright.local.config.ts
+npm --prefix frontend exec -- playwright test --config frontend/admin-tests/playwright.config.ts   # chỉ máy có admin
+node scripts/verify/admin-isolation.mjs   # sau npm run build
 # Sau npm run build:
 node scripts/verify/local-production.mjs
 ```
@@ -101,6 +103,8 @@ node scripts/verify/upload-matrix.mjs
 ```
 
 Integration cần MySQL và storage đang chạy; chỉ reset **btl_cloud_test**. E2E và hai script verify cần backend production-like ở :3000; `test:ui` là suite mock riêng. Nếu chạy lặp nhiều suite bị 429, tăng `AUTH_RATE_LIMIT_MAX=1000` chỉ cho process backend của lần kiểm thử, rồi khởi động lại với mặc định.
+
+Thử tải trên DB/bucket riêng (seed, lệnh `autocannon`, kết quả mẫu): [scripts/load/README.md](scripts/load/README.md).
 
 ## Cấu trúc và đóng góp
 

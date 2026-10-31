@@ -3,10 +3,14 @@
 > Tài liệu 3/3 của Design Baseline v1.0: **CÔNG VIỆC, TIẾN ĐỘ, KIỂM CHỨNG, NGHIỆM THU**. Yêu cầu: [CONTEXT.md](CONTEXT.md). Thiết kế: [ARCHITECTURE.md](ARCHITECTURE.md).
 >
 > `BASELINE_VERSION: 1.0` · `OWNER_APPROVED_M0: YES` — owner đã phê duyệt ở [OWNER DESIGN APPROVAL](#owner-design-approval); thay đổi sau đó ghi ở Nhật ký thay đổi baseline.
+>
+> Mở rộng tuỳ chọn E1–E8 (CR-009: E1–E3, E6–E8 đã duyệt, E4–E5 hoãn; không thuộc M0–M5): [E1–E8 — Mở rộng đề xuất](#e1e8--mở-rộng-đề-xuất).
 
 ## Quy tắc và milestone
 
 Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code owner review. Chỉ tick task sau khi đã kiểm chứng, kèm một dòng bằng chứng. Các ô [OWNER] và FINAL OWNER ACCEPTANCE do owner tự nghiệm thu.
+
+**XBR-28:** Khi một quyết định đã duyệt thay đổi (CR) hoặc trạng thái milestone đổi, cập nhật [PROJECT_OVERVIEW §0](PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút) trong cùng PR (CONTEXT §C8.8; ARCHITECTURE §A12.12).
 
 | Milestone | Phạm vi | Trạng thái |
 |---|---|---|
@@ -15,6 +19,7 @@ Dùng nhánh feature/*, fix/*, chore/*. PR cần CI job `ci-required` và code o
 | M3 | Frontend | Đã ghép lịch sử |
 | M4 | Local prototype | M4-01…06/09…11 đã kiểm; 07/08 hoãn; chờ owner gate |
 | M5 | Chuẩn bị AWS | Chưa làm |
+| E1–E8 | Mở rộng tuỳ chọn (CR-009) | E0, E1-01, E1-02, E1-03, E1-04, E1-05, E1-06, E2-01, E2-02, E2-03, E2-04, E3-01, E3-02, E3-03, E6-01, E7-01, E7-02, E7-03, E7-04, E7-05, E7-06, E8 DONE (đợt 1–6); còn E1-07 và nghiệm thu E1-G, E2-G, E3-G, E6-G, E7-G của owner; E4–E5 DEFERRED |
 
 ## M0 — Requirements, Architecture & UX/UI Design
 
@@ -254,6 +259,176 @@ Các lượt setup lỗi không tính PASS: thiếu S3 trước khi infra sẵn 
   - In: M5 · Out: quyết định + phạm vi · Dep: M5-10 · Verify: owner ghi quyết định
   - Bằng chứng: —
 
+## E1–E8 — Mở rộng đề xuất
+
+> **APPROVED — E1–E3, E6–E8 (owner 30/10/2026, CR-009). E4–E5: DEFERRED.** Yêu cầu: [CONTEXT §C8](CONTEXT.md#c8-mở-rộng-đề-xuất-e1e8). Thiết kế: [ARCHITECTURE §A12](ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8). Phần mở rộng **tuỳ chọn**, không phải điều kiện của bài tập cloud. M0–M5, hạn nộp và FINAL OWNER ACCEPTANCE ở trên giữ nguyên. Không đặt ngày. Task chưa làm: **NOT STARTED**; task hoãn: **DEFERRED**.
+
+### Quy tắc E
+
+- **Owner chọn task tiếp theo** (XOD-01). Agent chỉ làm task được giao, khi các task phụ thuộc đã xong, và chỉ trong module ghi ở task.
+- Không bắt đầu trước **E0-01** (owner duyệt) và **E0-02** (ghi CR).
+- Cột **Nơi mã**: `commit` = vào repo, chạy CI; `admin` = thư mục gitignore, bằng chứng là kết quả chạy trên máy owner; `docs` = chỉ tài liệu. Không commit/push khi owner chưa cho phép.
+- Migration: sao lưu trước, áp bằng `prisma:deploy`, không reset (ARCHITECTURE §A12.4).
+- Sau mỗi task `commit`: `npm run lint && npm run build && npm test`; task chạm DB/API chạy thêm `npm --prefix backend run test:integration`.
+- `ADMIN_TEST` = `npm --prefix backend exec -- vitest run --config admin/vitest.config.ts`.
+
+### Phụ thuộc và làm song song
+
+```mermaid
+flowchart LR
+  E0["E0 Duyệt"] --> E1["E1 Admin"]
+  E0 --> E3a["E3-01 Đo số liệu"]
+  E0 --> E4["E4 Hồ sơ (hoãn)"]
+  E0 --> E6["E6 Mật khẩu"]
+  E0 --> E21["E2-01 DELETING"]
+  E0 --> E7a["E7-01…03 Audit, log"]
+  E0 --> E8["E8 Khôi phục ngữ cảnh"]
+  E1 --> E2["E2-02…04 Quản lý user"]
+  E21 --> E2
+  E1 --> E3b["E3-02, 03 Dashboard, thử tải"]
+  E3a --> E3b
+  E4 --> E5["E5 Username, bạn bè (hoãn)"]
+  E2 --> E44["E4-04 Avatar trong admin (hoãn)"]
+  E4 --> E44
+  E2 --> E55["E5-05 Kiểm tra cuối E5 (hoãn)"]
+  E5 --> E55
+  E1 --> E7b["E7-04, 05 Activity, Errors"]
+  E7a --> E7b
+  E7a --> E76["E7-06 Audit cho E2, E4, E5"]
+  E2 --> E76
+```
+
+| | Task |
+|---|---|
+| Làm song song được ngay (E0 đã xong) | E1-01, E1-02, E2-01, E3-01, E6-01, E7-01, E7-03, E8-01, E8-03 |
+| Chuỗi tuần tự | E1-02 → E1-03 → E1-04 → E1-06 · (hoãn) E4-01 → E4-02 → E5-01 → (E5-02, E5-03) → E5-04 · E7-01 → E7-02 · (E7-01, E7-03, E1-03) → E7-04 → E7-05 · E8-01 → E8-02 |
+| Song song nhưng merge lần lượt | E3-01 và E7-03 cùng sửa `app.ts`/`request-context.ts` |
+
+### E0 — Duyệt
+
+| ID | Trạng thái | Task | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|
+| E0-01 | [x] DONE | **[OWNER]** Duyệt §C8, §A12 và phần này; trả lời XOD-15…20 ở [E Approval](#e-approval) | — | — | `EXTENSIONS_APPROVED: YES` | Owner duyệt trong chat 30/10/2026, nhờ agent đánh dấu |
+| E0-02 | [x] DONE | Ghi CR vào Nhật ký thay đổi baseline theo CONTEXT §C8.9; đổi nhãn PROPOSED của §C8, §A12 và phần này | docs | E0-01 | CR-009 | CR-009 có trong Nhật ký; nhãn đã đổi (chưa commit) |
+
+### E1 — Local Admin Dashboard
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E1-01 | [x] DONE | Migration `last_active_at` + activity tracker | XM-01 | commit | E0-02 | Ghi tối đa 1 lần/5 phút; `updated_at` không đổi | Unit + integration. 30/10/2026, `8610c9f` (`feature/wave1-a`, đã merge vào `TAV_branch`): `npm run lint && npm run build && npm test` PASS (backend unit 71, frontend 85); `test:integration` 77/77 (`activity.test.ts` 3/3); `migrate deploy` lên DB test có dữ liệu: số dòng users/sessions/documents không đổi |
+| E1-02 | [x] DONE | `.gitignore` thư mục admin; khung admin process (token, loopback, thoát khi config không phải local) | XA-01 | admin + commit (`.gitignore`) | E0-02 | E1-AC-03; `git check-ignore backend/admin/main.ts` khớp | 30/10/2026: `npm --prefix backend exec -- vitest run --config backend/admin/vitest.config.ts` 13/13 PASS (token sai/thiếu 403, `X-Forwarded-For` 403, socket không loopback 403, bind 127.0.0.1:3003, DB/S3 không loopback, `NODE_ENV=production` hoặc thiếu token → thoát); `git check-ignore` khớp 3 thư mục; `git ls-files \| grep -i admin` rỗng; lint/build/test gốc PASS (92 backend, 100 frontend). Phần 401 của E1-AC-03 thuộc controller (E1-03) |
+| E1-03 | [x] DONE | Controller khởi động admin nếu có, proxy `/browser/admin/*`; Vite bridge cho `/admin/` | XM-02 | commit | E1-02 | Không phiên → 401; không có thư mục admin → Start All vẫn OK | `node --test backend/dev/`. 30/10/2026 (`TAV_branch`): `node --test backend/dev/*.test.mjs` 36/36 (proxy 401/404/503/413, chuyển tiếp token + `X-Admin-Actor`; `not-installed`, Start All OK; admin khởi động sau cùng, dừng trước); lint/build/test PASS (backend 122, frontend 101); `ADMIN_TEST` 13/13; trạng thái admin ở `status().admin`, panel cũ không đổi |
+| E1-04 | [x] DONE | Chuyển panel developer vào thư mục admin, gỡ khỏi Git; nạp bằng `import.meta.glob`; sửa README/WINDOWS_HOSTING/TEAM_HANDOFF; script `scripts/verify/admin-isolation.mjs` | XM-03, XA-05 | admin + commit | E1-03 | E1-AC-01, 02, 06 | `node scripts/verify/admin-isolation.mjs`; clone sạch. 30/10/2026 (`TAV_branch`): `admin-isolation` PASS (không file admin nào được track, 136 file commit không import admin, build không chứa admin); giả lập clone sạch (tạm chuyển 3 thư mục admin ra ngoài): lint, `tsc`, build frontend, unit (backend 122, frontend 93), `node --test backend/dev` 36/36 PASS; admin frontend 9/9 (`src/admin/vitest.config.ts`); `/admin` nằm trong layout public, link **Quản trị** chỉ khi có thư mục admin |
+| E1-05 | [x] DONE | ADM-01: số user, tài liệu, dung lượng logic, dung lượng đĩa SeaweedFS, sức khoẻ | XA-02 | admin | E1-01, E1-03 | E1-AC-04, 05 | `ADMIN_TEST overview`. 30/10/2026 (`backend/admin/overview.ts`, gitignore): `ADMIN_TEST overview` 6/6 trên DB test (E1-AC-04, 05; mỗi phần lỗi độc lập; snapshot > 15 s → backend tắt); stack thật: `:3003/admin/overview` không token → 403, qua Vite chưa đăng nhập → 401 |
+| E1-06 | [x] DONE | Trang Dashboard (số liệu + dịch vụ/log của panel cũ) | XA-05 | admin | E1-04, E1-05 | Backend tắt → số liệu DB và điều khiển vẫn dùng được | Kiểm tay + RTL. 30/10/2026 (`frontend/src/admin/Dashboard.tsx`, gitignore): RTL admin 14/14 (Dashboard 4: đủ số liệu, phần `null` → "Không đo được", lỗi API tại chỗ, làm mới 10 s chỉ khi tab hiển thị); admin chạy riêng nên backend tắt vẫn đọc DB (`ADMIN_TEST overview`); `npm run lint`, frontend build + 93/93, `admin-isolation` PASS |
+| E1-07 | [ ] NOT STARTED | **[OWNER]** Sao lưu thư mục admin ra ngoài máy (repo private hoặc bản nén) | — | — | E1-02 | Có bản sao (XR-01) | Owner |
+| E1-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E1 | — | — | E1-01…07 | "ĐỒNG Ý" hoặc danh sách cần sửa | — |
+
+### E2 — Quản lý người dùng
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E2-01 | [x] DONE | Migration `deletion_started_at`; app public coi user `DELETING` như không tồn tại | XM-04 | commit | E0-02 | Không đăng nhập được; tài liệu 404, không có trong tìm kiếm | Integration; `node scripts/verify/authz-matrix.mjs`. 30/10/2026, `36db668` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 71, frontend 85); `test:integration` 81/81 (`deleting-user.test.ts` 4/4); `authz-matrix` 82/82 với backend build trỏ DB test (:3010); số dòng không đổi |
+| E2-02 | [x] DONE | ADM-02, 03, 05, 06: tìm, xem, sửa email/tên hiển thị, thu hồi phiên (avatar, bio, username hoãn cùng E4–E5) | XA-03 | admin | E1-05 | E2-AC-01…03 (phần audit kiểm ở E7-06); không có `passwordHash` | `ADMIN_TEST users`. 30/10/2026 (`backend/admin/users.ts`, gitignore; thêm mã `USER_NOT_FOUND` 404, `ACCOUNT_DELETING` 409 vào `errors.ts` theo §A12.5): `ADMIN_TEST users` 5/5 trên DB test (E2-AC-01…03, 404, user `DELETING` → 409, không có `passwordHash`); toàn bộ admin 30/31 (test bind :3003 lỗi vì stack đang chạy); `npm run lint`, backend unit 122/122 |
+| E2-03 | [x] DONE | ADM-07 xoá tài khoản theo XSEQ-01 | XA-04 | admin | E2-01, E2-02 | E2-AC-04…06 (dùng `fault-storage`) | `ADMIN_TEST deletion` 4/4. 30/10/2026 (`backend/admin/deletion.ts`, gitignore; thêm `CONFIRMATION_MISMATCH` 400, `ACCOUNT_DELETION_INCOMPLETE` 503 vào `errors.ts` theo §A12.5): E2-AC-04 (2 Public + 2 Private → không còn bản ghi/object/phiên/user, đăng ký lại được), E2-AC-05 (storage lỗi ở object thứ 2 → 503 còn 3, tài liệu còn lại 404 khi xem/tải, tìm 0; bấm lại → COMPLETED), tài liệu chen vào (FK) → 503 rồi bấm lại xong, E2-AC-06 (sai email 400 không đổi gì; bấm liên tiếp và song song → giống bấm một lần). 503 trả envelope lỗi + `remainingDocuments`. Audit `ADMIN_ACCOUNT_DELETE` làm ở E7-06 |
+| E2-04 | [x] DONE | Trang danh sách user và chi tiết (sửa, thu hồi phiên, xoá có gõ email, "Tiếp tục xoá") | XA-05 | admin | E1-06, E2-02, E2-03 | Xoá thử trên dữ liệu thử nghiệm | Kiểm tay + RTL. 30/10/2026 (`frontend/src/admin/UsersPage.tsx`, `UserDetailPage.tsx`, `adminSend` trong `api.ts`, gitignore; route `/admin/users`, `/admin/users/:id`): danh sách tìm email/tên, 20/trang, ACTIVE/DELETING; chi tiết hồ sơ (trường E4/E5 null thì ẩn), sửa email/tên (chỉ gửi trường đổi, lỗi 400/409 tại chỗ), thu hồi mọi phiên, xoá phải gõ lại email, nút khoá khi đang chạy, 503 → "Chưa hoàn tất, còn N tài liệu" + "Tiếp tục xoá", 20 sự kiện gần nhất. RTL Users 4/4 (tổng admin frontend 25/25). Xoá thử trên dữ liệu thử nghiệm: owner kiểm tay |
+| E2-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E2: xoá một tài khoản thử, dừng SeaweedFS giữa chừng rồi tiếp tục | — | — | E2-01…04 | Bucket không còn object của user | Liệt kê bucket (như ACC-09) |
+
+### E3 — Giám sát hiệu năng
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E3-01 | [x] DONE | Đo request/CPU/RAM/event loop trong backend; ghi file snapshot từ `express-child.mjs` | XM-05 | commit | E0-02 | E3-AC-02; file cập nhật mỗi 5 s | Unit; `node --test backend/dev/`. 30/10/2026, `8e47070` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 97, gồm `metrics.test.ts` 10/10; frontend 85); `node --test backend/dev/*.test.mjs` 34/34 (gồm `express-child.test.mjs`); `test:integration` 86/86 |
+| E3-02 | [x] DONE | ADM-01 thêm `metrics`; phần Hiệu năng trên Dashboard | XA-02, XA-05 | admin | E3-01, E1-06 | E3-AC-01, 03 | `ADMIN_TEST overview` + kiểm tay. 30/10/2026 (`frontend/src/admin/Dashboard.tsx`, `LiveChart.tsx`, gitignore): ADM-01 đã trả `metrics` từ E1-05 (giữ nguyên); thẻ Hiệu năng (req/s, đang xử lý, P50/P95, 4xx/5xx, CPU/RAM backend và máy, event loop P99, link Xem lỗi), `metrics: null` → "Không đo được (backend tắt)"; định nghĩa registered/active (E3-FR-04, registered không tính tài khoản đang xoá theo thuật ngữ §C8). Thêm khung Biểu đồ trực tiếp theo yêu cầu owner: 6 biểu đồ SVG (req/s 5 phút từ ô 10 s, P50/P95, CPU, RAM, event loop, độ trễ DB/storage) + trạng thái dịch vụ, tooltip và bảng số liệu, không thêm thư viện. RTL Dashboard 6/6; `ADMIN_TEST overview` 7/7 (E3-AC-03: storage dừng → ok=false ở lần gọi kế tiếp, treo → hết hạn 2 s). E3-AC-01 trên stack thật: `npx autocannon -a 200 -c 1 -R 10 /api/health` → snapshot `perSecond = 10` (100 request trong một ô 10 s) |
+| E3-03 | [x] DONE | Seed DB thử tải + README lệnh `autocannon`; chạy 3 kịch bản; báo cáo điểm nghẽn và nhận xét có cần cache không | XM-12 | commit | E3-02 | E3-AC-04 | Báo cáo trong bằng chứng task. 30/10/2026 (`scripts/load/seed.mjs`, `scripts/load/README.md`): DB `btl_cloud_load` tạo bằng `migrate deploy`; seed 50 user + 500 tài liệu chạy 2 lần không lỗi, từ chối DB khác. Backend production-like :3100, `LOG_LEVEL=warn`, mỗi bậc rút còn 20 s, **có ghi audit**. Tìm kiếm 63/341/368 req/s (c=1/10/50), P50/P97.5 ở c=10 = 26/36 ms, 0 lỗi; tải 1 MiB 29/105/117 req/s, P50/P97.5 ở c=10 = 91/141 ms, 0 lỗi; đăng nhập 16/80/79 req/s, P50/P97.5 ở c=10 = 125/143 ms, 0 lỗi (autocannon không có P95). Điểm nghẽn: tìm kiếm ở MySQL (CPU backend ~8%), tải xuống ở SeaweedFS/đĩa, đăng nhập ở CPU argon2id (~4,5 luồng). Không cần cache (chưa đủ 3 điều kiện §A12.6). Chênh lệch bật/tắt phần đo (E3-AC-04) **chưa đo**: XM-05 luôn bật trong `backend/src`, chờ owner quyết định có thêm cờ tắt hay không |
+| E3-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E3 | — | — | E3-01…03 | Owner xem dashboard khi đang thử tải | — |
+
+### E4 — Hồ sơ người dùng
+
+> **DEFERRED** (XOD-21, owner 30/10/2026): chưa làm; làm lại cần CR mới.
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E4-01 | [ ] DEFERRED | Migration hồ sơ; thêm `sharp`; API-16/17/18 avatar | XM-06 | commit | E0-02 | E4-AC-01…03; `upload-matrix` vẫn 42/42 | Unit + integration; `npm --prefix backend audit` |
+| E4-02 | [ ] DEFERRED | API-15 (tên hiển thị, bio); `UserDto` thêm trường | XM-06 | commit | E4-01 | E4-AC-04, 05 | Integration + contract test |
+| E4-03 | [ ] DEFERRED | Trang `/me/profile`, cắt avatar, tên ở header mở hồ sơ | XM-10 | commit | E4-02 | Dùng được ở 360 px và bằng bàn phím | RTL + `test:ui` + E2E |
+| E4-04 | [ ] DEFERRED | Admin: xoá avatar khi xoá tài khoản, xem avatar, cộng dung lượng avatar | XA-02, XA-03, XA-04 | admin | E4-01, E2-03 | E2-AC-04 có avatar | `ADMIN_TEST` |
+| E4-G | [ ] DEFERRED | **[OWNER]** Nghiệm thu E4 | — | — | E4-01…04 | Owner tự tải/thay/xoá avatar, sửa tên và bio | — |
+
+### E5 — Username, tìm người dùng, bạn bè
+
+> **DEFERRED** (XOD-21, owner 30/10/2026): chưa làm; làm lại cần CR mới.
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E5-01 | [ ] DEFERRED | Migration username (tự cấp cho tài khoản cũ); đăng ký bắt buộc username; đổi username chờ 7 ngày; `OwnerDto.username`; sửa form và test cũ | XM-07 | commit | E4-02 | E5-AC-01…03; E2E cũ vẫn PASS | Integration + `test:e2e`; đếm dòng trước/sau migration |
+| E5-02 | [ ] DEFERRED | API-19 tìm user, API-20 hồ sơ public, API-21 tài liệu Public theo user | XM-08 | commit | E5-01 | E5-AC-02, 06 | Integration |
+| E5-03 | [ ] DEFERRED | Migration `friendships`; API-22…27 | XM-09 | commit | E5-01 | E5-AC-04, 05 | Integration (có ca đồng thời) |
+| E5-04 | [ ] DEFERRED | Trang `/people`, `/u/:username`, `/me/friends`; tên người đăng mở hồ sơ | XM-10 | commit | E5-02, E5-03 | Có ghi chú "Bạn bè không xem được tài liệu riêng tư" | RTL + `test:ui` + E2E |
+| E5-05 | [ ] DEFERRED | `authz-matrix` thêm bạn bè × Private; admin hiện `friendCount`; kiểm xoá tài khoản xoá luôn bạn bè | XM-09, XA-03 | commit + admin | E5-03, E2-03 | E5-AC-05, 06 | `authz-matrix` 100% PASS; `ADMIN_TEST` |
+| E5-G | [ ] DEFERRED | **[OWNER]** Nghiệm thu E5 | — | — | E5-01…05 | Hai tài khoản thật: kết bạn, xem hồ sơ, không thấy Private | — |
+
+### E6 — Chỉ báo độ mạnh mật khẩu
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E6-01 | [x] DONE | Hàm chấm điểm + thanh chỉ báo trên form đăng ký | XM-11 | commit | E0-02 | E6-AC-01, 02 | 30/10/2026: 15 unit/RTL mới PASS (bảng E6, Unicode, aria-live, không mạng khi gõ, Yếu vẫn đăng ký); lint/build/test gốc PASS (92 backend, 100 frontend); `npm --prefix frontend run test:ui` 8/8 PASS, gồm màu/viền và axe 360/768/1280 px |
+| E6-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E6 | — | — | E6-01 | Owner xem bốn mức trên điện thoại và máy tính | — |
+
+### E7 — Audit log và chẩn đoán lỗi
+
+| ID | Trạng thái | Task | Module | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|---|
+| E7-01 | [x] DONE | Migration `audit_events`; repository + recorder + middleware `audited()`; `AUDIT_RETENTION_DAYS`; xoá quá hạn lúc khởi động | XM-13 | commit | E0-02 | E7-AC-04, 05; allowlist `metadata` | Unit + integration; đếm dòng các bảng cũ trước/sau migration. 30/10/2026, `793341b` (`feature/wave1-a`, đã merge vào `TAV_branch`): lint/build/test PASS (backend unit 87, gồm `audit.test.ts` 15/15; frontend 85); `test:integration` 86/86 (`audit.test.ts` 5/5: E7-AC-04, E7-AC-05 khởi động lại backend thật, allowlist); áp cả 3 migration bằng `migrate deploy`: users 3/3, sessions 2/2, documents 3/3; DB test ↔ schema không lệch |
+| E7-02 | [x] DONE | Gắn `audited()` vào route `auth` và `documents` (MVP) | XM-13 | commit | E7-01 | E7-AC-01…03 | Integration; `authz-matrix` 82/82 và `upload-matrix` 42/42 vẫn PASS. 30/10/2026 (`TAV_branch`): `test:integration` 89/89 (`audit.test.ts`: E7-AC-01…05); `authz-matrix` 82/82, `upload-matrix` 42/42 với backend trỏ DB test (:3010); lint, `tsc`, unit PASS (backend 122, frontend 101). Đăng xuất khi chưa đăng nhập không tạo sự kiện |
+| E7-03 | [x] DONE | Thêm `module`, `stage`, `code` vào dòng log request; `AppError.stage`; gắn `stage` ở chỗ bọc lỗi storage/DB | XM-14 | commit | E0-02 | Dòng log đủ trường ở 400/404/503/500; redact không đổi | 30/10/2026: 25 unit mới PASS (destination giả, 400/404/503/500, redact, stage storage/DB); lint/build/test gốc PASS (92 backend, 85 frontend). Owner chạy integration/contract sau merge; chưa chạy vì Agent A dùng DB test |
+| E7-04 | [x] DONE | ADM-08 Activity; ADM-09 Errors đọc file log; ADM-10 tra `requestId` | XA-06, XA-07 | admin | E7-01, E7-03, E1-03 | E7-AC-06…09 | `ADMIN_TEST activity`, `ADMIN_TEST errors` (file log mẫu). 30/10/2026 (`backend/admin/activity.ts`, `errors.ts`, gitignore): `ADMIN_TEST activity` 3/3 (E7-AC-06, 400, ADM-10 phần audit), `ADMIN_TEST errors` 4/4 (E7-AC-07 với log mẫu: mỗi request lỗi đếm 1 lần, dòng hỏng/4xx/log ngoài backend bị bỏ; E7-AC-08 phần log); E7-AC-09 trên stack thật: `:3000/api/admin/activity`, `/errors` → 404, `:3003` không token → 403. Kiểm E7-AC-07/08 đầu-cuối khi có trang Errors (E7-05) |
+| E7-05 | [x] DONE | Trang Activity Logs, Errors; chi tiết user hiện `recentActivity` | XA-05 | admin | E7-04, E1-06 | Lọc, tổng hợp theo module/mã, ô tìm `requestId`, `coverageFrom` | Kiểm tay + RTL. 30/10/2026 (`frontend/src/admin/ActivityPage.tsx`, `ErrorsPage.tsx`, `shared.tsx`, gitignore; route con `/admin/activity`, `/admin/errors` + mục điều hướng): Activity lọc actor/hành động/đối tượng/kết quả/từ–đến, 50/trang, chỉ làm mới bằng tay; Errors chọn 15m/1h/24h (link Xem lỗi mở 15m), lọc module/mã/status, bảng theo module và theo mã, danh sách lỗi có stack, bấm requestId hoặc nhập để tra ADM-10 (log + audit, `auditUnavailable` → ghi chú), `coverageFrom`/"Chưa có log". Lỗi API hiện tại chỗ. RTL: Activity 2/2, Errors 3/3 (tổng admin frontend 21/21). `recentActivity` hiện ở trang chi tiết user (E2-04) |
+| E7-06 | [x] DONE | Ghi sự kiện `ADMIN_*` (E2); xoá audit khi xoá tài khoản theo XSEQ-01. Sự kiện E4/E5 làm khi hai giai đoạn đó được làm lại | XM-13, XA-03, XA-04 | commit + admin | E7-02, E2-03 | E2-AC-02 (phần audit), E7-AC-10 | Integration + `ADMIN_TEST deletion`. 30/10/2026 (`backend/admin/audit.ts`, `main.ts`, gitignore; không sửa `backend/src`, dùng `AuditRecorder` sẵn có): `ADMIN_USER_UPDATE` (`fields` chỉ tên trường), `ADMIN_SESSIONS_REVOKE` (`revoked`), `ADMIN_ACCOUNT_DELETE` (`maskedEmail`, `deletedDocuments`, `remainingDocuments`); actor `DEVELOPER` = `X-Admin-Actor`, `requestId` = `req.id`; 2xx → SUCCESS, ≥ 400 → FAILURE kèm mã (xoá dở → `ACCOUNT_DELETION_INCOMPLETE`). `ADMIN_TEST audit` 5/5: E2-AC-02 (không có giá trị email/tên), thu hồi, E7-AC-10 (không còn sự kiện actor A, giữ sự kiện admin và email đã che, giữ sự kiện tải xuống của người khác), FAILURE khi xoá dở/sai email, ghi lỗi → response không đổi + `audit.write_failed`. E7-AC-09: integration 89/89 (`:3000/api/admin/*` → 404) |
+| E7-G | [ ] NOT STARTED | **[OWNER]** Nghiệm thu E7: gây lỗi storage khi upload, tìm theo `requestId`, xem Activity của tài khoản thử | — | — | E7-01…06 | Thấy đúng module, bước, mã lỗi và sự kiện `FAILURE` | — |
+
+### E8 — Khôi phục ngữ cảnh dự án
+
+Nội dung hướng dẫn đã có sẵn ở [PROJECT_OVERVIEW §0](PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút) (vị trí đã duyệt, XOD-20). Các task dưới đây kiểm chứng và duy trì nó.
+
+| ID | Trạng thái | Task | Nơi mã | Phụ thuộc | Đầu ra · tiêu chí | Kiểm chứng |
+|---|---|---|---|---|---|---|
+| E8-01 | [x] DONE | Kiểm §0: mọi link/anchor mở đúng mục; trạng thái khớp phần trên của MILESTONES; phát biểu cache khớp mã; mọi module ở §A3.6/§A12.3 đủ input/output, phụ thuộc, lỗi | docs | E0-02 | E8-AC-02…05 | 30/10/2026: 31/31 link trong §0 trỏ đúng tệp và đúng tiêu đề (CONTEXT §C1, §C3.2, §C4, §C6.6, §C8.9; ARCHITECTURE §A1.2, §A1.4, §A3.6, §A5, §A5.5, §A6, §A7, §A12.3, §A12.12, SEQ-01/02/03/05; MILESTONES › E8, Quy tắc và milestone, Nhật ký thay đổi baseline; §12, §13, README); §0.6 khớp trạng thái M1–M5/E/SEC-002; cache khớp `static.ts` (`/assets/*` `public, max-age=31536000, immutable`, còn lại `no-cache`), `noStore()` trên `/api`, API-13 `private, no-store`; 22 module §A3.6 và 21 thẻ §A12.3 đủ ba mục ("—" là chủ đích: hàm thuần/không lỗi riêng); lệnh §0.7 đều tồn tại. Không có chỗ sai cần sửa |
+| E8-02 | [x] DONE | Diễn tập 10 phút với một người chưa đọc tài liệu, dùng 10 câu hỏi bên dưới; sửa §0 theo chỗ vướng | docs | E8-01 | E8-AC-01 (≥ 8/10 đúng, ≤ 10 phút) | Ghi thời gian, điểm, chỗ vướng vào bằng chứng. 30/10/2026: owner chốt hoàn thành; không ghi điểm, thời gian hay chỗ vướng của buổi diễn tập |
+| E8-03 | [x] DONE | Thêm quy tắc XBR-28 ("cập nhật §0 trong cùng PR khi đổi CR/trạng thái") vào [Quy tắc và milestone](#quy-tắc-và-milestone) | docs | E0-02 | Quy tắc có hiệu lực | 30/10/2026: đã đối chiếu quy tắc với CONTEXT §C8.8/ARCHITECTURE §A12.12, kiểm anchor §0; cập nhật §0.6 cùng thay đổi trạng thái. Lint/build/test gốc PASS (92 backend, 100 frontend) |
+| E8-G | [x] DONE | **[OWNER]** Nghiệm thu E8 | — | E8-01…03 | Owner tự đọc §0 và thấy đủ để làm việc tiếp | — 30/10/2026: owner nghiệm thu ("chốt E8") |
+
+Câu hỏi diễn tập E8-02: (1) Hệ thống giải quyết bài toán gì; Public khác Private thế nào? (2) Một request đi qua những thành phần nào tới MySQL và storage? (3) Phiên đăng nhập lưu ở đâu, vì sao không dùng JWT? (4) Upload ghi object hay DB trước; lỗi giữa chừng thì sao? (5) User khác mở tài liệu Private của tôi nhận mã gì, vì sao? (6) Module nào quyết định quyền tài liệu? (7) Chạy local và kiểm tra sức khoẻ bằng lệnh gì? (8) Lệnh nào chạy giống CI? (9) Milestone hiện tại, việc tiếp theo, việc đang hoãn/chặn? (10) Hiện có cache gì và không có cache gì?
+
+### Tiến độ E
+
+| Giai đoạn | Task (không tính gate) | Xong |
+|---|---|---|
+| E0 | 2 | 2 |
+| E1 | 7 | 0 |
+| E2 | 4 | 0 |
+| E3 | 3 | 0 |
+| E4 | 4 | hoãn |
+| E5 | 5 | hoãn |
+| E6 | 1 | 0 |
+| E7 | 6 | 0 |
+| E8 | 3 | 0 |
+
+### E Approval
+
+Owner duyệt trong chat ngày 30/10/2026 và nhờ agent đánh dấu. Chi tiết quyết định: CONTEXT §C8.10.
+
+- [x] Tôi đã đọc CONTEXT §C8, ARCHITECTURE §A12 và phần E1–E8 này
+- [x] XOD-15: audit (user + admin) ở một bảng MySQL `audit_events`, thay đề xuất file của XOD-05
+- [x] XOD-16: giữ audit 90 ngày, đổi bằng `AUDIT_RETENTION_DAYS`
+- [x] XOD-17: lỗi chẩn đoán đọc từ file log của controller, không tạo bảng lỗi
+- [x] XOD-18: đăng nhập sai không ghi email
+- [x] XOD-19: xoá tài khoản xoá sự kiện của user, giữ sự kiện admin với email đã che
+- [x] XOD-20: hướng dẫn 10 phút đặt ở PROJECT_OVERVIEW §0
+- [x] XOD-21: hoãn E4–E5 (hồ sơ, username, bạn bè)
+
+`EXTENSIONS_APPROVED: YES` — E1–E3, E6–E8; E4–E5 DEFERRED
+
 ## Nhật ký thay đổi baseline
 
 | CR | Thay đổi | Trạng thái |
@@ -267,6 +442,7 @@ Các lượt setup lỗi không tính PASS: thiếu S3 trước khi infra sẵn 
 | CR-006 | Một bảng màu, sáng/tối theo hệ thống | APPROVED (owner 2026-10-23) |
 | CR-007 | DB ↔ storage best-effort, bỏ guard/worker/concurrency | APPROVED (owner 2026-10-23) |
 | CR-008 | Rút gọn tài liệu cho nhóm người phát triển | APPROVED (owner 2026-10-23) |
+| CR-009 | Thêm mở rộng E1–E3, E6–E8 (CONTEXT §C8, ARCHITECTURE §A12, phần E1–E8); audit `audit_events`, lỗi từ log sẵn có, hướng dẫn 10 phút (XOD-15…20); hoãn E4–E5 (XOD-21) | APPROVED (owner 2026-10-30) |
 
 ## Lỗi tồn đọng
 

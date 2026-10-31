@@ -25,7 +25,7 @@ npm --prefix backend run dev:account -- ten_cua_ban
 .\run.bat start
 ```
 
-Lệnh cấp tài khoản in mật khẩu ngẫu nhiên một lần. Mở `http://localhost:5173`, chọn **Đăng nhập nhà phát triển** để mở bộ điều khiển dịch vụ. Lần chạy đầu launcher chuẩn bị cấu hình, dịch vụ local, migration và bucket; cần kết nối mạng. Docker Desktop là tuỳ chọn; launcher có bản MySQL/SeaweedFS portable trên Windows.
+Lệnh cấp tài khoản in mật khẩu ngẫu nhiên một lần. Mở `http://localhost:5173/admin`, chọn **Đăng nhập nhà phát triển** để mở bộ điều khiển dịch vụ (chỉ máy có thư mục admin gitignore; máy khác dùng `run.bat start`/`stop`). Lần chạy đầu launcher chuẩn bị cấu hình, dịch vụ local, migration và bucket; cần kết nối mạng. Docker Desktop là tuỳ chọn; launcher có bản MySQL/SeaweedFS portable trên Windows.
 
 Tài khoản `admin` đã đặt trên máy hiện tại nằm trong `backend/tmp/developer-account.json`, được Git bỏ qua, nên **không tự có trên máy người clone**. Mỗi người cấp tài khoản local của mình bằng lệnh trên. Quyền developer chỉ mở bộ điều khiển dịch vụ; sửa code cần quyền truy cập repo và công cụ lập trình. Quyền GitHub và quyền AWS được cấp riêng.
 

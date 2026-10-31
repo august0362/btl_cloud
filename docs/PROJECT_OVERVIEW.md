@@ -4,7 +4,108 @@ Tài liệu đọc liền mạch cho thành viên nhóm: bài toán, thành ph�
 
 Bản này dựa trên main `31e51a7` (29/10/2026). Các sơ đồ Mermaid được GitHub tự vẽ; trong VS Code dùng extension `bierner.markdown-mermaid`.
 
-**Đọc nhanh:** [Kiến trúc](#6-kiến-trúc) · [Dữ liệu](#7-dữ-liệu-và-lưu-trữ) · [Bảo mật](#8-xác-thực-phân-quyền-bảo-mật) · [API](#9-đặc-tả-rest-api) · [Luồng xử lý](#10-luồng-xử-lý-chính) · [Chạy local](#12-môi-trường-local-và-cấu-hình) · [AWS](#13-kiến-trúc-aws-mục-tiêu-m5-chưa-triển-khai) · [Kiểm chứng](#14-kiểm-thử-ci-và-tiến-độ).
+**Đọc nhanh:** [Hướng dẫn 10 phút](#0-project-re-entry--hướng-dẫn-10-phút) · [Kiến trúc](#6-kiến-trúc) · [Dữ liệu](#7-dữ-liệu-và-lưu-trữ) · [Bảo mật](#8-xác-thực-phân-quyền-bảo-mật) · [API](#9-đặc-tả-rest-api) · [Luồng xử lý](#10-luồng-xử-lý-chính) · [Chạy local](#12-môi-trường-local-và-cấu-hình) · [AWS](#13-kiến-trúc-aws-mục-tiêu-m5-chưa-triển-khai) · [Kiểm chứng](#14-kiểm-thử-ci-và-tiến-độ).
+
+## 0. Project Re-entry — Hướng dẫn 10 phút
+
+> Đọc mục này đầu tiên khi quay lại dự án sau một thời gian. Mục này chỉ tóm tắt và dẫn link; khi mâu thuẫn, [CONTEXT](CONTEXT.md), [ARCHITECTURE](ARCHITECTURE.md), [MILESTONES](MILESTONES.md) thắng. Đã đối chiếu mã ở commit `80dc3a9` (30/10/2026). Việc duy trì mục này là giai đoạn E8 (đã duyệt, CR-009) ([MILESTONES › E8](MILESTONES.md#e8--khôi-phục-ngữ-cảnh-dự-án)).
+
+### 0.1 Mục đích và yêu cầu cốt lõi
+
+- Website lưu trữ và chia sẻ tài liệu học tập PDF/DOCX/PPTX ≤ 50 MiB. **Public**: ai cũng tìm và xem metadata, phải đăng nhập mới tải. **Private**: chỉ chủ sở hữu thấy.
+- Chín yêu cầu FR-01…09: tài khoản, tìm kiếm, tải xuống cần đăng nhập, tải lên, chọn Public/Private, kho cá nhân, sửa, thay tệp, xoá ([CONTEXT §C4](CONTEXT.md#c4-yêu-cầu-chức-năng)).
+- Mục tiêu học phần là kiến trúc AWS 8 hạng mục ([CONTEXT §C1](CONTEXT.md#c1-tổng-quan)). Hạn: **09/11/2026** nộp báo cáo, mã nguồn, video; **16/11/2026** bảo vệ.
+
+### 0.2 Kiến trúc tổng thể
+
+```mermaid
+flowchart LR
+  b["Trình duyệt<br/>React SPA"] -->|"/api, cùng origin"| e["Express 5<br/>API + SPA, N instance"]
+  e -->|"Prisma"| m[("MySQL 8.4<br/>users, sessions, documents")]
+  e -->|"S3 API"| s[("SeaweedFS local<br/>S3 trên AWS")]
+  dev["Công cụ local<br/>controller :3001"] -.->|"chỉ máy dev"| e
+```
+
+Modular monolith một process (D-01). Phiên lưu DB nên instance stateless. Từ local lên AWS (ALB + ASG + RDS + S3) chỉ đổi cấu hình, chưa provisioning ([§13](#13-kiến-trúc-aws-mục-tiêu-m5-chưa-triển-khai)).
+
+### 0.3 Module chính — tự kiểm tra ba câu
+
+Với mỗi module, tự trả lời: **input/output là gì? phụ thuộc vào gì? lỗi thì sao?** Bảng dưới là đáp án ngắn; đặc tả đầy đủ ở [ARCHITECTURE §A3.6](ARCHITECTURE.md#a36-đặc-tả-module).
+
+| Module | Input → Output | Phụ thuộc | Khi lỗi |
+|---|---|---|---|
+| `http/middleware` | request → `req.id`, `req.auth` | config, AuthService | 403 CSRF, 401, 429, 404 |
+| `http/errorHandler` | Error → envelope JSON có `requestId` | logger | Lỗi lạ → 500, log stack |
+| `modules/auth` + `users` | email, mật khẩu → `UserDto` + cookie phiên | repositories, argon2 | `INVALID_CREDENTIALS`, `EMAIL_ALREADY_EXISTS` |
+| `documents` (service, loader, policy) | DTO, tệp đã kiểm → `DocumentDto`, stream | DocumentRepository, ObjectStorage | 403/404 theo quyền; `STORAGE_UNAVAILABLE` |
+| `files` (upload, FileInspector) | multipart → tệp tạm đã xác minh loại | multer, yauzl | 413, 415, 400 |
+| `storage` | key, tệp → object / stream | AWS SDK v3 | `StorageError` UNAVAILABLE / NOT_FOUND |
+| `modules/health` | — → liveness / readiness | Prisma, ObjectStorage | Liveness luôn 200; readiness 503 |
+| `config/env` | `process.env` → `Config` | zod | Thiếu biến → thoát |
+| Frontend `api/` | tham số → dữ liệu có type | fetch, XHR | `ApiError`, `NETWORK_ERROR` |
+| Frontend `auth/` | API-03 → user, guard route | `api/auth` | 401 → Guest + toast |
+| `backend/dev` (controller, launcher) | lệnh Start/Stop → dịch vụ local, log | developer auth | Chỉ dev; không lên AWS |
+
+### 0.4 Ba luồng quan trọng
+
+| Luồng | Tóm tắt | Chi tiết |
+|---|---|---|
+| Xác thực | Đăng ký/đăng nhập → băm argon2id → token phiên 32 byte trong cookie HttpOnly `sid` 7 ngày; DB chỉ lưu SHA-256 của token. Mỗi request nạp phiên; request ghi phải có `X-CSRF-Protection: 1` và `Origin` hợp lệ | [SEQ-01](ARCHITECTURE.md#seq-01--đăng-ký--đăng-nhập--đăng-xuất), [§A5](ARCHITECTURE.md#a5-xác-thực-và-phân-quyền) |
+| Upload / download | Kiểm đăng nhập và quyền **trước** khi nhận tệp → ghi đĩa tạm → FileInspector xác minh loại theo nội dung → `putObject` → INSERT. Lỗi ở bất kỳ bước nào → không có tài liệu. Download: kiểm quyền → stream từ storage qua backend | [SEQ-02](ARCHITECTURE.md#seq-02--tải-lên-thành-công), [SEQ-03](ARCHITECTURE.md#seq-03--tải-lên-thất-bại), [SEQ-05](ARCHITECTURE.md#seq-05--tải-xuống-khi-đã-đăng-nhập) |
+| Phân quyền | `document.policy` (`canView`, `canManage`) là nơi duy nhất quyết định. Private của người khác → 404; sửa trái phép tài liệu Public → 403; tìm kiếm lọc Public ngay trong SQL | [CONTEXT §C3.2](CONTEXT.md#c32-ma-trận-quyền), [§A5.5](ARCHITECTURE.md#a55-phân-quyền-phía-server) |
+
+### 0.5 Bất biến và quyết định không được phá
+
+- MySQL là nguồn sự thật; object key bất biến; ghi object trước rồi mới ghi DB (D-06, D-07, [§A6](ARCHITECTURE.md#a6-object-storage-và-vòng-đời-tài-liệu)).
+- Xoá object là best-effort, lỗi ghi log `storage.orphan`; thay tệp đồng thời thì lần ghi sau thắng; không có worker (CR-007, D-08…D-10).
+- [§A7](ARCHITECTURE.md#a7-rest-api-contract) là hợp đồng API duy nhất; đổi field hay mã lỗi phải qua CR.
+- Không JWT, không CORS, không token trong localStorage; không có vai trò admin trong `users`.
+- Liveness không phụ thuộc DB/storage (D-14). Khác biệt local/AWS chỉ nằm trong biến môi trường.
+- **Cache:** chỉ có cache tài nguyên tĩnh production (`/assets/*` immutable 1 năm; `index.html` `no-cache`). API JSON `no-store`, tải xuống `private, no-store`. Không có Redis hay cache truy vấn phía server. Chỉ xét cache khi có số đo E3 ([CONTEXT §C8.9](CONTEXT.md#c89-ảnh-hưởng-tới-baseline-và-hiện-trạng-cache)).
+
+### 0.6 Trạng thái hiện tại
+
+Nguồn: [MILESTONES](MILESTONES.md#quy-tắc-và-milestone). Sửa bảng này khi trạng thái ở đó đổi.
+
+| Trạng thái | Nội dung |
+|---|---|
+| DONE | M0 thiết kế (owner duyệt); M1–M3 backend, DB, storage, frontend đã triển khai; M4-01…06, M4-09…11 đã kiểm chứng local; E0, E1-01 (activity tracker), E1-02 (khung admin local, gitignore), E1-03 (controller chạy admin, proxy `/admin/*`), E1-04 (panel developer chuyển vào admin `/admin`), E1-05 (API số liệu admin), E1-06 (trang Dashboard admin), E2-01 (trạng thái DELETING), E2-02 (API quản lý user admin), E2-03 (xoá tài khoản admin), E2-04 (trang Users admin), E3-01 (đo hiệu năng), E3-02 (phần Hiệu năng và biểu đồ trực tiếp trên Dashboard), E3-03 (script và báo cáo thử tải), E6-01 (chỉ báo mật khẩu), E7-01 (bảng audit_events), E7-02 (audit route auth/documents), E7-03 (trường log chẩn đoán), E7-04 (API Activity/Errors admin), E7-05 (trang Activity Logs và Errors admin), E7-06 (audit thao tác admin), E8 (kiểm hướng dẫn §0, diễn tập, quy tắc cập nhật; owner nghiệm thu) |
+| BLOCKED / chờ | M4-07, M4-08 hoãn (CR-005). M4-12, M4-G chờ owner. M5 chờ M4-G; provisioning AWS chờ M5-G. M1-00, M1-03 (Docker thật) và M3-01 chưa tick. SEC-002 (Prisma CLI) còn mở |
+| NOT STARTED | M5-01…M5-10 |
+| APPROVED, CÒN MỞ | E1–E3, E6–E8 (CR-009, 30/10/2026) còn task/gate; E6-G vẫn chờ owner, các tính năng admin, audit và metrics chưa hoàn thành |
+| DEFERRED | E4–E5 hồ sơ, username, bạn bè (XOD-21) |
+
+### 0.7 Chạy, kiểm tra sức khoẻ, test
+
+```sh
+npm --prefix backend run dev:account -- ten_cua_ban   # lần đầu: tài khoản developer
+run.bat start          # hoặc Start.vbs; Docker: xem README
+run.bat status         # trạng thái + log đã lọc bí mật
+curl http://localhost:3000/api/health         # liveness
+curl http://localhost:3000/api/health/ready   # DB + storage
+npm ci && npm run lint && npm run build && npm test   # giống CI
+npm --prefix backend run test:integration             # cần MySQL + SeaweedFS
+node --test backend/dev/*.test.mjs                     # launcher/controller
+npm --prefix frontend run test:e2e                     # cần stack :3000
+node scripts/verify/authz-matrix.mjs                   # ma trận quyền
+```
+
+Web dev: http://localhost:5173. Chi tiết và lỗi thường gặp: [README](../README.md), [§12](#12-môi-trường-local-và-cấu-hình).
+
+### 0.8 Ưu tiên tiếp theo
+
+1. **M4-12** diễn tập demo và **M4-G** gate (owner).
+2. **M5-01 → M5-10** chuẩn bị AWS, rồi **M5-G**.
+3. E1–E3, E6–E8 đã duyệt; owner chọn từng task. Gợi ý: không để chúng chiếm thời gian của M5 trước hạn 09/11/2026.
+
+### 0.9 Quy trình khôi phục ngữ cảnh
+
+1. Đọc mục §0 này (10 phút).
+2. Tìm module sẽ sửa và hợp đồng input/output của nó: [§A3.6](ARCHITECTURE.md#a36-đặc-tả-module) (MVP) hoặc [§A12.3](ARCHITECTURE.md#a123-module) (mở rộng đề xuất); API ở [§A7](ARCHITECTURE.md#a7-rest-api-contract).
+3. Xem quyết định và phụ thuộc liên quan: [§A1.2](ARCHITECTURE.md#a12-quyết-định-thiết-kế), [§A1.4](ARCHITECTURE.md#a14-quy-tắc-phụ-thuộc), [CONTEXT §C6.6](CONTEXT.md#c66-quyết-định-cần-owner-xem-xét).
+4. Đọc trạng thái mới nhất của task trong [MILESTONES](MILESTONES.md) và [Nhật ký thay đổi baseline](MILESTONES.md#nhật-ký-thay-đổi-baseline).
+5. Chạy test liên quan (§0.7) **trước** khi sửa để biết điểm xuất phát.
+6. Khi một quyết định đã duyệt thay đổi: ghi CR, sửa tài liệu nguồn và §0 trong cùng PR ([§A12.12](ARCHITECTURE.md#a1212-khôi-phục-ngữ-cảnh-và-điều-hướng-kiến-trúc-e8)).
 
 ## 1. Giới thiệu
 
@@ -26,11 +127,20 @@ Mục tiêu học phần là triển khai và demo kiến trúc cloud, đồng t
 
 ### 2.2 Ngoài phạm vi
 
-Chưa có nhóm chia sẻ, link có thời hạn, preview nội dung, quản trị người dùng, lịch sử phiên bản hoặc tìm kiếm full-text. Tài khoản developer chỉ mở công cụ local.
+Chưa có nhóm chia sẻ, link có thời hạn, preview nội dung, quản trị người dùng, lịch sử phiên bản hoặc tìm kiếm full-text. Tài khoản developer chỉ mở công cụ local. Quản trị local và audit đã được duyệt thêm (E1–E3, E7, CR-009) nhưng chưa triển khai; hồ sơ, bạn bè (E4–E5) hoãn (§2.3).
 
 ### 2.3 Giai đoạn
 
 M0 thiết kế; M1–M3 ứng dụng; M4 kiểm chứng local; M5 chuẩn bị AWS. Việc tạo tài nguyên cloud cần phạm vi riêng được owner chốt. Xem [MILESTONES](MILESTONES.md) trước khi nhận việc.
+
+Mở rộng tuỳ chọn E1–E8 (CR-009): E1–E3, E6–E8 **đã duyệt**, chưa triển khai; E4–E5 **hoãn**. Không thay đổi M0–M5:
+
+| Giai đoạn | Nội dung | Yêu cầu · Thiết kế · Task |
+|---|---|---|
+| E1–E3 | Admin local (tiến trình riêng, gitignore): dashboard, quản lý/xoá user, số liệu hiệu năng | [§C8.1–C8.3](CONTEXT.md#c81-e1--local-admin-dashboard) · [§A12](ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8) · [E1–E3](MILESTONES.md#e1--local-admin-dashboard) |
+| E4–E6 | E4–E5 (hoãn): hồ sơ/avatar, username/tìm user/bạn bè · E6: chỉ báo mật khẩu | [§C8.4–C8.6](CONTEXT.md#c84-e4--hồ-sơ-người-dùng) · [§A12.3](ARCHITECTURE.md#a123-module) · [E4–E6](MILESTONES.md#e4--hồ-sơ-người-dùng) |
+| E7 | Audit log (bảng `audit_events`) và chẩn đoán lỗi từ log sẵn có | [§C8.7](CONTEXT.md#c87-e7--audit-log-và-chẩn-đoán-lỗi) · [§A12.7](ARCHITECTURE.md#a127-audit-log-và-chẩn-đoán-lỗi-e7) · [E7](MILESTONES.md#e7--audit-log-và-chẩn-đoán-lỗi) |
+| E8 | Hướng dẫn 10 phút (§0) và quy trình khôi phục ngữ cảnh | [§C8.8](CONTEXT.md#c88-e8--khôi-phục-ngữ-cảnh-dự-án) · [§A12.12](ARCHITECTURE.md#a1212-khôi-phục-ngữ-cảnh-và-điều-hướng-kiến-trúc-e8) · [E8](MILESTONES.md#e8--khôi-phục-ngữ-cảnh-dự-án) |
 
 ## 3. Tác nhân và ma trận quyền
 
@@ -284,7 +394,23 @@ flowchart TB
     └── ui-tests/              Playwright với API mock (responsive, axe, bàn phím)
 ```
 
-Bổ sung công cụ development: `backend/dev/` quản lý dịch vụ, `frontend/dev/` là cầu nối Vite, `frontend/src/dev/` chứa UI. Các thư mục này tách khỏi runtime production.
+Bổ sung công cụ development: `backend/dev/` quản lý dịch vụ, `frontend/dev/` là cầu nối Vite, UI nằm ở `frontend/src/admin/` (gitignore từ E1-04, nạp bằng `import.meta.glob` tại `/admin`). Các thư mục này tách khỏi runtime production.
+
+### 6.8 Kiến trúc mở rộng (E1–E8, chưa triển khai)
+
+Ứng dụng public vẫn là một modular monolith; E4–E5 (hồ sơ, bạn bè, `avatars/`, `friendships`) đang hoãn. Admin là tiến trình **riêng, chỉ local**: mã nằm trong thư mục gitignore, không có trong build và không lên AWS. Admin đọc MySQL/SeaweedFS, file số liệu E3 và file log của controller (lỗi E7).
+
+```mermaid
+flowchart LR
+  pub["Public app :3000<br/>+ hồ sơ, bạn bè, audit"] --> db[("MySQL<br/>+ friendships, audit_events")]
+  pub --> s3[("SeaweedFS / S3<br/>documents/, avatars/")]
+  pub -.->|"stdout"| ctrl["Controller :3001"]
+  ctrl -.->|"spawn, proxy"| adm["Admin :3003<br/>chỉ 127.0.0.1, gitignore"]
+  adm --> db
+  adm --> s3
+```
+
+Quyết định, module, API, schema: [ARCHITECTURE §A12](ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8).
 
 ## 7. Dữ liệu và lưu trữ
 
@@ -857,7 +983,7 @@ Bảng đầy đủ FR → UC → API → Page → AC → task ở [ARCHITECTURE
 
 ### 14.3 Tiến độ và việc còn mở
 
-M4-12/M4-G chờ owner; M4-07 lỗi storage thật và M4-08 nhiều instance hoãn. M5-01…10/M5-G chưa làm. SEC-002 Prisma CLI/deepmerge-ts là advisory đã ghi nhận, cần xử lý riêng.
+M4-12/M4-G chờ owner; M4-07 lỗi storage thật và M4-08 nhiều instance hoãn. M5-01…10/M5-G chưa làm. SEC-002 Prisma CLI/deepmerge-ts là advisory đã ghi nhận, cần xử lý riêng. E1–E3, E6–E8 đã duyệt (CR-009), task NOT STARTED; E4–E5 hoãn ([MILESTONES › E1–E8](MILESTONES.md#e1e8--mở-rộng-đề-xuất)).
 
 Giới hạn: object mồ côi sau lỗi/crash, replace last-write-wins, rate limit theo instance, race hết phiên lúc tải và collation đ/d cần kiểm chứng. Hạn nộp theo PDF: 09/11/2026 báo cáo/mã nguồn/video; 16/11/2026 bảo vệ. Chi tiết trạng thái/nghiệm thu ở MILESTONES.
 

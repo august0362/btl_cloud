@@ -4,7 +4,7 @@
 >
 > `BASELINE_VERSION: 1.0` · `DESIGN_STATUS: APPROVED` · `OWNER_APPROVAL: APPROVED` (MILESTONES › OWNER DESIGN APPROVAL) · 2026-10-20 · cập nhật theo CR-001…CR-008
 
-**Mục lục:** [C0 Nguồn](#c0-nguồn-và-quy-ước) · [C1 Tổng quan](#c1-tổng-quan) · [C2 Phạm vi](#c2-phạm-vi) · [C3 Tác nhân và quyền](#c3-tác-nhân-và-quyền) · [C4 Yêu cầu chức năng](#c4-yêu-cầu-chức-năng) · [C5 Phi chức năng](#c5-yêu-cầu-phi-chức-năng) · [C6 Giả định, rủi ro, quyết định](#c6-giả-định-ràng-buộc-rủi-ro-quyết-định) · [C7 Scope Freeze](#c7-scope-freeze--requirements-baseline)
+**Mục lục:** [C0 Nguồn](#c0-nguồn-và-quy-ước) · [C1 Tổng quan](#c1-tổng-quan) · [C2 Phạm vi](#c2-phạm-vi) · [C3 Tác nhân và quyền](#c3-tác-nhân-và-quyền) · [C4 Yêu cầu chức năng](#c4-yêu-cầu-chức-năng) · [C5 Phi chức năng](#c5-yêu-cầu-phi-chức-năng) · [C6 Giả định, rủi ro, quyết định](#c6-giả-định-ràng-buộc-rủi-ro-quyết-định) · [C7 Scope Freeze](#c7-scope-freeze--requirements-baseline) · [C8 Mở rộng đề xuất E1–E8 (PROPOSED)](#c8-mở-rộng-đề-xuất-e1e8)
 
 ## C0. Nguồn và quy ước
 
@@ -19,7 +19,7 @@
 
 Thư mục pdf không theo Git, nhóm chia sẻ riêng. Các sai lệch lịch sử còn cần xử lý được giữ ở §C6.5.
 
-**Quy ước:** FR/AC/BR/NFR là chức năng/tiêu chí/quy tắc/phi chức năng; CN/AS/RK/DS/OD là ràng buộc/giả định/rủi ro/sai lệch/quyết định trong tài liệu này. D/UC/API/P/SEQ/CD/F/U/INV ở ARCHITECTURE; task M<n>-xx và nghiệm thu ACC ở MILESTONES.
+**Quy ước:** FR/AC/BR/NFR là chức năng/tiêu chí/quy tắc/phi chức năng; CN/AS/RK/DS/OD là ràng buộc/giả định/rủi ro/sai lệch/quyết định trong tài liệu này. D/UC/API/P/SEQ/CD/F/U/INV ở ARCHITECTURE; task M<n>-xx và nghiệm thu ACC ở MILESTONES. Phần mở rộng đề xuất dùng ID riêng (`E<n>-FR`, `E<n>-AC`, `XBR`, `XOD`), xem §C8.0.
 
 **Thuật ngữ:** Guest chưa đăng nhập; User đã đăng nhập; Owner sở hữu tài liệu đang xét; metadata là thông tin tài liệu, object là byte tệp trong storage.
 
@@ -62,6 +62,8 @@ Thư mục pdf không theo Git, nhóm chia sẻ riêng. Các sai lệch lịch s
 
 Mạng xã hội (bình luận, đánh giá, theo dõi, chia sẻ cho người cụ thể, nhóm lớp); tìm kiếm toàn văn, AI search, gợi ý, xem trước tệp; kiểm duyệt tự động, quét virus; trang quản trị, vai trò admin; quên/đổi mật khẩu, xác minh email, SSO, đổi tên hiển thị; xoá tài khoản, thùng rác, lịch sử phiên bản; thống kê, hạn mức dung lượng; app di động, đa ngôn ngữ; OpenStack.
 
+Một số mục trên (quản trị local, xoá tài khoản, thống kê, hồ sơ, đổi tên hiển thị, bạn bè) được **đề xuất** lại ở §C8. Theo CR-009 (owner 30/10/2026): quản trị local, xoá tài khoản, thống kê (E1–E3) được đưa vào phạm vi mở rộng; hồ sơ, đổi tên hiển thị, bạn bè (E4–E5) vẫn ngoài phạm vi vì đang hoãn.
+
 ### C2.3 Giai đoạn
 
 | Giai đoạn | Nội dung | Trạng thái |
@@ -79,6 +81,7 @@ Chuyển từ local lên AWS **chỉ đổi cấu hình**, không đổi kiến 
 - **Guest**: không có phiên hợp lệ (chưa đăng nhập, đã đăng xuất hoặc phiên hết hạn).
 - **User**: có phiên hợp lệ.
 - **Owner**: vai trò theo từng tài liệu, khi `users.id = documents.owner_id`; backend kiểm tra ở **mỗi** request. Không có vai trò admin.
+- **Developer** (ngoài website): tài khoản công cụ local (ARCHITECTURE §A5.9), không phải bản ghi `users`. Quyền admin local cho developer được thêm ở §C8 (CR-009).
 
 ### C3.2 Ma trận quyền
 
@@ -354,3 +357,302 @@ STATUS:          APPROVED — owner đã duyệt (MILESTONES › OWNER DESIGN AP
 ```
 
 Sau khi owner duyệt, mọi thay đổi phạm vi phải ghi vào **Nhật ký thay đổi baseline** (MILESTONES) và được owner chấp thuận trước khi triển khai.
+
+Các giai đoạn mở rộng ở §C8 được thêm vào phạm vi qua CR-009 (owner 30/10/2026): E1–E3, E6–E8 đã duyệt; E4–E5 hoãn.
+
+## C8. Mở rộng đề xuất (E1–E8)
+
+> **APPROVED — E1–E3, E6–E8 (owner 30/10/2026, CR-009). E4–E5: DEFERRED (XOD-21).** Phần mở rộng tuỳ chọn, không phải điều kiện của bài tập cloud. Chưa có tính năng nào dưới đây được triển khai. Phần nào của E1–E3, E7 dùng avatar, username hay bạn bè chỉ làm khi E4/E5 được làm lại. Thiết kế: [ARCHITECTURE §A12](ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8). Task: [MILESTONES › E1–E8](MILESTONES.md#e1e8--mở-rộng-đề-xuất).
+>
+> Nguyên tắc chung: **đơn giản nhất có thể, không overengineering.** Không thêm dịch vụ, Redis, WebSocket, hàng đợi, Prometheus/Grafana, Elasticsearch, tracing phân tán. Dependency mới duy nhất: `sharp` (E4).
+
+### C8.0 Phạm vi, quy ước, quy tắc chung
+
+"Phase 1–8" trong yêu cầu của owner tương ứng **E1–E8**.
+
+| Giai đoạn | Tên | Nơi chạy | Ai dùng |
+|---|---|---|---|
+| E1 | Local Admin Dashboard | Chỉ máy owner (`localhost:5173/admin`) | Developer |
+| E2 | Quản lý người dùng | Chỉ máy owner | Developer |
+| E3 | Giám sát hiệu năng | Đo trong Express, xem ở admin | Developer |
+| E4 | Hồ sơ (avatar, tên hiển thị, bio) | Ứng dụng public | User |
+| E5 | Username, tìm người dùng, bạn bè | Ứng dụng public | Guest/User |
+| E6 | Chỉ báo độ mạnh mật khẩu | Frontend public | Người đăng ký |
+| E7 | Audit log và chẩn đoán lỗi | Ghi trong ứng dụng public; xem ở admin | Developer |
+| E8 | Khôi phục ngữ cảnh dự án | Tài liệu | Developer, owner |
+
+**ID:** `E<n>-FR-xx` chức năng · `E<n>-AC-xx` tiêu chí chấp nhận · `XBR-xx` quy tắc · `XOD-xx` quyết định owner. Thiết kế ở ARCHITECTURE §A12 dùng `XD`, `XM`/`XA` (module), `ADM`, `API-15+`, `XSEQ`, `XR`; task `E<n>-xx` ở MILESTONES.
+
+**Thuật ngữ:** *Developer* là tài khoản công cụ local hiện có (ARCHITECTURE §A5.9), không phải bản ghi trong `users`; "admin" trong §C8 là developer dùng trang `/admin`. *Mã admin* là mã trong thư mục bị `.gitignore`, chỉ có trên máy owner. *Registered user* là tài khoản đang tồn tại và không đang bị xoá. *Active user* là user có request đã đăng nhập trong khoảng thời gian đang xét. *Sự kiện audit* là một thao tác nghiệp vụ có ý nghĩa đã được ghi lại. *Lỗi chẩn đoán* là một dòng log lỗi/cảnh báo có cấu trúc.
+
+**Hiện trạng làm nền** (mã ở commit `80dc3a9`):
+- Có ba bảng `users`, `sessions`, `documents`. `documents.owner_id` là FK `RESTRICT`; `sessions.user_id` là FK `CASCADE`.
+- `ObjectStorage` có put/get/delete/checkHealth. Xoá object là best-effort, lỗi ghi log `storage.orphan` (CR-007).
+- Mỗi request có `requestId` (header `X-Request-Id`). `pino-http` ghi một dòng JSON khi request kết thúc, gồm status, `durationMs`, `userId`. `errorHandler` ghi thêm dòng ERROR kèm `code` cho lỗi 5xx.
+- Controller local ở `127.0.0.1:3001` thu stdout của các dịch vụ vào `backend/tmp/local-services.ndjson`. File tối đa 2 MB và giữ một file cũ.
+- Panel developer nằm trong `frontend/src/dev`.
+- Chưa có admin, audit, hồ sơ, username, bạn bè, số liệu hiệu năng hay chỉ báo mật khẩu.
+
+| ID | Quy tắc chung |
+|---|---|
+| XBR-01 | Admin chạy trong tiến trình riêng, chỉ trên máy owner. Mã admin bị `.gitignore`: không push, không có trong bản build, không lên AWS. Ứng dụng public không có route admin. Repo clone về (không có mã admin) vẫn build, test, chạy bình thường |
+| XBR-02 | Quyền admin chỉ đến từ developer auth hiện có. Không thêm vai trò admin vào `users` |
+| XBR-03 | Không API nào trả `password_hash`, token/ID phiên, khoá S3, chuỗi kết nối DB |
+| XBR-04 | Bạn bè **không** thay đổi quyền tài liệu: Private vẫn chỉ owner xem (BR-01) |
+| XBR-05 | MySQL là nguồn sự thật; bản ghi không bao giờ trỏ tới object chưa ghi xong. Object key do server sinh |
+| XBR-06 | Tài khoản đang bị xoá (`DELETING`) coi như không tồn tại với ứng dụng public: không đăng nhập được; hồ sơ và tài liệu không hiển thị |
+| XBR-07 | Hồ sơ public gồm username, tên hiển thị, bio, avatar, tài liệu Public. Không bao giờ có email. Guest xem được; tìm user cần đăng nhập; admin xem được mọi hồ sơ (kể cả `DELETING`) và email |
+| XBR-08 | Không reset DB. Migration chỉ thêm cột/bảng, giữ nguyên dữ liệu cũ. Sao lưu trước khi áp |
+
+### C8.1 E1 — Local Admin Dashboard
+
+| ID | Yêu cầu |
+|---|---|
+| E1-FR-01 | Trang `/admin` chỉ có trên Vite dev `localhost:5173` của máy có mã admin, và cần đăng nhập developer |
+| E1-FR-02 | Panel developer hiện có (Backend ON/OFF, Restart, Start/Stop All, Services, log) chuyển khỏi trang public vào `/admin`, giữ nguyên chức năng. Máy không có mã admin dùng `Start.vbs`, `Stop.vbs`, `run.bat` |
+| E1-FR-03 | Dashboard hiển thị: registered users; active users (15 phút, 24 giờ, 7 ngày); số tài liệu (tổng, Public, Private); dung lượng logic (tổng kích thước tệp theo DB); dung lượng đĩa thật của SeaweedFS; trạng thái MySQL, SeaweedFS, backend |
+| E1-FR-04 | Ứng dụng ghi thời điểm hoạt động gần nhất của user (`last_active_at`), tối đa 1 lần ghi / 5 phút / user |
+| E1-FR-05 | Khi backend tắt, `/admin` vẫn mở được; số liệu từ DB và điều khiển dịch vụ vẫn dùng được |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E1-AC-01 | `http://localhost:3000/admin` → trang "Không tìm thấy"; `GET :3000/api/admin/...` → 404 |
+| E1-AC-02 | `git ls-files` không có đường dẫn admin; bản build không chứa mã admin; clone sạch chạy `npm ci && npm run lint && npm run build && npm test` PASS |
+| E1-AC-03 | Gọi admin không qua controller (sai token, không phải loopback) → 403; chưa đăng nhập developer → 401 |
+| E1-AC-04 | Có 3 user, trong đó 1 user hoạt động trong 15 phút → registered = 3, active 15 phút = 1 |
+| E1-AC-05 | 2 tài liệu Public 1 MiB + 1 Private 2 MiB → tổng 3 tài liệu (2 Public, 1 Private), dung lượng logic 4 MiB; dung lượng đĩa > 0 |
+| E1-AC-06 | Khi chạy dev, trang public không còn panel developer. Tắt backend từ `/admin` → điều khiển, log, số liệu DB vẫn hoạt động |
+
+### C8.2 E2 — Quản lý người dùng
+
+| ID | Yêu cầu |
+|---|---|
+| E2-FR-01 | Tìm user theo email, tên hiển thị, username; phân trang 20/trang |
+| E2-FR-02 | Xem toàn bộ hồ sơ: email, tên hiển thị, username, bio, avatar, ngày tạo, hoạt động gần nhất, số phiên còn hạn, số tài liệu (Public/Private), dung lượng, số bạn bè (sau E5), trạng thái |
+| E2-FR-03 | Sửa email (đúng định dạng, không trùng; hiếm khi dùng), tên hiển thị, bio, username (không bị thời gian chờ). Không xem hay đặt mật khẩu |
+| E2-FR-04 | Thu hồi mọi phiên của user |
+| E2-FR-05 | Xoá vĩnh viễn tài khoản: mọi tài liệu (Public và Private) và object, avatar, bạn bè, phiên, sự kiện audit của user (XBR-24), rồi user |
+| E2-FR-06 | Nếu xoá lỗi giữa chừng, **thử lại được** bằng chính nút xoá ("Tiếp tục xoá") |
+| E2-FR-07 | Mọi thao tác sửa/thu hồi/xoá được ghi thành sự kiện audit (E7); trang chi tiết user hiện 20 sự kiện gần nhất liên quan tới user |
+
+| ID | Quy tắc xoá tài khoản |
+|---|---|
+| XBR-09 | Phải gõ đúng email của user để xác nhận (ở UI và API) |
+| XBR-10 | Bước 1: đánh dấu `DELETING` và xoá mọi phiên. Từ đây user không đăng nhập được và tài liệu bị ẩn |
+| XBR-11 | Xoá object trước, rồi mới xoá bản ghi tài liệu của nó. Bản ghi còn lại là việc còn phải làm khi thử lại |
+| XBR-12 | Storage lỗi → dừng, báo "chưa hoàn tất, còn N tài liệu"; user giữ `DELETING`. Không xoá user khi còn tài liệu/avatar. Không có thùng rác, không khôi phục |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E2-AC-01 | Tìm "nguyen" khớp email/tên, không phân biệt hoa thường; response không có `passwordHash` |
+| E2-AC-02 | Sửa email sai định dạng → 400; trùng email khác → 409; hợp lệ → user đăng nhập được bằng email mới. Sự kiện audit ghi tên trường đã sửa, không ghi giá trị |
+| E2-AC-03 | Sau khi thu hồi phiên, cookie cũ của user gọi `/api/documents/mine` → 401 |
+| E2-AC-04 | User có 2 Public + 2 Private (+ avatar, bạn bè khi có E4/E5): xoá xong → không còn bản ghi, object, phiên, user; đăng ký lại cùng email được |
+| E2-AC-05 | Dừng SeaweedFS giữa chừng → "chưa hoàn tất"; tài liệu còn lại không xem/tìm/tải được. Bật lại, bấm "Tiếp tục xoá" → hoàn tất |
+| E2-AC-06 | Gõ sai email xác nhận → 400, không có gì thay đổi. Bấm xoá hai lần liên tiếp → kết quả cuối giống bấm một lần |
+
+### C8.3 E3 — Giám sát hiệu năng
+
+| ID | Yêu cầu |
+|---|---|
+| E3-FR-01 | Trong 5 phút gần nhất: request/giây, số request đang xử lý, P50/P95 thời gian phản hồi, tỉ lệ lỗi 4xx và 5xx |
+| E3-FR-02 | CPU và RAM của backend và của máy; độ trễ event loop |
+| E3-FR-03 | Sức khoẻ DB và storage (ok/lỗi, độ trễ) |
+| E3-FR-04 | Registered users và active users là hai chỉ số riêng; UI ghi định nghĩa của từng chỉ số |
+| E3-FR-05 | Có script và hướng dẫn thử tải, chạy trên DB/bucket riêng, không đụng dữ liệu thật |
+| E3-FR-06 | Không thêm cache. Hiện trạng cache ở §C8.9; điều kiện để thêm cache ở ARCHITECTURE §A12.6 |
+
+Số liệu chỉ nằm trong bộ nhớ của backend, kích thước cố định, mất khi khởi động lại. E3 chỉ giữ **số đếm tổng hợp**; chi tiết từng lỗi thuộc E7 (XBR-26).
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E3-AC-01 | 100 request trong 10 giây → dashboard báo ≈ 10 req/s |
+| E3-AC-02 | Unit test với thời gian phản hồi đã biết → P50/P95 đúng. Bộ nhớ không tăng theo số request |
+| E3-AC-03 | Dừng SeaweedFS → storage báo lỗi trong ≤ 15 giây |
+| E3-AC-04 | Script thử tải chạy được và có báo cáo mẫu: kết quả mỗi kịch bản, kết luận điểm nghẽn, chênh lệch khi bật/tắt phần đo (mục tiêu < 2%) |
+
+### C8.4 E4 — Hồ sơ người dùng
+
+> **DEFERRED** (XOD-21, owner 30/10/2026): chưa làm; làm lại cần CR mới.
+
+| ID | Yêu cầu |
+|---|---|
+| E4-FR-01 | User tải avatar JPEG/PNG/WebP và cắt vuông trong trình duyệt. Server mã hoá lại thành WebP 512×512 và xoá metadata (EXIF, GPS) |
+| E4-FR-02 | Avatar lưu trong SeaweedFS/S3 qua `ObjectStorage`. Thay avatar thất bại thì giữ avatar cũ; thành công thì xoá avatar cũ. Có thể xoá avatar (quay về chữ cái đầu) |
+| E4-FR-03 | User tự sửa tên hiển thị và bio |
+| E4-FR-04 | Bấm tên mình ở header → trang hồ sơ `/me/profile` |
+
+| ID | Quy tắc |
+|---|---|
+| XBR-13 | Ảnh gửi lên ≤ 1 MiB, mỗi cạnh 64–4096 px, nhận dạng theo nội dung (không tin đuôi tệp). Không hỗ trợ SVG, GIF, HEIC |
+| XBR-14 | Bio 0–300 ký tự, cho phép xuống dòng, hiển thị dạng chữ thuần. Tên hiển thị theo quy tắc hiện có (1–100 ký tự) |
+| XBR-15 | Chỉ chính user (và admin qua E2) sửa được hồ sơ của user đó. Quyền tài liệu không đổi |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E4-AC-01 | Tải PNG hợp lệ → header và hồ sơ hiện avatar; object là WebP 512×512, không có EXIF |
+| E4-AC-02 | Tệp `.png` thực chất là PDF/SVG → 415; > 1 MiB → 413; 5000×5000 px → 400 |
+| E4-AC-03 | Thay avatar khi storage dừng → báo lỗi, avatar cũ vẫn hiện. Thay thành công → object cũ bị xoá (hoặc có log `storage.orphan`) |
+| E4-AC-04 | Đổi tên hiển thị → tài liệu Public của user hiện tên mới. Bio 301 ký tự → lỗi; bio chứa `<script>` hiển thị nguyên văn |
+| E4-AC-05 | Guest gọi API sửa hồ sơ → 401. Ma trận phân quyền tài liệu (`authz-matrix`) vẫn PASS 100% |
+
+### C8.5 E5 — Username, tìm người dùng, bạn bè
+
+> **DEFERRED** (XOD-21, owner 30/10/2026): chưa làm; làm lại cần CR mới.
+
+| ID | Yêu cầu |
+|---|---|
+| E5-FR-01 | Mỗi user có username duy nhất, không phân biệt hoa thường, tách biệt với tên hiển thị; bắt buộc khi đăng ký |
+| E5-FR-02 | Tài khoản cũ được tự cấp username, không mất dữ liệu, không reset DB |
+| E5-FR-03 | User đổi username tối đa 1 lần / 7 ngày |
+| E5-FR-04 | User đã đăng nhập tìm người khác theo username hoặc tên hiển thị |
+| E5-FR-05 | Hồ sơ public `/u/{username}` (Guest xem được): avatar, tên, username, bio, tài liệu **Public**, nút kết bạn. Tên người đăng trên tài liệu dẫn tới hồ sơ này |
+| E5-FR-06 | Gửi, huỷ, chấp nhận, từ chối lời mời; huỷ kết bạn; xem danh sách bạn bè và lời mời của chính mình. Danh sách bạn bè là riêng tư |
+| E5-FR-07 | Không có chat, nhắn tin realtime, gợi ý bạn bè |
+
+| ID | Quy tắc |
+|---|---|
+| XBR-16 | Username 3–30 ký tự `a–z 0–9 _ .`, bắt đầu và kết thúc bằng chữ/số, lưu chữ thường. Cấm các tên `admin`, `api`, `me`, `login`, `register`, `upload`, `documents`, `u`, `settings`, `root`, `system` |
+| XBR-17 | Thời gian chờ đổi username tính từ lần đặt gần nhất (đăng ký tính là một lần). Username tự cấp cho tài khoản cũ đổi được ngay lần đầu. Admin sửa không bị giới hạn. Username cũ được giải phóng ngay |
+| XBR-18 | Tự mời mình → 400. Mỗi cặp user chỉ có một quan hệ. Gửi lại khi đang chờ → trả lời mời cũ. Đã là bạn → 409. Nếu người kia đã mời mình trước → thành bạn luôn |
+| XBR-19 | Chỉ người nhận được chấp nhận. Người gửi huỷ hoặc người nhận từ chối đều xoá lời mời. Một trong hai người được huỷ kết bạn. Thao tác lên quan hệ không phải của mình → 404 |
+| XBR-20 | Bạn bè không thấy tài liệu Private của nhau ở bất kỳ đâu |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E5-AC-01 | Sau migration, mọi user cũ có username hợp lệ, duy nhất; số user/tài liệu/phiên không đổi; vẫn đăng nhập được |
+| E5-AC-02 | Đăng ký `Alice` khi đã có `alice` → 409; `admin` → 400. `/u/ALICE` mở cùng hồ sơ với `/u/alice`; hồ sơ không có email, chỉ có tài liệu Public |
+| E5-AC-03 | Vừa đăng ký đã đổi username → 409 kèm ngày được đổi; sau 7 ngày (giả lập) → đổi được |
+| E5-AC-04 | A mời B; A mời lại → cùng lời mời; B mời A → thành bạn; A tự mời → 400. A và B mời nhau đồng thời → đúng một quan hệ bạn bè |
+| E5-AC-05 | A và B là bạn: B xem/tải tài liệu Private của A → 404. Người ngoài chấp nhận lời mời A→B → 404 |
+| E5-AC-06 | Guest tìm user → 401; Guest mở `/u/{username}` → xem được. Xoá tài khoản B (E2) → B biến mất khỏi danh sách bạn của A |
+
+### C8.6 E6 — Chỉ báo độ mạnh mật khẩu
+
+| ID | Yêu cầu |
+|---|---|
+| E6-FR-01 | Form đăng ký (và form đặt mật khẩu mới nếu sau này có) hiện chỉ báo khi gõ |
+| E6-FR-02 | Ba tiêu chí: (1) có chữ hoa; (2) có ký tự đặc biệt; (3) dài hơn 12 ký tự |
+| E6-FR-03 | < 8 ký tự → **Quá ngắn**; 0 tiêu chí → **Yếu** (trắng); 1–2 → **Trung bình** (nâu nhạt); 3 → **Mạnh** (nâu đậm) |
+| E6-FR-04 | Chỉ để tham khảo: không chặn đăng ký; server giữ quy tắc 8–128 ký tự. Có dòng ghi chú "Chỉ là gợi ý theo ba quy tắc đơn giản, không phải đánh giá bảo mật đầy đủ." |
+
+Độ dài tính theo ký tự Unicode. Chữ hoa gồm cả chữ hoa tiếng Việt ("Đ", "Ầ"). Ký tự đặc biệt là ký tự không phải chữ và không phải số. Mật khẩu không được gửi đi đâu để chấm. Luôn có nhãn chữ, không chỉ dựa vào màu; mức Yếu có viền để thấy trên nền sáng.
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E6-AC-01 | `abc` Quá ngắn · `abcdefgh` Yếu · `Abcdefgh` Trung bình · `Abcdefgh!` Trung bình · `abcdefghijklm` Trung bình · `Abcdefgh!xyz1` Mạnh · `Đặcbiệt12345` Trung bình, thêm `#` → Mạnh |
+| E6-AC-02 | Mật khẩu "Yếu" ≥ 8 ký tự vẫn đăng ký được; không có request mạng khi gõ; trình đọc màn hình đọc được mức |
+
+### C8.7 E7 — Audit log và chẩn đoán lỗi
+
+**Mục tiêu.** Biết *ai đã làm gì, khi nào, kết quả ra sao*, và tìm nhanh *lỗi nằm ở module nào, bước nào, của request nào*. Dùng lại `requestId`, log Pino, file log của controller, MySQL và admin local. Không thêm dịch vụ.
+
+| ID | Yêu cầu |
+|---|---|
+| E7-FR-01 | Ghi sự kiện audit cho các thao tác có ý nghĩa: đăng ký, đăng nhập (kể cả thất bại), đăng xuất; tải lên, tải xuống, sửa metadata, thay tệp, xoá tài liệu; sửa hồ sơ, avatar, username (E4/E5); gửi, chấp nhận, huỷ/từ chối lời mời, huỷ kết bạn (E5); thao tác admin (E2). Giai đoạn nào chưa làm thì chưa có sự kiện của giai đoạn đó |
+| E7-FR-02 | Mỗi sự kiện có: thời điểm, actor (user, developer hoặc ẩn danh), hành động, đối tượng (loại + id), kết quả (`SUCCESS`/`FAILURE` + mã lỗi), `requestId` |
+| E7-FR-03 | Admin lọc sự kiện theo actor, hành động, đối tượng, kết quả, khoảng thời gian; mới nhất trước; phân trang 50/trang |
+| E7-FR-04 | Thời gian lưu cấu hình được bằng biến môi trường (mặc định 90 ngày). Sự kiện quá hạn bị xoá |
+| E7-FR-05 | Mỗi lỗi chẩn đoán có: module, bước (stage), mã lỗi, `requestId`, HTTP status, thời điểm, thời lượng request |
+| E7-FR-06 | Tổng hợp số lỗi theo module và theo mã lỗi, trong 15 phút / 1 giờ / 24 giờ |
+| E7-FR-07 | Nhập một `requestId` → thấy mọi dòng log lỗi/cảnh báo và mọi sự kiện audit của request đó |
+| E7-FR-08 | Admin có hai mục **Activity Logs** và **Errors**: bộ lọc, bảng tổng hợp, chi tiết lỗi. Chỉ có trong admin local |
+
+| ID | Quy tắc |
+|---|---|
+| XBR-21 | **Không** ghi: lượt xem trang, thao tác gõ phím, tìm kiếm, xem chi tiết, `GET /api/auth/me`, health check, body request, tiêu đề/mô tả/tên tệp, email (trừ email đã che khi xoá tài khoản, XOD-06), mật khẩu, cookie, token, IP, user-agent |
+| XBR-22 | Ghi audit **không được** làm hỏng hay đổi kết quả thao tác nghiệp vụ. Sự kiện được ghi sau khi thao tác xong, không chung transaction. Nếu ghi lỗi, thao tác giữ nguyên kết quả nhưng **phải** có log ERROR `audit.write_failed` kèm `requestId` và hiện trong mục Errors (không im lặng) |
+| XBR-23 | Chỉ developer qua admin local đọc được audit và lỗi. Ứng dụng public không có endpoint đọc audit; User không xem được audit, kể cả của chính mình |
+| XBR-24 | Khi xoá tài khoản (E2): xoá mọi sự kiện mà user là actor; giữ sự kiện admin về tài khoản đó, chỉ kèm id và email đã che. Sự kiện của người khác lên tài liệu của user (vd. tải xuống) giữ tới hết hạn; chúng chỉ chứa id nên không tra ra được ai |
+| XBR-25 | Lỗi chẩn đoán đọc từ log có sẵn, không lưu thêm bản sao. Local: trong phạm vi file log của controller (khoảng 2 × 2 MB gần nhất). AWS: CloudWatch Logs nếu OD-06 cho phép |
+| XBR-26 | E3 giữ số đếm tổng hợp trong bộ nhớ; E7 giữ bản ghi từng sự kiện/lỗi. E7 không tự đếm request; E3 không lưu chi tiết. Hai bên không thu thập trùng |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E7-AC-01 | A đăng nhập, tải lên, tải xuống, xoá tài liệu, đăng xuất → 5 sự kiện `SUCCESS` đúng thứ tự, đúng actor, đối tượng và `requestId` (trùng header `X-Request-Id`) |
+| E7-AC-02 | Đăng nhập sai → 1 sự kiện `FAILURE` `INVALID_CREDENTIALS`, actor ẩn danh, không có email. B tải tài liệu Private của A → `FAILURE` `DOCUMENT_NOT_FOUND`, actor B |
+| E7-AC-03 | Mở trang, tìm kiếm, xem chi tiết, gọi `/api/auth/me` và health không tạo sự kiện. Bảng audit không chứa mật khẩu, email, tiêu đề đã dùng khi test (kiểm bằng `SELECT … LIKE`) |
+| E7-AC-04 | Giả lập ghi audit lỗi → upload vẫn 201, tài liệu tồn tại; log có `audit.write_failed` kèm `requestId`; mục Errors hiện lỗi đó |
+| E7-AC-05 | `AUDIT_RETENTION_DAYS=1` và có sự kiện 2 ngày tuổi → sau khi khởi động lại, sự kiện cũ bị xoá, sự kiện mới còn |
+| E7-AC-06 | Lọc actor + hành động + khoảng thời gian trả đúng tập; phân trang đúng tổng |
+| E7-AC-07 | Gây lỗi storage khi upload → Errors có dòng `module=documents`, `stage=storage.put`, `code=STORAGE_UNAVAILABLE`, status 503, `durationMs`, `requestId`; tổng hợp 15 phút đếm 1 lỗi ở `documents` |
+| E7-AC-08 | Nhập `requestId` của E7-AC-07 → thấy dòng lỗi và sự kiện audit `FAILURE` của cùng request |
+| E7-AC-09 | `:3000/api/admin/activity` và `:3000/api/admin/errors` → 404. Gọi ADM-08…10 không qua controller → 403 |
+| E7-AC-10 | Xoá tài khoản A → không còn sự kiện có actor là A; còn sự kiện `ADMIN_ACCOUNT_DELETE` với email đã che |
+
+### C8.8 E8 — Khôi phục ngữ cảnh dự án
+
+**Mục tiêu.** Developer hoặc owner quay lại sau nhiều tuần/tháng nắm lại dự án trong khoảng **10 phút**, chỉ bằng bốn tài liệu hiện có.
+
+| ID | Yêu cầu |
+|---|---|
+| E8-FR-01 | PROJECT_OVERVIEW có mục "Project Re-entry — 10-Minute Guide" ở đầu, gồm: mục đích và yêu cầu cốt lõi; kiến trúc tổng thể; module chính, trách nhiệm, phụ thuộc; ba luồng xác thực, upload/download, phân quyền; bất biến và quyết định quan trọng; trạng thái DONE/PROPOSED/BLOCKED; lệnh khởi động, health check, test; việc ưu tiên lấy từ MILESTONES; link tới CONTEXT, ARCHITECTURE, MILESTONES |
+| E8-FR-02 | Có quy trình khôi phục ngữ cảnh 6 bước: đọc hướng dẫn 10 phút → tìm module và hợp đồng input/output → xem quyết định và phụ thuộc liên quan → đọc trạng thái milestone mới nhất → chạy test liên quan trước khi sửa → cập nhật tài liệu khi quyết định đã duyệt thay đổi |
+| E8-FR-03 | Mỗi module (MVP ở ARCHITECTURE §A3.6, mở rộng ở §A12.3) trả lời được ba câu: input/output là gì; phụ thuộc vào gì; lỗi thì chuyện gì xảy ra |
+| E8-FR-04 | Trạng thái cache được ghi đúng với mã (§C8.9) |
+| E8-FR-05 | Không tạo file tài liệu mới. Hướng dẫn chỉ tóm tắt và dẫn link, không chép lại đặc tả |
+
+| ID | Quy tắc |
+|---|---|
+| XBR-27 | Hướng dẫn 10 phút không phải nguồn sự thật. Khi mâu thuẫn, CONTEXT/ARCHITECTURE/MILESTONES thắng và hướng dẫn phải được sửa |
+| XBR-28 | Khi một quyết định đã duyệt thay đổi (CR) hoặc trạng thái milestone đổi, hướng dẫn được cập nhật trong cùng PR |
+
+| ID | Tiêu chí chấp nhận |
+|---|---|
+| E8-AC-01 | Một thành viên chưa đọc tài liệu, chỉ dùng hướng dẫn và link của nó, trả lời đúng ≥ 8/10 câu hỏi kiểm tra (MILESTONES E8-02) trong ≤ 10 phút |
+| E8-AC-02 | Mọi link trong hướng dẫn mở đúng mục (không có anchor hỏng) |
+| E8-AC-03 | Trạng thái trong hướng dẫn khớp MILESTONES; không tính năng PROPOSED nào được mô tả là đã có |
+| E8-AC-04 | Mỗi module ở §A3.6 và §A12.3 có đủ input/output, phụ thuộc, hành vi lỗi |
+| E8-AC-05 | Phát biểu về cache khớp mã: `backend/src/http/static.ts`, `noStore()` trong `request-context.ts`, header của API-13 |
+
+### C8.9 Ảnh hưởng tới baseline và hiện trạng cache
+
+Khi owner duyệt, CR phải được ghi vào Nhật ký thay đổi baseline (MILESTONES) trước khi làm giai đoạn tương ứng:
+
+| Baseline | Thay đổi | Giai đoạn |
+|---|---|---|
+| §C2.2 loại trừ trang quản trị, xoá tài khoản, thống kê | Admin local (không phải vai trò web) | E1–E3, E7 |
+| §C2.2 loại trừ mạng xã hội và "đổi tên hiển thị" | Thêm hồ sơ, user tự đổi tên hiển thị, bạn bè | E4–E5 |
+| ARCHITECTURE §A7 (contract 1.0) | `UserDto`/`OwnerDto` thêm trường; đăng ký thêm `username` bắt buộc; thêm API-15…27 | E4–E5 |
+| ARCHITECTURE §A4 | Thêm cột vào `users`; thêm bảng `friendships`, `audit_events` | E1, E2, E4, E5, E7 |
+| ARCHITECTURE §A5.8, §A10.2 | Dòng log request thêm `module`, `stage`, `code`; biến `AUDIT_RETENTION_DAYS` | E7 |
+| Panel developer (`frontend/src/dev`, `frontend/local-tests`), README, WINDOWS_HOSTING, TEAM_HANDOFF | Chuyển vào thư mục admin (gitignore), gỡ khỏi repo; cập nhật tài liệu | E1 |
+| IAM §A10.9 (`documents/*`) | Nếu đưa E4 lên AWS: thêm `avatars/*`. Không đổi task M5 | E4 |
+| PROJECT_OVERVIEW | Hướng dẫn 10 phút §0 | E8 |
+
+Không đổi: FR-01…09, BR-01…11, ma trận quyền §C3.2, luồng tài liệu ARCHITECTURE §A6, kế hoạch và hạn M5.
+
+**Hiện trạng cache** (đã đối chiếu mã ở `80dc3a9`):
+- Có cache tài nguyên tĩnh ở chế độ production (`SERVE_FRONTEND=true`): `/assets/*` có hash → `public, max-age=31536000, immutable`; `index.html` và SPA fallback → `no-cache`.
+- Mọi JSON dưới `/api` → `no-store`; tải xuống API-13 → `private, no-store`.
+- **Không có** Redis hay cache ứng dụng/truy vấn phía server.
+- Đề xuất duy nhất có cache: ảnh avatar API-18 `private, max-age=86400` (E4; URL đổi khi đổi ảnh).
+- Chỉ xét tối ưu cache khi số đo E3 thoả điều kiện ở ARCHITECTURE §A12.6. Không có task cache trong E1–E8.
+
+### C8.10 Quyết định của owner
+
+XOD-01…21: owner quyết định ngày 30/10/2026 (XOD-15…21 duyệt trong chat, agent ghi lại theo yêu cầu của owner).
+
+| ID | Câu hỏi | Quyết định / đề xuất |
+|---|---|---|
+| XOD-01 | Thứ tự giai đoạn | Không cố định; owner chọn từng task. Module phải rõ đầu vào/đầu ra |
+| XOD-02 | Admin đặt ở đâu | Tiến trình riêng, không có trong bản build |
+| XOD-03 | Panel developer | Chuyển sang `/admin`; toàn bộ mã admin bị `.gitignore` |
+| XOD-04 | Admin sửa email? | Được, phải đúng định dạng và không trùng (hiếm dùng) |
+| XOD-05 | Audit lưu ở đâu | Không dùng file; **thay bằng XOD-15** |
+| XOD-06 | Audit giữ gì về người bị xoá | Id + email đã che (`n***@gmail.com`), để owner nhận ra đã xoá tài khoản nào mà không giữ email đầy đủ |
+| XOD-07 | Mã hoá lại avatar | Có, bằng `sharp` |
+| XOD-08 | User tự đổi tên hiển thị | Có |
+| XOD-09 | Username khi đăng ký | Bắt buộc |
+| XOD-10 | Đổi username | Chờ 7 ngày giữa hai lần |
+| XOD-11 | Danh sách bạn bè | Riêng tư |
+| XOD-12 | Xem hồ sơ, tìm user | Tìm cần đăng nhập; Guest xem hồ sơ public; admin xem mọi hồ sơ |
+| XOD-13 | Công cụ thử tải | `autocannon` qua `npx`: công cụ dòng lệnh Node.js, bắn nhiều request đồng thời và báo req/s, P50/P95/P99, số lỗi; không thêm vào `package.json` |
+| XOD-14 | Đo đĩa SeaweedFS | Có |
+| XOD-15 | Audit lưu ở đâu (E7) | **Duyệt:** một bảng MySQL `audit_events` cho cả sự kiện user và admin. Lý do: sự kiện user phát sinh trên mọi instance (cả AWS), cần lọc, phân trang, xoá theo hạn. Đánh đổi: bảng có cả trên RDS |
+| XOD-16 | Thời gian lưu audit | **Duyệt:** 90 ngày, đổi bằng `AUDIT_RETENTION_DAYS`; xoá lúc khởi động (như D-10), không worker |
+| XOD-17 | Nguồn lỗi chẩn đoán | **Duyệt:** đọc file log sẵn có của controller, không tạo bảng lỗi. Đánh đổi: local chỉ xem được khoảng 2 × 2 MB log gần nhất |
+| XOD-18 | Đăng nhập sai có ghi email? | **Duyệt:** không; actor ẩn danh |
+| XOD-19 | Audit khi xoá tài khoản | **Duyệt:** xoá sự kiện của user, giữ sự kiện admin với email đã che (XBR-24) |
+| XOD-20 | Nơi đặt hướng dẫn 10 phút | **Duyệt:** PROJECT_OVERVIEW §0, cập nhật theo XBR-28 |
+| XOD-21 | Làm E4–E5 lúc này? | **Hoãn** (chưa cần). E4-04, E5-05 và các phần admin dùng avatar, username, bạn bè (ADM-04, `hasAvatar`, sửa/tìm username, `friendCount`) cũng hoãn. Làm lại cần CR mới |

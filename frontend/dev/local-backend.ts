@@ -23,8 +23,11 @@ export function localBackendPlugin(): Plugin {
           res.statusCode = status;
           res.end(JSON.stringify({ error }));
         };
-        const read = req.method === "GET" && ["/status", "/session"].includes(req.url ?? "");
-        const write = req.method === "POST" && ["/login", "/logout", "/start", "/stop", "/restart", "/start-all", "/stop-all"].includes(req.url ?? "");
+        // XM-02: /admin/* đi tiếp tới controller; controller kiểm phiên developer rồi chuyển cho admin local.
+        const admin = (req.url ?? "").startsWith("/admin/");
+        const read = req.method === "GET" && (admin || ["/status", "/session"].includes(req.url ?? ""));
+        const write = (req.method === "POST" && ["/login", "/logout", "/start", "/stop", "/restart", "/start-all", "/stop-all"].includes(req.url ?? "")) ||
+          (admin && ["POST", "PATCH"].includes(req.method ?? ""));
         if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress ?? "") ||
             req.headers.forwarded || req.headers["x-forwarded-for"] ||
             req.headers.host !== "localhost:5173" ||
@@ -43,6 +46,7 @@ export function localBackendPlugin(): Plugin {
               Cookie: req.headers.cookie ?? "", "Content-Type": "application/json" },
           }, (response) => {
             res.statusCode = response.statusCode ?? 502;
+            if (response.headers["content-type"]) res.setHeader("Content-Type", response.headers["content-type"]);
             if (response.headers["set-cookie"]) res.setHeader("Set-Cookie", response.headers["set-cookie"]);
             response.pipe(res);
           });
