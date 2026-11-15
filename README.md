@@ -1,30 +1,32 @@
 # BTL Cloud — Kho tài liệu học tập
 
-Lưu trữ và chia sẻ PDF, DOCX, PPTX (tối đa 50 MiB), với tài khoản, kho cá nhân, tìm kiếm và chế độ Công khai/Riêng tư. Hiện là **local prototype**; M4-07/08 hoãn (CR-005), M5 (AWS) chưa làm.
-Tiến độ: [MILESTONES](docs/MILESTONES.md). Tổng quan kiến trúc, đặc tả và sơ đồ: [PROJECT_OVERVIEW](docs/PROJECT_OVERVIEW.md).
-Bàn giao cho thành viên nhóm theo hai PDF: [TEAM_HANDOFF](docs/TEAM_HANDOFF.md).
-Quay lại dự án sau một thời gian: [hướng dẫn 10 phút](docs/PROJECT_OVERVIEW.md#0-project-re-entry--hướng-dẫn-10-phút). Mở rộng tuỳ chọn E1–E8 (E1–E3, E6–E8 đã duyệt, chưa triển khai; E4–E5 hoãn): [yêu cầu](docs/CONTEXT.md#c8-mở-rộng-đề-xuất-e1e8) · [thiết kế](docs/ARCHITECTURE.md#a12-mở-rộng-đề-xuất-e1e8) · [kế hoạch](docs/MILESTONES.md#e1e8--mở-rộng-đề-xuất).
+Lưu trữ và chia sẻ PDF, DOCX, PPTX (tối đa 50 MiB), với tài khoản, kho cá nhân, tìm kiếm và chế độ Công khai/Riêng tư. Hiện là **local prototype**; AWS (M5) chưa làm.
 
-## Yêu cầu và chạy nhanh
+| Tài liệu | Nội dung |
+|---|---|
+| [PROJECT_OVERVIEW](docs/PROJECT_OVERVIEW.md) | Đọc đầu tiên: trạng thái, yêu cầu, ma trận quyền, phân công AWS cho nhóm |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Thiết kế, schema, hợp đồng API, cấu hình local/AWS |
+| [MILESTONES](docs/MILESTONES.md) | Task, bằng chứng, CR, nghiệm thu |
+| [WINDOWS_HOSTING](docs/WINDOWS_HOSTING.md) | Host website trên PC Windows cho người dùng từ xa |
 
-Cài **Node.js 24** (kèm npm); dùng Docker Desktop hoặc Windows với `run.bat` khi không có Docker. Clone repo vào thư mục mới, mở terminal tại gốc repo.
+## Chạy nhanh
 
-**Windows:** nhấp **Start.vbs** để chạy ẩn, hoặc dùng `run.bat start` trong terminal. Lần đầu launcher tải MySQL 8.4.7 và SeaweedFS 4.48 vào `%LOCALAPPDATA%\btl-cloud-services`, cài dependency, tạo `.env`, áp migration, tạo bucket và mở web. Khi web sẵn sàng, vào http://localhost:5173/register để tạo tài khoản; đăng xuất rồi đăng nhập tại `/login`. Dừng toàn bộ bằng **Stop.vbs**, nút **Stop All** có xác nhận, hoặc `run.bat stop`. Dữ liệu portable được giữ giữa các lần chạy.
+Cài **Node.js 24**. Clone repo vào thư mục mới, mở terminal tại gốc repo.
 
-**Docker** (hai terminal cho ứng dụng):
+**Windows (không cần Docker):** nhấp **Start.vbs** (chạy ẩn) hoặc `run.bat start`. Lần đầu launcher tải MySQL 8.4.7 và SeaweedFS 4.48 vào `%LOCALAPPDATA%\btl-cloud-services`, cài dependency, tạo `.env`, áp migration, tạo bucket và mở web (cần mạng). Vào http://localhost:5173/register để tạo tài khoản; không có tài khoản demo mặc định. Dừng bằng **Stop.vbs** hoặc `run.bat stop`; dữ liệu được giữ giữa các lần chạy.
+
+**Docker** (hai terminal):
 
 ```sh
 docker compose up -d --wait
 npm ci
-cp backend/.env.example backend/.env
+cp backend/.env.example backend/.env      # PowerShell: Copy-Item
 npm --prefix backend run prisma:deploy
 npm --prefix backend run storage:init
 npm --prefix backend run dev
-# Terminal thứ hai, tại gốc repo:
+# Terminal thứ hai:
 npm --prefix frontend run dev
 ```
-
-Trong PowerShell, có thể dùng `Copy-Item` thay `cp`. Vào `/register` tạo tài khoản; không có tài khoản demo mặc định. Không commit `.env`.
 
 | Dịch vụ | URL/cổng |
 |---|---|
@@ -32,90 +34,55 @@ Trong PowerShell, có thể dùng `Copy-Item` thay `cp`. Vào `/register` tạo 
 | Backend / health / readiness | http://localhost:3000/api/health · /api/health/ready |
 | MySQL / S3-compatible storage | 127.0.0.1:3306 / http://localhost:9000 |
 
-Production-like: `npm run build`, đặt biến **của process** `SERVE_FRONTEND=true`, chạy `npm --prefix backend start`; SPA và API cùng http://localhost:3000. PowerShell: `$env:SERVE_FRONTEND='true'`; cmd: `set SERVE_FRONTEND=true`.
+**Production-like:** `npm run build`, đặt biến của process `SERVE_FRONTEND=true` (PowerShell `$env:SERVE_FRONTEND='true'`), chạy `npm --prefix backend start`; SPA và API cùng http://localhost:3000. Không commit `.env`.
 
-**Host trên PC Windows cho người dùng từ xa:** xem [WINDOWS_HOSTING](docs/WINDOWS_HOSTING.md).
-`BTL_LOCAL_PRODUCTION=1` cho launcher quản lý Express đã build tại `127.0.0.1:3000`;
-quản trị qua Vite localhost bằng tài khoản developer hiện tại, người dùng truy cập website qua HTTPS.
+## Launcher và công cụ developer
 
-## Launcher Windows và Development Tools
-
-**Thành viên mới cần tài khoản developer:** sau khi clone, mở terminal ở gốc repo, chạy `npm ci`, rồi `npm --prefix backend run dev:account -- ten_cua_ban`. Lưu mật khẩu được in ra, mở Start.vbs và chọn **Đăng nhập nhà phát triển** trên web. Chỉ cấp một lần mỗi bản sao; những lần sau dùng lại tài khoản. Hướng dẫn chi tiết và lệnh cấp lại nằm bên dưới.
-
-Chạy **Start.vbs** để mở toàn bộ stack mà không hiện CMD/PowerShell. Nếu dịch vụ đã chạy, bấm Start lần nữa sẽ mở lại web và giữ các dịch vụ hiện có. Các yêu cầu Start trùng trong lúc đang khởi động được gộp lại. **Stop.vbs** dừng toàn bộ. Trong terminal dùng `run.bat` / `run.bat start`, `run.bat stop`; `run.bat restart` dừng rồi bật lại. Nếu Start đang chạy, Stop/Restart chờ lượt để thực hiện; `run.bat status` vẫn đọc được trạng thái và log đã lọc bí mật. Không dùng launcher trên AWS hoặc chạy controller với NODE_ENV=production; chế độ host trên PC dùng tùy chọn ở hướng dẫn trên.
-
-Controller Node duy nhất tại **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, thu stdout/stderr và giữ các handle/PID nó tạo. Dịch vụ chạy ẩn; cấu hình `.env`, thư mục MySQL, SeaweedFS và tài liệu đã có được giữ. Lần đầu vẫn dùng MySQL 8.4.7 / SeaweedFS 4.48 portable, `npm ci`, migration deploy và tạo bucket như launcher cũ; không reset DB. Biến `DEBUG` được bỏ riêng trong môi trường con của dịch vụ để tránh lỗi SeaweedFS. Backend không có watcher: dùng **Khởi động lại** sau khi sửa mã backend.
-
-Tại **http://localhost:5173/admin** (link **Quản trị**), mở **Đăng nhập nhà phát triển** và dùng tài khoản được cấp để truy cập toàn bộ công cụ local (Backend, Start/Stop All, Services và Developer Mode). Controller kiểm tra phiên cho cả đọc trạng thái/log lẫn thao tác điều khiển; sửa `localStorage` hoặc đăng nhập tài khoản người dùng thông thường không cấp quyền developer. Phiên dùng cookie HttpOnly, SameSite=Strict, hết hạn sau 8 giờ; đăng xuất hoặc khởi động lại controller yêu cầu đăng nhập lại. Đăng nhập developer vẫn hoạt động khi Express/MySQL đang tắt. Công cụ này nằm trong thư mục admin gitignore (`frontend/src/admin/`, `backend/admin/`), chỉ có trên máy owner; clone không có thư mục này thì web không có link **Quản trị** và Start All vẫn chạy.
-
-Người quản lý cấp **một tài khoản developer cục bộ cho mỗi bản sao dự án** bằng lệnh tại gốc repo:
+**Tài khoản developer** (một lần cho mỗi bản sao, sau `npm ci`):
 
 ```sh
-npm --prefix backend run dev:account
-# Tuỳ chọn tên khác:
-# npm --prefix backend run dev:account -- ten_developer
+npm --prefix backend run dev:account -- ten_cua_ban
 # Cấp lại mật khẩu và thu hồi phiên cũ:
-# npm --prefix backend run dev:account -- developer --reset
+npm --prefix backend run dev:account -- ten_cua_ban --reset
 ```
 
-Lệnh sinh mật khẩu ngẫu nhiên và chỉ hiển thị một lần trong terminal; lưu lại để cấp cho developer. Kho tài khoản là `backend/tmp/developer-account.json`, chỉ chứa tên tài khoản, salt và bản băm scrypt; được bỏ qua bởi Git và bị Vite chặn truy cập. Không tự tạo tài khoản mặc định; chạy lại lệnh không ghi đè tài khoản đã có nếu thiếu `--reset`. Tài khoản web vẫn nằm riêng trong MySQL, bảng `btl_cloud.users` (`email`, `password_hash` dùng Argon2id); `backend/.env` chứa thông tin kết nối dịch vụ.
+Mật khẩu ngẫu nhiên chỉ in một lần. `backend/tmp/developer-account.json` chỉ giữ tên, salt, hash scrypt; được Git bỏ qua và Vite chặn phục vụ. Tài khoản website là chuyện khác, nằm trong bảng `btl_cloud.users`.
 
-Sau khi đăng nhập developer, công tắc **Backend** chỉ bật/tắt Express; **Developer Mode** chỉ mở bảng Status/chẩn đoán. Hai công tắc độc lập trong phiên được cấp quyền. **Services · Dịch vụ cục bộ** hiển thị trạng thái, cổng, lỗi khởi động và log của Frontend/Backend/MySQL/SeaweedFS. Có bộ lọc dịch vụ/mức log, xóa log hiển thị và sao chép chẩn đoán. Log hiển thị tối đa 500 dòng ở controller (150 dòng trong danh sách); file `backend/tmp/local-services.ndjson` xoay vòng khoảng 2 MiB, giữ một bản `.1`. Lỗi controller lúc boot nằm trong `controller-boot.log`. Mật khẩu, cookie và token được che; token điều khiển trong `local-controller.json` không được trả về UI hay phục vụ qua Vite. Start.vbs/Stop.vbs và CLI tiếp tục dùng quyền truy cập máy local để khởi động/khôi phục dịch vụ.
+**Launcher:** `run.bat` / `run.bat start`, `run.bat stop`, `run.bat restart`, `run.bat status` (trạng thái + log đã lọc bí mật). Bấm Start khi đã chạy thì chỉ mở lại web. Controller duy nhất ở **127.0.0.1:3001** khởi động MySQL/SeaweedFS → Express :3000 → Vite :5173, giữ PID/handle nó tạo và ghi log vào `backend/tmp/local-services.ndjson` (xoay ở 2 MiB, giữ `.1`). Backend không có watcher: sửa mã backend xong thì **Khởi động lại**.
 
-**Start All** bật các dịch vụ còn thiếu; Vite vẫn có thể lên khi hạ tầng lỗi để xem Services và thử lại. **Stop All** cần xác nhận, dùng được khi Backend/Developer Mode đang OFF, dừng Backend → Frontend → SeaweedFS → MySQL → controller cuối cùng. Dịch vụ do launcher tạo được dừng theo lifecycle phù hợp; nếu chưa dừng hết, controller giữ trạng thái/lỗi để thử lại bằng `run.bat stop`. Sau Stop All phải mở lại bằng Start.vbs hoặc `run.bat start`. Dữ liệu, volume, .env và cấu hình portable được giữ.
+- Không nhận quản lý tiến trình có sẵn chỉ vì nó chiếm đúng cổng, không giết theo tên/cổng; tự dừng phiên cũ (hoặc `npm run dev` thủ công) trước khi chạy launcher.
+- Docker tuỳ chọn: dùng Docker khi `docker info` thành công, ngược lại dùng portable; ép bằng `BTL_LOCAL_MODE=portable` hoặc `docker`. Chỉ dừng container do launcher tạo; không `compose down -v`.
+- Từ chối `NODE_ENV=production` hoặc DB/storage không phải loopback. Toàn bộ launcher/controller nằm ngoài `backend/src`, không có trong bản build.
 
-Launcher không nhận quản lý tiến trình có sẵn chỉ vì nó chiếm đúng cổng, không dùng `taskkill /im` hay giết theo tên/cổng. Nếu đang chạy phiên launcher cũ hoặc mở `npm run dev` thủ công, hãy tự dừng đúng phiên cũ trước khi chuyển sang launcher mới. Lỗi chiếm cổng được ghi rõ; Stop All không dừng dịch vụ ngoài quyền quản lý. Nếu web không mở được, launcher hiện một thông báo Windows ngắn kèm đường dẫn log. Không tự lặp khởi động khi dịch vụ crash; toast/log báo lỗi, **Start All** khôi phục dịch vụ thiếu để tránh vòng lặp crash.
-
-Docker vẫn tùy chọn: mặc định dùng Docker khi `docker info` thành công, nếu không dùng portable. Có thể chọn `BTL_LOCAL_MODE=portable` hoặc `docker` cho process chạy launcher. Docker dùng nguyên Compose của repo và giữ volume; chỉ dừng container ID do launcher tạo, có ledger local và label đúng thư mục dự án. Container có sẵn do người dùng bật có thể được dùng nhưng được ghi **Ngoài quyền quản lý**, không bị Stop All dừng. Không dừng Docker Desktop, không `compose down -v`. Chế độ chạy được giữ trong phiên controller.
-
-Chỉ báo kết nối luôn hiện, độc lập hai công tắc: sage **Trực tuyến**, amber **Hoạt động hạn chế** (nêu dependency lỗi), coral **Ngoại tuyến**, cyan **Đang kết nối lại**. Dev kiểm tra health mỗi 12 giây khi tab hiện, khi focus, khi mạng trở lại và sau lỗi API. Nút **Thử kết nối lại** kiểm tra ngay. Bản nháp, tệp đã chọn và cache giữ trong trang; uploads/mutations không tự gửi lại. Tránh đóng/tải lại trang khi còn bản nháp.
-
-Toàn bộ launcher/controller/worker nằm ngoài `backend/src` và `backend/dist`; UI Tools chỉ được import trong `import.meta.env.DEV`, cầu nối chỉ đăng ký trong Vite dev. Express production không đăng ký endpoint control/diagnostic. Production giữ chỉ báo kết nối, không thêm polling định kỳ; không sửa AWS, EC2 Auto Scaling, deployment hay tạo tài nguyên cloud. Launcher từ chối NODE_ENV=production hoặc DB/storage không phải loopback. Các biến `BTL_LOCAL_NO_BROWSER=1`, `BTL_LOCAL_NO_NOTIFY=1` chỉ dành cho automation local; bỏ mở trình duyệt được xét theo từng lần chạy launcher.
-
-Kiểm tra:
-
-```sh
-node --test backend/dev/*.test.mjs
-npm --prefix frontend test
-npm --prefix frontend exec -- playwright test --config frontend/admin-tests/playwright.config.ts   # chỉ máy có admin
-node scripts/verify/admin-isolation.mjs   # sau npm run build
-# Sau npm run build:
-node scripts/verify/local-production.mjs
-```
-
-Suite trình duyệt local cần Chrome, stack đang chạy và biến môi trường `BTL_TEST_DEVELOPER_PASSWORD` bằng mật khẩu được cấp (`BTL_TEST_DEVELOPER_USERNAME` mặc định `developer`). Ví dụ PowerShell: `$env:BTL_TEST_DEVELOPER_PASSWORD='mat-khau-duoc-cap'` trước lệnh Playwright. Suite kiểm tra đăng nhập/phân quyền developer, switch độc lập trong phiên được cấp quyền, log/toast, crash backend, Stop All và mở lại bằng Start.vbs. Các ca readiness DB/storage dùng response lỗi giả lập; không sửa tài liệu người dùng. Unit Docker kiểm tra container ownership và partial failure; cần máy có Docker Desktop để nghiệm thu Docker thật.
+**Trang quản trị** http://localhost:5173/admin (link **Quản trị**, chọn **Đăng nhập nhà phát triển**): Dashboard số liệu và hiệu năng, điều khiển Backend/Start All/Stop All, Services và log, Users, Activity, Errors, Trực tiếp. Phiên developer là cookie HttpOnly, SameSite=Strict, tối đa 8 giờ; vẫn đăng nhập được khi Express/MySQL tắt. Mã admin nằm trong thư mục gitignore (`backend/admin/`, `frontend/src/admin/`, `frontend/admin-tests/`), chỉ có trên máy owner; clone không có thì web không có link **Quản trị** và Start All vẫn chạy.
 
 ## Kiểm thử
 
-Trên Windows, chạy `run.bat stop` trước `npm ci` để tránh khoá Prisma DLL; không cài lại dependency khi app/test còn chạy. Sau chuỗi lint/build/unit, bật lại hạ tầng để chạy integration/E2E; dừng backend dev trước khi dùng backend production-like.
+Trên Windows, chạy `run.bat stop` trước `npm ci` để tránh khoá Prisma DLL.
 
 ```sh
-npm ci
-npm run lint
-npm run build
-npm test
-npm --prefix backend run test:integration
-npm --prefix frontend test
+npm ci && npm run lint && npm run build && npm test     # giống CI
+npm --prefix backend run test:integration              # cần MySQL + storage; chỉ reset btl_cloud_test
+node --test backend/dev/*.test.mjs                      # launcher/controller
 npm --prefix frontend exec -- playwright install chromium
-npm --prefix frontend run test:e2e
-node scripts/verify/authz-matrix.mjs
-node scripts/verify/upload-matrix.mjs
+npm --prefix frontend run test:e2e                      # cần backend production-like :3000
+npm --prefix frontend run test:ui                       # API mock, không cần backend
+node scripts/verify/authz-matrix.mjs                    # cần :3000
+node scripts/verify/upload-matrix.mjs                   # cần :3000
+node scripts/verify/admin-isolation.mjs                 # sau npm run build
+node scripts/verify/local-production.mjs                # sau npm run build
 ```
 
-Integration cần MySQL và storage đang chạy; chỉ reset **btl_cloud_test**. E2E và hai script verify cần backend production-like ở :3000; `test:ui` là suite mock riêng. Nếu chạy lặp nhiều suite bị 429, tăng `AUTH_RATE_LIMIT_MAX=1000` chỉ cho process backend của lần kiểm thử, rồi khởi động lại với mặc định.
+Nếu chạy lặp nhiều suite bị 429, đặt `AUTH_RATE_LIMIT_MAX=1000` chỉ cho process backend của lần kiểm thử. Test admin (chỉ máy có admin): `npm --prefix backend exec -- vitest run --config admin/vitest.config.ts`; Playwright admin cần `BTL_TEST_DEVELOPER_PASSWORD`. Thử tải trên DB/bucket riêng: [scripts/load/README.md](scripts/load/README.md).
 
-Thử tải trên DB/bucket riêng (seed, lệnh `autocannon`, kết quả mẫu): [scripts/load/README.md](scripts/load/README.md).
+## Đóng góp
 
-## Cấu trúc và đóng góp
-
-`backend/`: Express, Prisma, storage adapter, test; `frontend/`: React/Vite, API client, UI/E2E; `docker/` và `docker-compose.yml`: hạ tầng local; `scripts/`: lệnh chung và kiểm chứng; `docs/`: thiết kế và tiến độ. Xem [§A1.3](docs/ARCHITECTURE.md#a13-cấu-trúc-thư-mục-và-người-phụ-trách) và [§A1.4](docs/ARCHITECTURE.md#a14-quy-tắc-phụ-thuộc): controller gọi service; repository dùng Prisma; adapter storage gọi SDK; frontend gọi mạng qua api/.
-
-Dùng nhánh `feature/*`, `fix/*`, `chore/*`; Conventional Commits; mở PR vào main. PR cần CI `ci-required` đạt và code owner review. Chỉ tick task đã kiểm chứng kèm một dòng bằng chứng; owner tự nghiệm thu gate.
+Nhánh `feature/*`, `fix/*`, `chore/*`; Conventional Commits; PR vào `main` cần CI `ci-required` và code owner review. Quy tắc phụ thuộc: [§A1.4](docs/ARCHITECTURE.md#a14-quy-tắc-phụ-thuộc) (controller gọi service; chỉ repository dùng Prisma; chỉ adapter storage gọi AWS SDK; frontend gọi mạng qua `api/`).
 
 ## Lỗi thường gặp
 
-- **Prisma chặn reset bởi AI:** dừng, xin owner câu đồng ý reset đúng DB `btl_cloud_test`; chỉ khi owner trả lời mới đặt `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` bằng nguyên văn câu đó cho process test. Không reset `btl_cloud`.
-- **npm allowScripts:** dùng lockfile và cấu hình `allowScripts` trong backend/package.json; thiếu Prisma client thì chạy `npm --prefix backend run prisma:generate`. Không bật mọi install script trên toàn máy.
-- **Cổng bị chiếm:** chạy `run.bat stop`, kiểm tra 3306/9000/3000/5173 và dừng đúng process cũ trước khi chạy lại.
-- **Đường dẫn tiếng Việt/khoảng trắng:** đặt đường dẫn trong dấu nháy; nếu công cụ không hỗ trợ, clone vào `C:\tmp\btl-clone`. Agent gọi launcher qua `cmd /d /c` với đường dẫn tuyệt đối và working directory rõ ràng; dùng `Start-Process` + `.WaitForExit()`, không pipe output hoặc dùng `-Wait`.
-- **SeaweedFS báo `invalid value "release" ... debug`:** bỏ biến DEBUG trong terminal chạy (`Remove-Item Env:DEBUG -ErrorAction SilentlyContinue` với PowerShell, `set DEBUG=` với cmd), rồi chạy lại `run.bat`.
+- **Prisma chặn reset bởi AI:** xin owner câu đồng ý reset đúng DB `btl_cloud_test`; chỉ khi owner trả lời mới đặt `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` bằng nguyên văn câu đó cho process test. Không reset `btl_cloud`.
+- **npm allowScripts:** dùng cấu hình `allowScripts` trong `backend/package.json`; thiếu Prisma client thì `npm --prefix backend run prisma:generate`.
+- **Cổng bị chiếm:** `run.bat stop`, kiểm tra 3306/9000/3000/5173 và dừng đúng process cũ.
+- **Đường dẫn tiếng Việt/khoảng trắng:** đặt trong dấu nháy; nếu công cụ không hỗ trợ, clone vào `C:\tmp\btl-clone`. Gọi launcher từ script: `Start-Process` + `.WaitForExit()`, không pipe output hoặc dùng `-Wait`.
+- **SeaweedFS báo `invalid value "release" ... debug`:** bỏ biến DEBUG (`Remove-Item Env:DEBUG -ErrorAction SilentlyContinue` hoặc `set DEBUG=`) rồi chạy lại `run.bat`.

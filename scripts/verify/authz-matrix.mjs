@@ -36,7 +36,7 @@ try {
     check(`${doc.owner} owner replace`, (await doc.call('PUT', `/api/documents/${doc.id}/file`, body)).status, 200);
     check(`${doc.owner} owner delete`, (await doc.call('DELETE', `/api/documents/${doc.id}`)).status, 204);
   }
-  console.table(rows); console.log(`PASS ${rows.length} authorization checks; CONTEXT C3.2 Guest/A/B covered`);
+  console.table(rows); console.log(`PASS ${rows.length} authorization checks; PROJECT_OVERVIEW §3 Guest/A/B covered`);
 } finally {
   for (const doc of docs) await doc.call('DELETE', `/api/documents/${doc.id}`);
 }
