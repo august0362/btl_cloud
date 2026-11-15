@@ -27,7 +27,7 @@ export class DocumentService {
     private readonly logger: Logger,
   ) {}
 
-  async searchPublic(query: PublicQuery, viewer: Viewer | null): Promise<PageDto<DocumentDto>> {
+  async searchPublic(query: Omit<PublicQuery, 'sort'> & { sort: 'newest' | 'title' }, viewer: Viewer | null): Promise<PageDto<DocumentDto>> {
     const { rows, total } = await this.documents.search({ scope: { kind: 'public' }, ...query });
     return toPageDto(rows.map((row) => toDocumentDto(row, viewer?.userId)), query.page, query.pageSize, total);
   }

@@ -1,5 +1,9 @@
 import { Prisma, type FileType, type PrismaClient, type Visibility } from '@prisma/client';
 
+import { discoverableSql } from './document.scope.js';
+
+export type Db = PrismaClient | Prisma.TransactionClient;
+
 // deletionStartedAt chỉ dùng cho document.loader (XM-04); không vào DocumentDto.
 const ownerSelect = { owner: { select: { id: true, displayName: true, deletionStartedAt: true } } } as const;
 
@@ -61,7 +65,7 @@ export class DocumentRepository {
   async search(search: DocumentSearch): Promise<{ rows: DocumentWithOwner[]; total: number }> {
     const conditions: Prisma.Sql[] = [
       search.scope.kind === 'public'
-        ? Prisma.sql`d.visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM users u WHERE u.id = d.owner_id AND u.deletion_started_at IS NULL)`
+        ? discoverableSql()
         : Prisma.sql`d.owner_id = ${search.scope.ownerId}`,
     ];
     if (search.visibility) conditions.push(Prisma.sql`d.visibility = ${search.visibility}`);
@@ -87,8 +91,29 @@ export class DocumentRepository {
     return { rows: ids.map((id) => byId.get(id)).filter((row): row is DocumentWithOwner => row !== undefined), total };
   }
 
-  async insert(row: NewDocumentRow): Promise<void> {
-    await this.prisma.document.create({ data: { ...row, fileVersion: 1 } });
+  async findDiscoverableByIds(ids: string[]): Promise<DocumentWithOwner[]> {
+    if (ids.length > 100) throw new RangeError('At most 100 document ids');
+    if (ids.length === 0) return [];
+    const visible = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT d.id FROM documents d WHERE d.id IN (${Prisma.join(ids)}) AND ${discoverableSql()}`;
+    const rows = await this.prisma.document.findMany({ where: { id: { in: visible.map((row) => row.id) }, visibility: 'PUBLIC', owner: { deletionStartedAt: null } }, include: ownerSelect });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ids.flatMap((id) => { const row = byId.get(id); return row ? [row] : []; });
+  }
+
+  async searchRelevanceOrdered(p: { q: string; fileType?: FileType; offset: number; limit: number }): Promise<{ total: number; rows: { id: string; title: string; description: string | null; createdAt: Date }[] }> {
+    const pattern = `%${escapeLike(p.q)}%`;
+    const conditions = [discoverableSql(), Prisma.sql`(d.title LIKE ${pattern} ESCAPE '!' OR d.description LIKE ${pattern} ESCAPE '!')`];
+    if (p.fileType) conditions.push(Prisma.sql`d.file_type = ${p.fileType}`);
+    const where = Prisma.join(conditions, ' AND ');
+    const [counts, rows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ total: bigint | number }>>`SELECT COUNT(*) AS total FROM documents d WHERE ${where}`,
+      this.prisma.$queryRaw<Array<{ id: string; title: string; description: string | null; createdAt: Date }>>`SELECT d.id, d.title, d.description, d.created_at AS createdAt FROM documents d WHERE ${where} ORDER BY (d.title LIKE ${pattern} ESCAPE '!') DESC, d.created_at DESC, d.id DESC LIMIT ${p.limit} OFFSET ${p.offset}`,
+    ]);
+    return { total: Number(counts[0]?.total ?? 0), rows };
+  }
+
+  async insert(row: NewDocumentRow, db: Db = this.prisma): Promise<void> {
+    await db.document.create({ data: { ...row, fileVersion: 1 } });
   }
 
   /** Ném P2025 nếu tài liệu đã bị xoá đồng thời. Không bao giờ chạm cột tệp (INV-D2 chiều ngược). */
@@ -101,8 +126,8 @@ export class DocumentRepository {
   }
 
   /** Last write wins; không cập nhật visibility. */
-  async updateFile(id: string, file: FileColumns, now: Date): Promise<number> {
-    const result = await this.prisma.document.updateMany({
+  async updateFile(id: string, file: FileColumns, now: Date, db: Db = this.prisma): Promise<number> {
+    const result = await db.document.updateMany({
       where: { id },
       data: { ...file, fileVersion: { increment: 1 }, fileUpdatedAt: now, updatedAt: now },
     });

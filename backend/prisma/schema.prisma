@@ -30,6 +30,8 @@ model User {
   lastActiveAt      DateTime?  @map("last_active_at") @db.DateTime(3)
   // E2 (§A12.4, XBR-06): khác NULL = DELETING; app public coi như user không tồn tại.
   deletionStartedAt DateTime?  @map("deletion_started_at") @db.DateTime(3)
+  personalizationEnabled Boolean @default(false) @map("personalization_enabled")
+  interactions DocumentInteraction[]
   sessions          Session[]
   documents         Document[]
 
@@ -64,6 +66,8 @@ model Document {
   createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   fileUpdatedAt    DateTime   @map("file_updated_at") @db.DateTime(3)
+  fingerprint DocumentFingerprint?
+  interactions DocumentInteraction[]
   owner            User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   @@index([visibility, createdAt], map: "idx_documents_visibility_created")
@@ -107,4 +111,52 @@ model AuditEvent {
   @@index([targetId, createdAt], map: "idx_audit_events_target_created")
   @@index([requestId], map: "idx_audit_events_request_id")
   @@map("audit_events")
+}
+
+enum FingerprintTextStatus {
+  OK       // đã phân tích toàn bộ phần chữ trong giới hạn
+  PARTIAL  // dừng vì chạm giới hạn (số từ/trang/phần XML), vẫn có chữ ký
+  SKIPPED  // không có chữ ký; lý do ở text_reason
+}
+
+enum InteractionKind {
+  VIEW
+  DOWNLOAD
+}
+
+// Feature A. 1 dòng / tài liệu, mô tả đúng phiên bản tệp hiện tại (file_version).
+model DocumentFingerprint {
+  documentId   String                @id @map("document_id") @db.Char(36)
+  fileVersion  Int                   @map("file_version") @db.UnsignedInt
+  sha256       String                @db.Char(64)
+  algoVersion  Int                   @map("algo_version") @db.UnsignedSmallInt
+  textStatus   FingerprintTextStatus @map("text_status")
+  textReason   String?               @map("text_reason") @db.VarChar(30)
+  textSha256   String?               @map("text_sha256") @db.Char(64)   // chỉ khi text_status = OK
+  shingleCount Int?                  @map("shingle_count") @db.UnsignedInt
+  minhash      Bytes?                @db.VarBinary(512)                // 128 × uint32 big-endian
+  createdAt    DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime              @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  document     Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([sha256], map: "idx_document_fingerprints_sha256")
+  @@index([textSha256], map: "idx_document_fingerprints_text_sha256")
+  @@index([algoVersion, shingleCount], map: "idx_document_fingerprints_algo_shingles")
+  @@map("document_fingerprints")
+}
+
+// Feature B. 1 dòng / (user, tài liệu, loại); lặp lại chỉ cập nhật last_at.
+model DocumentInteraction {
+  userId     String          @map("user_id") @db.Char(36)
+  documentId String          @map("document_id") @db.Char(36)
+  kind       InteractionKind
+  firstAt    DateTime        @map("first_at") @db.DateTime(3)
+  lastAt     DateTime        @map("last_at") @db.DateTime(3)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, documentId, kind])
+  @@index([documentId, lastAt], map: "idx_document_interactions_document_last")
+  @@index([lastAt], map: "idx_document_interactions_last_at")
+  @@map("document_interactions")
 }

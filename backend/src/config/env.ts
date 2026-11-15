@@ -9,6 +9,8 @@ const booleanString = z.enum(['true', 'false']).transform((value) => value === '
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 
 const envSchema = z.object({
+  DUPLICATE_MODE: z.enum(['off', 'warn', 'block']).default('warn'),
+  RECOMMENDATIONS_ENABLED: booleanString.default('true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(0).max(65535).default(3000),
   HOST: z.string().min(1).optional(),
@@ -39,6 +41,8 @@ const envSchema = z.object({
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
 export interface Config {
+  duplicates: { mode: 'off' | 'warn' | 'block' };
+  recommendations: { enabled: boolean };
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   host: string | undefined;
@@ -92,6 +96,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   const e = result.data;
   return {
+    duplicates: { mode: e.DUPLICATE_MODE },
+    recommendations: { enabled: e.RECOMMENDATIONS_ENABLED },
     nodeEnv: e.NODE_ENV,
     port: e.PORT,
     host: e.HOST,
