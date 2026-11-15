@@ -153,7 +153,7 @@ describe('Kiểm quyền trước khi đọc body (M2-05, §A3.8)', () => {
   });
 });
 
-describe('Ma trận quyền quản lý (CONTEXT §C3.2) cho thay tệp và xoá', () => {
+describe('Ma trận quyền quản lý (PROJECT_OVERVIEW §3) cho thay tệp và xoá', () => {
   it('User khác: thay/xoá Public → 403, Private → 404; Guest → 401; dữ liệu không đổi', async () => {
     const replace = (agent: request.Agent | ReturnType<typeof guest>, id: string) =>
       agent.put(`/api/documents/${id}/file`).set(CSRF).attach('file', pdfBuffer('x'), 'x.pdf');
