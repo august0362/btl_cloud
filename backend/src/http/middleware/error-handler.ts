@@ -49,6 +49,6 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
     res
       .status(appError.status)
       .set(appError.headers)
-      .json({ error: { code: appError.code, message: appError.message, details: appError.details, requestId: req.id } });
+      .json({ error: { code: appError.code, message: appError.message, details: appError.details, ...(appError.duplicates !== undefined ? { duplicates: appError.duplicates } : {}), requestId: req.id } });
   };
 }

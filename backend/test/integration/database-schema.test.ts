@@ -265,7 +265,7 @@ describe('Table: documents (§A4.3)', () => {
 });
 
 describe('Relationships', () => {
-  it('should have exactly 4 tables (audit_events từ E7-01, §A12.4)', async () => {
+  it('should have exactly 6 tables (audit_events từ E7-01, §A12.4)', async () => {
     const tables = await prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name AS table_name
       FROM information_schema.tables
@@ -276,11 +276,11 @@ describe('Relationships', () => {
     `;
     const tableNames = tables.map(t => t.table_name);
     expect(tableNames).toEqual(
-      expect.arrayContaining(['users', 'sessions', 'documents', 'audit_events'])
+      expect.arrayContaining(['users', 'sessions', 'documents', 'audit_events', 'document_fingerprints', 'document_interactions'])
     );
     // Filter out Prisma internal tables
     const appTables = tableNames.filter(t => !t.startsWith('_prisma'));
-    expect(appTables.length).toBe(4);
+    expect(appTables.length).toBe(6);
   });
 
   it('all tables should use InnoDB engine', async () => {
@@ -297,3 +297,24 @@ describe('Relationships', () => {
   });
 });
 
+
+
+describe('Document intelligence foundation', () => {
+  it('defaults existing and new users to personalization disabled', async () => {
+    const columns = await prisma.$queryRaw<ColumnInfo[]>`DESCRIBE users`;
+    expect(columns.find((c) => c.Field === 'personalization_enabled')).toMatchObject({ Null: 'NO', Default: '0' });
+  });
+  it('has cascading intelligence foreign keys and required indexes', async () => {
+    expect(await foreignKeys('document_fingerprints')).toEqual([{ columnName: 'document_id', refTable: 'documents', deleteRule: 'CASCADE' }]);
+    expect(await foreignKeys('document_interactions')).toEqual(expect.arrayContaining([
+      { columnName: 'user_id', refTable: 'users', deleteRule: 'CASCADE' },
+      { columnName: 'document_id', refTable: 'documents', deleteRule: 'CASCADE' },
+    ]));
+    const fp = await prisma.$queryRaw<IndexInfo[]>`SHOW INDEX FROM document_fingerprints`;
+    expect(fp.map((i) => i.Key_name)).toEqual(expect.arrayContaining(['idx_document_fingerprints_sha256', 'idx_document_fingerprints_text_sha256', 'idx_document_fingerprints_algo_shingles']));
+    const interactions = await prisma.$queryRaw<IndexInfo[]>`SHOW INDEX FROM document_interactions`;
+    expect(interactions.map((i) => i.Key_name)).toEqual(expect.arrayContaining(['idx_document_interactions_document_last', 'idx_document_interactions_last_at']));
+    const columns = await prisma.$queryRaw<ColumnInfo[]>`DESCRIBE document_fingerprints`;
+    expect(columns.find((c) => c.Field === 'minhash')?.Type).toBe('varbinary(512)');
+  });
+});

@@ -1,5 +1,6 @@
 /** Mã lỗi và envelope theo ARCHITECTURE §A7.2–§A7.3. */
 export type ErrorCode =
+  | 'DUPLICATE_DOCUMENT'
   | 'VALIDATION_ERROR'
   | 'INVALID_JSON'
   | 'UNAUTHENTICATED'
@@ -42,6 +43,7 @@ export interface ValidationIssue {
 }
 
 export const ERROR_STATUS: Record<ErrorCode, number> = {
+  DUPLICATE_DOCUMENT: 409,
   VALIDATION_ERROR: 400,
   INVALID_JSON: 400,
   UNAUTHENTICATED: 401,
@@ -65,6 +67,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
 };
 
 export const ERROR_MESSAGE: Record<ErrorCode, string> = {
+  DUPLICATE_DOCUMENT: 'Tệp này trùng hoàn toàn với một tài liệu đã có.',
   VALIDATION_ERROR: 'Dữ liệu gửi lên không hợp lệ.',
   INVALID_JSON: 'Dữ liệu JSON không hợp lệ.',
   UNAUTHENTICATED: 'Bạn cần đăng nhập để thực hiện thao tác này.',
@@ -93,10 +96,11 @@ export class AppError extends Error {
   readonly details: ValidationIssue[];
   readonly headers: Record<string, string>;
   readonly stage?: string;
+  readonly duplicates?: unknown[];
 
   constructor(
     code: ErrorCode,
-    options: { message?: string; details?: ValidationIssue[]; headers?: Record<string, string>; cause?: unknown; stage?: string } = {},
+    options: { duplicates?: unknown[]; message?: string; details?: ValidationIssue[]; headers?: Record<string, string>; cause?: unknown; stage?: string } = {},
   ) {
     super(options.message ?? ERROR_MESSAGE[code], { cause: options.cause });
     this.name = 'AppError';
@@ -105,6 +109,7 @@ export class AppError extends Error {
     this.details = options.details ?? [];
     this.headers = options.headers ?? {};
     this.stage = options.stage;
+    this.duplicates = options.duplicates;
   }
 }
 

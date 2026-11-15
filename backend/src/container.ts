@@ -39,6 +39,8 @@ export function createServices(deps: {
   const sessions = new SessionRepository(deps.prisma);
   const documents = new DocumentRepository(deps.prisma);
   const auth = new AuthService(runInTransaction, users, sessions, clock, deps.config.session.ttlHours);
+  // Feature A
+  // Feature B
   const documentService = new DocumentService(
     documents,
     deps.storage,
