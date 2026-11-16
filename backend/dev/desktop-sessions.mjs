@@ -1,4 +1,5 @@
-// Both desktop entrypoints share the existing stack; only the final owner stops it.
+// Both entrypoints share the stack. Server stop shuts down both modes;
+// admin stop preserves a running server.
 export function createDesktopSessions(io) {
   async function current() {
     const stack = await io.stack();
@@ -28,7 +29,7 @@ export function createDesktopSessions(io) {
     },
     async stop(role) {
       const { state } = await current();
-      if (role === 'server') await io.stopSharing();
+      if (role === 'server') state.admin = false;
       state[role] = false;
       await io.write(state);
       if (!state.admin && !state.server) {

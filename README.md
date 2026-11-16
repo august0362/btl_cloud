@@ -24,19 +24,19 @@ Cài **Node.js 24**, tải mã nguồn về máy rồi mở thư mục dự án.
 |---|---|
 | `server.bat` | Bật website, tạo link HTTPS và tự copy link vào clipboard |
 | `admin.bat` | Mở trang quản trị tại http://localhost:5173/admin |
-| `stop server.bat` | Dừng chia sẻ qua link public |
-| `stop admin.bat` | Dừng chế độ quản trị |
+| `stop server.bat` | Dừng toàn bộ server, admin và link chia sẻ |
+| `stop admin.bat` | Dừng chế độ quản trị; giữ server nếu đang chạy |
 
 Các file `.bat` là tiện ích local, được Git bỏ qua. Bản clone thông thường dùng `Start.vbs` để mở web local và `Stop.vbs` để dừng toàn bộ.
 
-Hai chế độ dùng chung dịch vụ. Bật thêm admin hoặc server sẽ giữ tiến trình đang chạy. Dừng một chế độ vẫn giữ dịch vụ cho chế độ còn lại; dừng chế độ cuối cùng sẽ tắt toàn bộ. Dữ liệu được giữ giữa các lần chạy.
+Hai chế độ dùng chung dịch vụ. Bật thêm admin hoặc server sẽ giữ tiến trình đang chạy. `stop server.bat` luôn dừng cả hai chế độ. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Dữ liệu được giữ giữa các lần chạy.
 
 ## Chia sẻ cho người khác
 
 1. Nhấp đúp `server.bat` và chờ thông báo **Đã copy link**.
 2. Dán link bằng **Ctrl + V** để gửi cho người dùng.
 3. Giữ máy chủ bật, có Internet và không sleep trong thời gian chia sẻ.
-4. Nhấp `stop server.bat` khi muốn ngừng chia sẻ.
+4. Nhấp `stop server.bat` để dừng chia sẻ và toàn bộ dịch vụ, kể cả admin.
 
 Bấm lại `server.bat` sẽ copy lại link hiện tại. Sau khi dừng rồi bật lại, link sẽ thay đổi. Người nhận không cần cài ứng dụng hay tải mã nguồn.
 
