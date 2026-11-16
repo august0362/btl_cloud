@@ -1,6 +1,4 @@
-# Dịch vụ local cho backend (ARCHITECTURE §A10.1).
-# MinIO đã ngừng phát hành image/binary miễn phí (RK-06) → object storage local dùng SeaweedFS (S3 API),
-# map ra cổng 9000 để S3_ENDPOINT giữ nguyên http://localhost:9000. Xem Nhật ký thay đổi baseline CR-001.
+# Hạ tầng local tuỳ chọn: MySQL và SeaweedFS (S3 API trên localhost:9000).
 # Mật khẩu/khoá dưới đây là GIÁ TRỊ DEV CÔNG KHAI, không dùng cho môi trường nào khác.
 services:
   mysql:

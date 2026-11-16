@@ -8,11 +8,11 @@ import { TEST_ENV } from '../helpers/config.js';
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * Chuẩn bị hạ tầng test (§A4.6, §A10.6): kiểm tra MySQL + S3 sẵn sàng, `prisma migrate reset`
- * trên DB test (áp dụng đúng migration commit trong repo), tạo bucket test nếu chưa có.
+ * Áp migration đã commit lên DB test và tạo bucket test nếu thiếu.
+ * Các fixture tự dọn dữ liệu; không reset schema hay lịch sử migration.
  */
 export default async function setup(): Promise<void> {
-  // Chốt an toàn: lệnh reset phá huỷ dữ liệu → chỉ cho phép trên DB có tên kết thúc bằng "_test".
+  // Các fixture xoá dữ liệu giữa test, nên chỉ cho phép DB dành riêng cho kiểm thử.
   const databaseName = new URL(TEST_ENV.DATABASE_URL).pathname.replace(/^\//, '');
   if (!databaseName.endsWith('_test')) {
     throw new Error(`Từ chối chạy integration test: DB "${databaseName}" không phải DB test (tên phải kết thúc bằng "_test").`);
@@ -29,13 +29,13 @@ export default async function setup(): Promise<void> {
     await prisma.$disconnect();
   }
 
-  const reset = spawnSync('npx', ['prisma', 'migrate', 'reset', '--force', '--skip-seed', '--skip-generate'], {
+  const migration = spawnSync(process.execPath, [path.join(backendDir, 'node_modules/prisma/build/index.js'), 'migrate', 'deploy'], {
     cwd: backendDir,
     env: { ...process.env, DATABASE_URL: TEST_ENV.DATABASE_URL },
     encoding: 'utf8',
-    shell: process.platform === 'win32',
   });
-  if (reset.status !== 0) throw new Error(`prisma migrate reset thất bại:\n${reset.stdout}\n${reset.stderr}`);
+  if (migration.error) throw migration.error;
+  if (migration.status !== 0) throw new Error(`prisma migrate deploy thất bại:\n${migration.stdout}\n${migration.stderr}`);
 
   process.env.AWS_ACCESS_KEY_ID = TEST_ENV.AWS_ACCESS_KEY_ID;
   process.env.AWS_SECRET_ACCESS_KEY = TEST_ENV.AWS_SECRET_ACCESS_KEY;

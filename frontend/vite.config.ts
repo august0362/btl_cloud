@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { localBackendPlugin } from "./dev/local-backend";
+import { localBackendPlugin } from "./dev/local-backend.ts";
 
 export default defineConfig({
   base: "/",

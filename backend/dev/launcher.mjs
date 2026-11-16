@@ -100,7 +100,7 @@ async function main() {
     try { await request('start-all'); } catch (error) { failure = error; }
     const status = await current();
     if (status?.services?.find((service) => service.name === 'frontend')?.state === 'running') {
-      await openBrowser(origin);
+      if (!process.argv.includes('--no-browser')) await openBrowser(origin);
       if (failure) { console.error('Một dịch vụ chưa sẵn sàng. Xem Services trong web.'); process.exitCode = 1; }
       else console.log('BTL Cloud đã sẵn sàng: http://localhost:5173');
     } else throw failure ?? new Error('Không khởi động được giao diện.');

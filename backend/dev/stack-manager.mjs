@@ -4,7 +4,6 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createProcessManager, portInUse } from './process-manager.mjs';
 import { createDockerService } from './docker-services.mjs';
-import { command } from './commands.mjs';
 import { backendDir } from './local-config.mjs';
 import { prepareDependencies, preparePortable, prepareApplication, initDatabase } from './prepare.mjs';
 
@@ -15,7 +14,7 @@ async function httpReady(url, expected) {
   } catch { return false; }
 }
 export function createStackManager(config, logs, overrides = {}) {
-  let mode = 'portable';
+  const mode = config.env.BTL_LOCAL_MODE === 'docker' ? 'docker' : 'portable';
   let pending;
   let operation = null;
   let lastError = null;
@@ -41,10 +40,6 @@ export function createStackManager(config, logs, overrides = {}) {
     if (initialized) return;
     await prepare();
     if (adapters) { services.mysql = adapters.mysql; services.seaweedfs = adapters.seaweedfs; services.admin = adapters.admin; initialized = true; return; }
-    if (config.env.BTL_LOCAL_MODE === 'docker') mode = 'docker';
-    else if (config.env.BTL_LOCAL_MODE !== 'portable') {
-      try { await command('docker', ['info', '--format', '{{.ServerVersion}}'], { quiet: true, timeout: 5000 }); mode = 'docker'; } catch { mode = 'portable'; }
-    }
     if (mode === 'docker') {
       services.mysql = createDockerService('mysql', 3306, config, logs);
       services.seaweedfs = createDockerService('seaweedfs', 9000, config, logs);

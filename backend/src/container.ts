@@ -44,9 +44,7 @@ export function createServices(deps: {
   const sessions = new SessionRepository(deps.prisma);
   const documents = new DocumentRepository(deps.prisma);
   const auth = new AuthService(runInTransaction, users, sessions, clock, deps.config.session.ttlHours);
-  // Feature A
   const duplicates = new DuplicateService(new DuplicateRepository(deps.prisma), deps.config.duplicates.mode, deps.logger);
-  // Feature B
   const recommendations = new RecommendationService(new RecommendationRepository(deps.prisma), documents, deps.config.recommendations.enabled, clock, deps.logger);
   const documentService = new DocumentService(
     documents,

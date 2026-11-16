@@ -51,10 +51,10 @@ export function localBackendPlugin(): Plugin {
             response.pipe(res);
           });
           upstream.setTimeout(900_000, () => upstream.destroy(new Error("timeout")));
-          upstream.once("error", () => fail(503, "Controller chưa sẵn sàng. Hãy chạy run.bat."));
+          upstream.once("error", () => fail(503, "Controller chưa sẵn sàng. Hãy chạy admin.bat hoặc Start.vbs."));
           res.once("close", () => upstream.destroy());
           req.pipe(upstream);
-        } catch { fail(503, "Controller chưa sẵn sàng. Hãy chạy run.bat."); }
+        } catch { fail(503, "Controller chưa sẵn sàng. Hãy chạy admin.bat hoặc Start.vbs."); }
       });
     },
   };

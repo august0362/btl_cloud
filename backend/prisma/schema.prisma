@@ -20,20 +20,20 @@ enum FileType {
 }
 
 model User {
-  id                String     @id @db.Char(36)
-  email             String     @unique(map: "uq_users_email") @db.VarChar(254)
-  passwordHash      String     @map("password_hash") @db.VarChar(255)
-  displayName       String     @map("display_name") @db.VarChar(100)
-  createdAt         DateTime   @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  id                     String                @id @db.Char(36)
+  email                  String                @unique(map: "uq_users_email") @db.VarChar(254)
+  passwordHash           String                @map("password_hash") @db.VarChar(255)
+  displayName            String                @map("display_name") @db.VarChar(100)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   // E1 (§A12.4): chỉ ghi bằng SQL thô (UserRepository.touchLastActive) để không đổi updated_at.
-  lastActiveAt      DateTime?  @map("last_active_at") @db.DateTime(3)
+  lastActiveAt           DateTime?             @map("last_active_at") @db.DateTime(3)
   // E2 (§A12.4, XBR-06): khác NULL = DELETING; app public coi như user không tồn tại.
-  deletionStartedAt DateTime?  @map("deletion_started_at") @db.DateTime(3)
-  personalizationEnabled Boolean @default(false) @map("personalization_enabled")
-  interactions DocumentInteraction[]
-  sessions          Session[]
-  documents         Document[]
+  deletionStartedAt      DateTime?             @map("deletion_started_at") @db.DateTime(3)
+  personalizationEnabled Boolean               @default(false) @map("personalization_enabled")
+  interactions           DocumentInteraction[]
+  sessions               Session[]
+  documents              Document[]
 
   @@index([lastActiveAt], map: "idx_users_last_active_at")
   @@map("users")
@@ -52,23 +52,23 @@ model Session {
 }
 
 model Document {
-  id               String     @id @db.Char(36)
-  ownerId          String     @map("owner_id") @db.Char(36)
-  title            String     @db.VarChar(200)
-  description      String?    @db.VarChar(2000)
+  id               String                @id @db.Char(36)
+  ownerId          String                @map("owner_id") @db.Char(36)
+  title            String                @db.VarChar(200)
+  description      String?               @db.VarChar(2000)
   visibility       Visibility
-  fileType         FileType   @map("file_type")
-  mimeType         String     @map("mime_type") @db.VarChar(100)
-  originalFilename String     @map("original_filename") @db.VarChar(255)
-  sizeBytes        Int        @map("size_bytes") @db.UnsignedInt
-  storageKey       String     @unique(map: "uq_documents_storage_key") @map("storage_key") @db.VarChar(512)
-  fileVersion      Int        @default(1) @map("file_version") @db.UnsignedInt
-  createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
-  fileUpdatedAt    DateTime   @map("file_updated_at") @db.DateTime(3)
-  fingerprint DocumentFingerprint?
-  interactions DocumentInteraction[]
-  owner            User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  fileType         FileType              @map("file_type")
+  mimeType         String                @map("mime_type") @db.VarChar(100)
+  originalFilename String                @map("original_filename") @db.VarChar(255)
+  sizeBytes        Int                   @map("size_bytes") @db.UnsignedInt
+  storageKey       String                @unique(map: "uq_documents_storage_key") @map("storage_key") @db.VarChar(512)
+  fileVersion      Int                   @default(1) @map("file_version") @db.UnsignedInt
+  createdAt        DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  fileUpdatedAt    DateTime              @map("file_updated_at") @db.DateTime(3)
+  fingerprint      DocumentFingerprint?
+  interactions     DocumentInteraction[]
+  owner            User                  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   @@index([visibility, createdAt], map: "idx_documents_visibility_created")
   @@index([ownerId, createdAt], map: "idx_documents_owner_created")
@@ -114,9 +114,9 @@ model AuditEvent {
 }
 
 enum FingerprintTextStatus {
-  OK       // đã phân tích toàn bộ phần chữ trong giới hạn
-  PARTIAL  // dừng vì chạm giới hạn (số từ/trang/phần XML), vẫn có chữ ký
-  SKIPPED  // không có chữ ký; lý do ở text_reason
+  OK // đã phân tích toàn bộ phần chữ trong giới hạn
+  PARTIAL // dừng vì chạm giới hạn (số từ/trang/phần XML), vẫn có chữ ký
+  SKIPPED // không có chữ ký; lý do ở text_reason
 }
 
 enum InteractionKind {
@@ -132,9 +132,9 @@ model DocumentFingerprint {
   algoVersion  Int                   @map("algo_version") @db.UnsignedSmallInt
   textStatus   FingerprintTextStatus @map("text_status")
   textReason   String?               @map("text_reason") @db.VarChar(30)
-  textSha256   String?               @map("text_sha256") @db.Char(64)   // chỉ khi text_status = OK
+  textSha256   String?               @map("text_sha256") @db.Char(64) // chỉ khi text_status = OK
   shingleCount Int?                  @map("shingle_count") @db.UnsignedInt
-  minhash      Bytes?                @db.VarBinary(512)                // 128 × uint32 big-endian
+  minhash      Bytes?                @db.VarBinary(512) // 128 × uint32 big-endian
   createdAt    DateTime              @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt    DateTime              @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   document     Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)

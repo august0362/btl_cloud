@@ -96,16 +96,22 @@ export class RecommendationService {
   async search(query: PublicQuery, userId?: string) {
     const q = query.q ?? '', offset = (query.page - 1) * query.pageSize;
     const raw = (start: number, limit: number) => this.documents.searchRelevanceOrdered({ q, fileType: query.fileType, offset: start, limit });
+    // Beyond the reranked prefix, SQL already supplies the final order. Avoid
+    // fetching 200 unused candidates or loading the user's history again.
+    if (!this.enabled || offset >= 200) {
+      const result = await raw(offset, query.pageSize);
+      const rows = await this.documents.findDiscoverableByIds(result.rows.map((row) => row.id));
+      return toPageDto(rows.map((row) => toDocumentDto(row, userId)), query.page, query.pageSize, result.total);
+    }
     const first = await raw(0, 200);
     let ids: string[];
     try {
-      if (!this.enabled) throw new Error('disabled');
       const index = this.index.get(), { vector } = await this.profile(userId, index);
       const ranked = first.rows.map((doc) => ({ doc, level: matchLevel(doc.title, doc.description, q), score: P.search.pref * (index?.byId.get(doc.id) ? cosine(vector, index.byId.get(doc.id)!.vec) : 0) + P.search.pop * (index?.byId.get(doc.id)?.pop ?? 0) + P.search.fresh * freshness(doc.createdAt, this.clock.now()) })).sort((a, b) => b.level - a.level || b.score - a.score || newest(a.doc, b.doc));
       ids = ranked.slice(offset, offset + query.pageSize).map((row) => row.doc.id);
       if (offset + query.pageSize > 200 && first.total > 200) ids.push(...(await raw(Math.max(offset, 200), offset >= 200 ? query.pageSize : offset + query.pageSize - 200)).rows.map((row) => row.id));
     } catch {
-      this.fallback('search', this.enabled ? 'ranking_failed' : 'disabled');
+      this.fallback('search', 'ranking_failed');
       ids = (await raw(offset, query.pageSize)).rows.map((row) => row.id);
     }
     const rows = await this.documents.findDiscoverableByIds(ids);

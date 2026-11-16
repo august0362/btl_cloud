@@ -10,6 +10,13 @@ import { TextWorkerPool } from '../../src/modules/duplicates/text-worker-pool.js
 const P = 2147483647;
 const text = Array.from({ length: 100 }, (_, i) => `từ${i}`).join(' ');
 describe('duplicate fingerprints', () => {
+  it('compares signatures without copying and respects typed-array offsets', () => {
+    const signature = signatureForShingles(['aws s3 cloud storage']);
+    const backing = new Uint8Array(600);
+    backing.set(signature, 40);
+    expect(estimate(signature, backing.subarray(40, 552))).toBe(1);
+    expect(() => estimate(signature, backing)).toThrow(RangeError);
+  });
   it('streams SHA-256 independent of filename', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'dup-'));
     try { const file = path.join(dir, 'a'); for (const bytes of [Buffer.alloc(0), Buffer.from('x'), Buffer.alloc(5 * 1024 * 1024, 42)]) { await writeFile(file, bytes); expect(await sha256File(file)).toBe(createHash('sha256').update(bytes).digest('hex')); } } finally { await rm(dir, { recursive: true }); }
