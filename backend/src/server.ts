@@ -48,6 +48,8 @@ async function main(): Promise<void> {
   await services.audit.purgeExpired(config.audit.retentionDays);
   const app = createApp({ config, logger, prisma, storage, services });
   metrics.start();
+  await services.recommendations.purge();
+  const stopRecommendations = services.recommendations.start();
 
   const server = app.listen({ port: config.port, host: config.host }, () => {
     logger.info({ port: config.port, version: config.version, event: 'server.started' }, 'Backend đã khởi động');
@@ -61,6 +63,7 @@ async function main(): Promise<void> {
     logger,
     closeServer: () => {
       metrics.stop();
+      stopRecommendations();
       return new Promise<void>((resolve) => server.close(() => resolve()));
     },
     disconnectDatabase: () => prisma.$disconnect(),

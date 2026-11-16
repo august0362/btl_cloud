@@ -54,7 +54,7 @@ export interface SearchParams {
   q?: string;
   fileType?: FileType;
   visibility?: Visibility;
-  sort?: "newest" | "title";
+  sort?: "newest" | "title" | "relevance";
   page?: number;
   pageSize?: number;
 }

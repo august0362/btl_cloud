@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { recommendationsApi } from "../api/recommendations";
 import { documentsApi } from "../api/documents";
 import { ApiError } from "../api/errors";
 import { useAuth } from "../auth/context";
@@ -111,6 +112,7 @@ export function DocumentDetailPage() {
           )}
         </div>
       </article>
+      <RelatedDocuments id={id} />
       <ConfirmDialog
         open={Boolean(deletion.target)}
         title="Xoá vĩnh viễn tài liệu?"
@@ -124,4 +126,12 @@ export function DocumentDetailPage() {
       />
     </>
   );
+}
+
+function RelatedDocuments({ id }: { id: string }) {
+  const { user } = useAuth();
+  const loader = useCallback((signal: AbortSignal) => recommendationsApi.related(id, 6, signal), [id]);
+  const { data, error } = useResource(loader, `${id}:${user?.id ?? "guest"}`);
+  if (error || !data?.items?.length) return null;
+  return <section aria-label="Tài liệu liên quan"><h2>Tài liệu liên quan</h2><ul>{data.items.map((doc) => <li key={doc.id}><Link to={`/documents/${doc.id}`}>{doc.title}</Link></li>)}</ul></section>;
 }
