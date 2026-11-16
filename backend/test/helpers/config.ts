@@ -14,8 +14,11 @@ export const TEST_ENV = {
 };
 
 export function testConfig(overrides: Record<string, string> = {}): Config {
-  return loadConfig({
+  const config = loadConfig({
     NODE_ENV: 'test',
+    // Legacy API fixtures intentionally reuse identical files. Policy tests explicitly
+    // select block; config.test.ts verifies that the application defaults to block.
+    DUPLICATE_MODE: 'warn',
     ...TEST_ENV,
     ALLOWED_ORIGINS: 'http://localhost:5173',
     UPLOAD_TMP_DIR: path.join(os.tmpdir(), 'btl-cloud-test-uploads'),
@@ -24,4 +27,7 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     INSTANCE_ID: 'test-instance',
     ...overrides,
   });
+  // Explicit fixture-only maintenance modes let legacy API fixtures seed duplicate
+  // data. Production loadConfig always resolves legacy env values to block.
+  return { ...config, duplicates: { mode: (overrides.DUPLICATE_MODE ?? 'warn') as Config['duplicates']['mode'] } };
 }

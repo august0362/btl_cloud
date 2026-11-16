@@ -35,7 +35,7 @@ Tài liệu không được phép xem trả 404. Người dùng không nhận id
 
 ## So trùng và gợi ý
 
-**So trùng:** mặc định `DUPLICATE_MODE=warn`, chỉ cảnh báo. Chế độ `block` chặn tệp giống hệt tài liệu của chính mình; với tài liệu Công khai của người khác, chỉ chặn khi bản mới cũng Công khai. Tạo bản Riêng tư của tài liệu Công khai vẫn được phép. Nội dung gần giống luôn chỉ cảnh báo. Không tự xoá hay gộp tài liệu.
+**So trùng:** upload/thay tệp bị từ chối (409) nếu trùng SHA-256 hoặc độ giống chữ từ 90% với tài liệu của chính mình hay một tài liệu Công khai. Từ 70% đến dưới 90% cho upload kèm cảnh báo tồn tại đến khi người dùng đóng. Private của người khác không nằm trong phạm vi so sánh. Các giá trị `DUPLICATE_MODE=warn/off` cũ được nâng thành `block`, không bỏ qua kiểm tra upload. Trích chữ bị giới hạn/không khả dụng được thông báo riêng, không được hiểu là không trùng. Dọn bản Private trùng bytes với Public là thao tác quản trị local có kế hoạch xem trước; xem README.
 
 **Gợi ý:** mặc định không lưu lịch sử cá nhân. Sau khi người dùng đồng ý, hệ thống ghi xem/tải tài liệu Công khai của người khác và giữ 90 ngày. Tắt cá nhân hoá sẽ xoá lịch sử; có nút xoá lịch sử riêng. Không lưu từ khoá tìm kiếm. Kết quả tìm kiếm ưu tiên mức khớp truy vấn trước sở thích cá nhân.
 

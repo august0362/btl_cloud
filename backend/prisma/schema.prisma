@@ -160,3 +160,11 @@ model DocumentInteraction {
   @@index([lastAt], map: "idx_document_interactions_last_at")
   @@map("document_interactions")
 }
+
+// A single immutable row serializes the final duplicate check and document commit
+// across processes/accounts. Text extraction and storage upload happen outside it.
+model DocumentIngestionLock {
+  id Int @id @db.UnsignedTinyInt
+
+  @@map("document_ingestion_locks")
+}

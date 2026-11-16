@@ -35,15 +35,15 @@ describe('duplicate upload and replacement', () => {
       expect((await upload(user, pdf(`different-${ctx.config.duplicates.mode}`))).body.data.duplicateCheck.exactMatches).toEqual([]);
     }
   });
-  it('never exposes private/deleting owners, rechecks visibility, and permits private copy of public bytes', async () => {
+  it('never exposes private/deleting owners and blocks even a private copy of public bytes', async () => {
     const a = await registerUser(block.app), b = await registerUser(block.app); const bytes = pdf('privacy');
     const first = await upload(a, bytes, 'PRIVATE', 'Secret title');
     const hidden = await upload(b, bytes); expect(hidden.status).toBe(201); expect(JSON.stringify(hidden.body)).not.toContain(first.body.data.id); expect(JSON.stringify(hidden.body)).not.toContain('Secret title');
     await b.agent.delete(`/api/documents/${hidden.body.data.id}`).set(CSRF);
     await a.agent.patch(`/api/documents/${first.body.data.id}`).set(CSRF).send({ visibility: 'PUBLIC' });
     const conflict = await upload(b, bytes); expect(conflict.status).toBe(409); await privacy(conflict, b.id);
-    const copy = await upload(b, bytes, 'PRIVATE'); expect(copy.status).toBe(201); expect(copy.body.data.duplicateCheck.result).toBe('WARNING'); await privacy(copy, b.id);
-    await b.agent.delete(`/api/documents/${copy.body.data.id}`).set(CSRF);
+    const copy = await upload(b, bytes, 'PRIVATE'); expect(copy.status).toBe(409); await privacy(copy, b.id);
+    expect(await block.prisma.document.count({ where: { ownerId: b.id } })).toBe(0);
     await a.agent.patch(`/api/documents/${first.body.data.id}`).set(CSRF).send({ visibility: 'PRIVATE' });
     const privateAgain = await upload(b, bytes); expect(privateAgain.body.data.duplicateCheck.exactMatches).toEqual([]);
     await b.agent.delete(`/api/documents/${privateAgain.body.data.id}`).set(CSRF);
@@ -56,12 +56,56 @@ describe('duplicate upload and replacement', () => {
     const replace = (body: Buffer) => b.agent.put(`/api/documents/${id}/file`).set(CSRF).attach('file', body, 'file.pdf');
     const conflict = await replace(bytes); expect(conflict.status).toBe(409); expect((await block.prisma.document.findUniqueOrThrow({ where: { id } })).fileVersion).toBe(1);
     await b.agent.patch(`/api/documents/${id}`).set(CSRF).send({ visibility: 'PRIVATE' });
-    expect((await replace(bytes)).status).toBe(200);
+    expect((await replace(bytes)).status).toBe(409);
+    expect((await block.prisma.document.findUniqueOrThrow({ where: { id } })).fileVersion).toBe(1);
+    const changedBytes = pdf('new distinct replacement');
+    expect((await replace(changedBytes)).status).toBe(200);
     const current = await block.prisma.document.findUniqueOrThrow({ where: { id } }); expect((await block.prisma.documentFingerprint.findUniqueOrThrow({ where: { documentId: id } })).fileVersion).toBe(current.fileVersion);
     await a.agent.delete(`/api/documents/${source.body.data.id}`).set(CSRF);
     expect((await replace(bytes)).body.data.duplicateCheck.exactMatches).toEqual([]);
     await b.agent.delete(`/api/documents/${id}`).set(CSRF); expect(await block.prisma.documentFingerprint.count()).toBe(0);
     expect((await upload(b, bytes)).body.data.duplicateCheck.result).toBe('ACCEPT');
+  });
+  it('rechecks layer 2 under the transaction lock and removes a losing upload object', async () => {
+    const user = await registerUser(block.app);
+    const words = Array.from({ length: 100 }, (_, i) => `transaction${i}`).join(' ');
+    block.storage.afterPut = async () => {
+      const winner = await uploadRequest(user, { title: 'winner', visibility: 'PUBLIC', file: await office(words, 'winner'), filename: 'winner.docx' });
+      expect(winner.status).toBe(201);
+    };
+    const loser = await uploadRequest(user, { title: 'loser', visibility: 'PRIVATE', file: await office(words, 'loser'), filename: 'loser.docx' });
+    expect(loser.status).toBe(409);
+    expect(loser.body.error.duplicates[0].matchType).toBe('SAME_TEXT');
+    expect(await block.prisma.document.count()).toBe(1);
+    await expect(block.s3.getObject(block.storage.putKeys[0]!)).rejects.toMatchObject({ kind: 'NOT_FOUND' });
+  });
+  it('includes a medium warning discovered only during the final transaction check', async () => {
+    const a = await registerUser(block.app), b = await registerUser(block.app);
+    const words = Array.from({ length: 2000 }, (_, i) => `warning${i}`);
+    let sourceId = '';
+    block.storage.afterPut = async () => {
+      const source = await uploadRequest(a, { title: 'late source', visibility: 'PUBLIC', file: await office(words.join(' ')), filename: 'source.docx' });
+      expect(source.status).toBe(201); sourceId = source.body.data.id;
+    };
+    const response = await uploadRequest(b, { title: 'medium', visibility: 'PRIVATE', file: await office(words.map((word, i) => i % 40 === 0 ? `edit${i}` : word).join(' ')), filename: 'medium.docx' });
+    expect(response.status).toBe(201);
+    expect(response.body.data.duplicateCheck.result).toBe('WARNING');
+    expect(response.body.data.duplicateCheck.textMatches[0].documentId).toBe(sourceId);
+  });
+  it('removes preliminary warnings for a source changed to another user’s Private before commit', async () => {
+    const a = await registerUser(block.app), b = await registerUser(block.app);
+    const words = Array.from({ length: 2000 }, (_, i) => `private${i}`);
+    const source = await uploadRequest(a, { title: 'private soon', visibility: 'PUBLIC', file: await office(words.join(' ')), filename: 'source.docx' });
+    expect(source.status).toBe(201);
+    block.storage.afterPut = async () => {
+      expect((await a.agent.patch(`/api/documents/${source.body.data.id}`).set(CSRF).send({ visibility: 'PRIVATE' })).status).toBe(200);
+    };
+    const response = await uploadRequest(b, { title: 'medium', visibility: 'PRIVATE', file: await office(words.map((word, i) => i % 40 === 0 ? `edit${i}` : word).join(' ')), filename: 'medium.docx' });
+    expect(response.status).toBe(201);
+    expect(response.body.data.duplicateCheck.result).toBe('ACCEPT');
+    expect(response.body.data.duplicateCheck.textMatches).toEqual([]);
+    expect(JSON.stringify(response.body)).not.toContain(source.body.data.id);
+    expect(JSON.stringify(response.body)).not.toContain('private soon');
   });
   it('rolls back DB + fingerprint and compensates object on post-Put failure', async () => {
     const user = await registerUser(block.app); block.storage.failPut = 1;
@@ -82,16 +126,53 @@ describe('duplicate upload and replacement', () => {
     expect(await block.prisma.document.count()).toBe(20); expect(await block.prisma.documentFingerprint.count()).toBe(20);
     for (const key of [...block.storage.putKeys, ...second.storage.putKeys]) { const exists = await block.prisma.document.count({ where: { storageKey: key } }); if (!exists) await expect(block.s3.getObject(key)).rejects.toMatchObject({ kind: 'NOT_FOUND' }); }
   }, 120000);
-  it('warns for same text across different ZIP bytes and near text while never blocking', async () => {
+  it('serializes layer-2 rejection across different accounts and app instances', async () => {
+    const a = await registerUser(block.app), b = await registerUser(second.app);
+    for (let pair = 0; pair < 5; pair++) {
+      const words = Array.from({ length: 100 }, (_, i) => `pair${pair}word${i}`).join(' ');
+      let arrivals = 0; let release!: () => void;
+      const ready = new Promise<void>((resolve) => { release = resolve; });
+      const barrier = async () => { if (++arrivals === 2) release(); await ready; };
+      block.storage.afterPut = barrier; second.storage.afterPut = barrier;
+      const [first, other] = await Promise.all([
+        uploadRequest(a, { title: 'first instance', visibility: 'PUBLIC', file: await office(words, 'first'), filename: 'a.docx' }),
+        uploadRequest(b, { title: 'second instance', visibility: 'PUBLIC', file: await office(words, 'other'), filename: 'b.docx' }),
+      ]);
+      expect([first.status, other.status].sort()).toEqual([201, 409]);
+      const rejected = first.status === 409 ? first : other;
+      expect(rejected.body.error.duplicates[0].matchType).toBe('SAME_TEXT');
+    }
+    expect(await block.prisma.document.count()).toBe(5);
+    expect(await block.prisma.documentFingerprint.count()).toBe(5);
+  }, 120000);
+  it('rejects same text and 90% near text before storage, but accepts dissimilar text', async () => {
     const user = await registerUser(block.app); const words = Array.from({ length: 2000 }, (_, i) => `word${i}`); const firstBytes = await office(words.join(' '), 'one');
     const first = await uploadRequest(user, { title: 'text', visibility: 'PUBLIC', file: firstBytes, filename: 'first.docx' }); expect(first.status).toBe(201);
-    const same = await uploadRequest(user, { title: 'same', visibility: 'PUBLIC', file: await office(words.join(' '), 'two'), filename: 'same.docx' }); expect(same.status).toBe(201); expect(same.body.data.duplicateCheck.textMatches[0]).toMatchObject({ matchType: 'SAME_TEXT', similarity: 1 });
-    const nearWords = words.map((w, i) => i % 40 === 0 ? `changed${i}` : w);
-    const near = await uploadRequest(user, { title: 'near', visibility: 'PUBLIC', file: await office(nearWords.join(' ')), filename: 'near.docx' }); expect(near.status).toBe(201); expect(near.body.data.duplicateCheck.textMatches[0].matchType).toBe('SIMILAR_TEXT'); expect(near.body.data.duplicateCheck.textMatches[0].similarity).toBeGreaterThanOrEqual(0.6); await privacy(near, user.id);
+    const same = await uploadRequest(user, { title: 'same', visibility: 'PUBLIC', file: await office(words.join(' '), 'two'), filename: 'same.docx' }); expect(same.status).toBe(409); expect(same.body.error.duplicates[0]).toMatchObject({ matchType: 'SAME_TEXT', similarity: 1 });
+    const nearWords = words.map((w, i) => i % 200 === 0 ? `changed${i}` : w);
+    const near = await uploadRequest(user, { title: 'near', visibility: 'PUBLIC', file: await office(nearWords.join(' ')), filename: 'near.docx' }); expect(near.status).toBe(409); expect(near.body.error.duplicates[0].matchType).toBe('SIMILAR_TEXT'); expect(near.body.error.duplicates[0].similarity).toBeGreaterThanOrEqual(0.9); await privacy(near, user.id);
+    expect(block.storage.putKeys).toHaveLength(1); expect(await block.prisma.document.count()).toBe(1);
+    const medium = await uploadRequest(user, { title: 'medium', visibility: 'PRIVATE', file: await office(words.map((w, i) => i % 40 === 0 ? `medium${i}` : w).join(' ')), filename: 'medium.docx' });
+    expect(medium.status).toBe(201);
+    expect(medium.body.data.duplicateCheck.result).toBe('WARNING');
+    expect(medium.body.data.duplicateCheck.textMatches[0].similarity).toBeGreaterThanOrEqual(0.7);
+    expect(medium.body.data.duplicateCheck.textMatches[0].similarity).toBeLessThan(0.9);
+    const different = await uploadRequest(user, { title: 'different', visibility: 'PUBLIC', file: await office(words.map((w, i) => i % 10 === 0 ? `new${i}` : w).join(' ')), filename: 'different.docx' });
+    expect(different.status).toBe(201); expect(different.body.data.duplicateCheck.result).toBe('ACCEPT');
   });
 });
 
 describe('duplicate analysis bounds and maintenance', () => {
+  it.each(['BUSY', 'TIMEOUT', 'ERROR'] as const)('rejects temporary %s analysis failures before persisting an upload', async (reason) => {
+    const { TextWorkerPool } = await import('../../src/modules/duplicates/text-worker-pool.js');
+    const { skipped } = await import('../../src/modules/duplicates/duplicate.policy.js');
+    const user = await registerUser(block.app);
+    vi.spyOn(TextWorkerPool.prototype, 'analyze').mockResolvedValueOnce(skipped(reason));
+    const response = await upload(user, pdf(`temporary-${reason}`));
+    expect(response.status).toBe(503);
+    expect(block.storage.putKeys).toHaveLength(0);
+    expect(await block.prisma.document.count()).toBe(0);
+  });
   it('caps candidate scan at 2000 and reports truncation', async () => {
     const { randomUUID } = await import('node:crypto');
     const { fingerprintText } = await import('../../src/modules/duplicates/minhash.js');

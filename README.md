@@ -14,7 +14,7 @@ Nếu đã nhận được link website, bạn chỉ cần mở link bằng trì
 
 **Công khai:** mọi người có thể tìm và xem thông tin. **Riêng tư:** chỉ bạn truy cập được. Chỉ chủ sở hữu được sửa hoặc xoá tài liệu.
 
-Khi tải lên, hệ thống có thể cảnh báo tệp trùng hoặc nội dung tương tự. Kết quả “chưa kiểm tra” nghĩa là chưa phân tích được nội dung. Gợi ý cá nhân hoá mặc định tắt; bạn có thể bật, tắt và xoá lịch sử trong **Tuỳ chọn gợi ý**.
+Khi tải lên hoặc thay tệp, API trả 409 và loại bản tải lên (không tạo tài liệu mới) nếu trùng SHA-256 hoặc giống chữ từ 90% với tài liệu có thể xem. Từ 70% đến dưới 90% vẫn cho upload và hiển thị cảnh báo đến khi người dùng đóng. PDF không có lớp chữ hoặc ngoài giới hạn trích chữ vẫn được so SHA-256. Worker bận/lỗi/timeout, lỗi truy vấn so sánh hoặc không thể quét đủ ứng viên trả 503 để thử lại, không cho qua kiểm tra. Gợi ý cá nhân hoá mặc định tắt; bạn có thể bật, tắt và xoá lịch sử trong **Tuỳ chọn gợi ý**.
 
 ## Chạy website trên Windows
 
@@ -57,3 +57,22 @@ Tài khoản quản trị là tài khoản developer riêng, khác tài khoản 
 - [Kiến trúc và API](docs/ARCHITECTURE.md)
 - [Kiểm thử](docs/MILESTONES.md)
 - [Vận hành trên Windows](docs/WINDOWS_HOSTING.md)
+
+## Dọn bản Private trùng Public (local)
+
+Upload chặn từ 90% trở lên, cảnh báo từ 70% đến dưới 90% (giữ thông báo đến khi người dùng đóng), kể cả khi `.env` cũ còn `DUPLICATE_MODE=warn` hoặc `off`. Có một migration cộng thêm bảng khoá ingest dùng chung để tuần tự hoá lần kiểm tra cuối giữa các tài khoản/instance. Launcher áp migration khi khởi động; nếu chạy thủ công, chạy `npm --prefix backend run prisma:deploy` trước backend mới. Không reset DB.
+
+Đối với dữ liệu cũ, lệnh quản trị dưới đây chỉ dọn bản **Private trùng SHA-256 100%** với Public còn tồn tại, kể cả khác chủ sở hữu. Không tự xoá tài liệu cũ chỉ vì giống chữ 90%. Giữ MySQL và SeaweedFS local đang chạy; chạy từ `backend/`:
+
+```sh
+npx tsx --env-file=.env scripts/backfill-fingerprints.ts
+npx tsx --env-file=.env scripts/cleanup-private-duplicates.ts
+```
+
+Lệnh thứ hai chỉ tạo kế hoạch trong `tmp/` và in các ID Private sẽ xoá / Public sẽ giữ. Xem kế hoạch, rồi áp dụng **đúng file đã xem** (thay đường dẫn bằng file lệnh vừa tạo):
+
+```sh
+npx tsx --env-file=.env scripts/cleanup-private-duplicates.ts --apply --plan=tmp/private-duplicate-plan-123.json
+```
+
+Trước khi xoá, công cụ đọc lại bytes của cả hai object, xác minh SHA-256 và khoá/kiểm lại metadata, fingerprint, visibility và phiên bản trong transaction. Bản Public đổi tệp, đổi sang Private, mất object, bị xoá hoặc chủ đang DELETING sẽ làm ứng viên bị bỏ qua. Lần xoá metadata Private được ghi audit trong cùng transaction. Sau khi commit, object Private được xoá; fingerprint/tương tác mất theo CASCADE. `storageDeleteFailed` là các ID có metadata đã xoá nhưng dọn object thất bại, cần xử lý tiếp từ storage key trong kế hoạch. Công cụ từ chối DB/storage ngoài loopback và không chạm AWS.

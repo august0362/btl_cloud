@@ -14,7 +14,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback((toast: ToastInput) => {
     const id = ++sequence.current;
     setToasts((value) => [...value, { ...toast, id }]);
-    timers.current.push(
+    if (!toast.persist) timers.current.push(
       setTimeout(
         () => setToasts((value) => value.filter((item) => item.id !== id)),
         5000,
@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            role="status"
+            role={toast.tone === "warning" ? "alert" : "status"}
             className={`toast toast--${toast.tone ?? "info"}`}
           >
             <span>{toast.message}</span>

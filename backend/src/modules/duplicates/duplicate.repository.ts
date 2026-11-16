@@ -14,23 +14,23 @@ interface MatchRow {
 export class DuplicateRepository {
     constructor(private readonly prisma: PrismaClient) { }
     private match(row: MatchRow, ownerId: string, matchType: DuplicateMatchDto['matchType'], similarity: number): DuplicateMatchDto {
-        return { documentId: row.id, title: row.title, visibility: row.visibility, ownedByYou: row.ownerId === ownerId, matchType, similarity: Math.round(similarity * 100) / 100 };
+        return { documentId: row.id, title: row.title, visibility: row.visibility, ownedByYou: row.ownerId === ownerId, matchType, similarity };
     }
     async exact(sha256: string, ownerId: string, excludeId?: string, db: Prisma.TransactionClient = this.prisma): Promise<DuplicateMatchDto[]> {
         const rows = await db.$queryRaw<MatchRow[]> `SELECT d.id, d.title, d.visibility, d.owner_id AS ownerId FROM document_fingerprints f JOIN documents d ON d.id=f.document_id AND d.file_version=f.file_version WHERE f.sha256=${sha256} AND ${duplicateScopeSql(ownerId)} AND d.id <> ${excludeId ?? ''} ORDER BY (d.owner_id=${ownerId}) DESC, d.created_at DESC, d.id DESC LIMIT 5`;
         return rows.map((r) => this.match(r, ownerId, 'EXACT', 1));
     }
-    async textMatches(text: PreparedFingerprint['text'], ownerId: string, excludeId?: string): Promise<{
+    async textMatches(text: PreparedFingerprint['text'], ownerId: string, excludeId?: string, db: Prisma.TransactionClient = this.prisma): Promise<{
         textMatches: DuplicateMatchDto[];
         candidatesScanned: number;
         candidatesTruncated: boolean;
     }> {
         let textMatches: DuplicateMatchDto[] = [];
         if (text.textSha256) {
-            const rows = await this.prisma.$queryRaw<MatchRow[]> `SELECT d.id, d.title, d.visibility, d.owner_id AS ownerId FROM document_fingerprints f JOIN documents d ON d.id=f.document_id AND d.file_version=f.file_version WHERE f.text_sha256=${text.textSha256} AND f.text_status='OK' AND f.algo_version=${P.algorithmVersion} AND ${duplicateScopeSql(ownerId)} AND d.id <> ${excludeId ?? ''} ORDER BY (d.owner_id=${ownerId}) DESC, d.created_at DESC, d.id DESC LIMIT 5`;
+            const rows = await db.$queryRaw<MatchRow[]> `SELECT d.id, d.title, d.visibility, d.owner_id AS ownerId FROM document_fingerprints f JOIN documents d ON d.id=f.document_id AND d.file_version=f.file_version WHERE f.text_sha256=${text.textSha256} AND f.text_status='OK' AND f.algo_version=${P.algorithmVersion} AND ${duplicateScopeSql(ownerId)} AND d.id <> ${excludeId ?? ''} ORDER BY (d.owner_id=${ownerId}) DESC, d.created_at DESC, d.id DESC LIMIT 5`;
             textMatches = rows.map((r) => this.match(r, ownerId, 'SAME_TEXT', 1));
         }
-        const candidates = await this.prisma.$queryRaw<MatchRow[]> `SELECT d.id, d.title, d.visibility, d.owner_id AS ownerId, f.minhash FROM document_fingerprints f JOIN documents d ON d.id=f.document_id AND d.file_version=f.file_version WHERE f.algo_version=${P.algorithmVersion} AND f.text_status IN ('OK','PARTIAL') AND f.shingle_count BETWEEN ${Math.ceil(text.shingleCount! * 0.5)} AND ${Math.floor(text.shingleCount! / 0.5)} AND ${duplicateScopeSql(ownerId)} AND d.id <> ${excludeId ?? ''} ORDER BY d.created_at DESC,d.id DESC LIMIT 2001`;
+        const candidates = await db.$queryRaw<MatchRow[]> `SELECT d.id, d.title, d.visibility, d.owner_id AS ownerId, f.minhash FROM document_fingerprints f JOIN documents d ON d.id=f.document_id AND d.file_version=f.file_version WHERE f.algo_version=${P.algorithmVersion} AND f.text_status IN ('OK','PARTIAL') AND f.shingle_count BETWEEN ${Math.ceil(text.shingleCount! * 0.5)} AND ${Math.floor(text.shingleCount! / 0.5)} AND ${duplicateScopeSql(ownerId)} AND d.id <> ${excludeId ?? ''} ORDER BY d.created_at DESC,d.id DESC LIMIT 2001`;
         const candidatesTruncated = candidates.length > P.candidates;
         const candidatesScanned = Math.min(candidates.length, P.candidates);
         const sameIds = new Set(textMatches.map((m) => m.documentId));
@@ -45,8 +45,13 @@ export class DuplicateRepository {
         result: T;
     }>): Promise<T> {
         return this.prisma.$transaction(async (db) => {
-            if (mode === 'block')
+            if (mode === 'block') {
+                // Held until COMMIT, unlike a named advisory lock released before commit.
+                // This covers uploads by different users on different app instances too.
+                const lock = await db.$queryRaw<Array<{ id: number }>>`SELECT id FROM document_ingestion_locks WHERE id=1 FOR UPDATE`;
+                if (!lock.length) throw new AppError('SERVICE_UNAVAILABLE', { stage: 'db' });
                 await db.$queryRaw `SELECT id FROM users WHERE id=${ownerId} FOR UPDATE`;
+            }
             // Lock the replacement row too: a concurrent metadata PATCH must not change the
             // visibility between the blocking decision and the actual file update.
             let currentVisibility = visibility;
@@ -58,8 +63,20 @@ export class DuplicateRepository {
                     throw new AppError('DOCUMENT_NOT_FOUND', { stage: 'db' });
                 currentVisibility = current[0].visibility;
             }
-            if (mode === 'block')
-                block(await this.exact(prepared.sha256, ownerId, excludeId, db), currentVisibility);
+            if (mode === 'block') {
+                const exactMatches = await this.exact(prepared.sha256, ownerId, excludeId, db);
+                block(exactMatches, currentVisibility);
+                prepared.check.exactMatches = exactMatches;
+                if (prepared.text.minhash) {
+                    const { textMatches, candidatesScanned, candidatesTruncated } = await this.textMatches(prepared.text, ownerId, excludeId, db);
+                    block(textMatches, currentVisibility);
+                    if (candidatesTruncated) throw new AppError('SERVICE_UNAVAILABLE', { stage: 'db' });
+                    prepared.check.textMatches = textMatches;
+                    prepared.check.textAnalysis.candidatesScanned = candidatesScanned;
+                    prepared.check.textAnalysis.candidatesTruncated = candidatesTruncated;
+                }
+            }
+            prepared.check.result = prepared.check.exactMatches.length || prepared.check.textMatches.length ? 'WARNING' : 'ACCEPT';
             const { documentId, fileVersion, result } = await write(db);
             await this.save(db, documentId, fileVersion, prepared);
             return result;

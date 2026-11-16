@@ -2,7 +2,7 @@ import { ApiError } from "../api/errors";
 import type { FormErrors } from "./validation";
 
 const messages: Record<string, string> = {
-  DUPLICATE_DOCUMENT: "Tệp này trùng hoàn toàn với một tài liệu đã có.",
+  DUPLICATE_DOCUMENT: "Không thể tải lên: tài liệu trùng tệp hoặc giống nội dung từ 90% với tài liệu đã có.",
   INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
   RATE_LIMITED: "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
   CSRF_REJECTED: "Yêu cầu bị từ chối vì lý do bảo mật. Vui lòng tải lại trang.",
