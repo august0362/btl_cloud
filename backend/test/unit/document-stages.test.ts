@@ -1,3 +1,4 @@
+import type { DuplicateService } from '../../src/modules/duplicates/duplicate.service.js';
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../../src/lib/logger.js';
 import type { DocumentRepository, DocumentWithOwner } from '../../src/modules/documents/document.repository.js';
@@ -22,7 +23,10 @@ function setup() {
   const storage = { putObject: vi.fn().mockResolvedValue(undefined), getObject: vi.fn(), deleteObject: vi.fn().mockResolvedValue(undefined), checkHealth: vi.fn() };
   const lines: string[] = [];
   const logger = createLogger({ level: 'info', instanceId: 'test' }, { write: (line) => { lines.push(line); } });
-  const service = new DocumentService(documents as unknown as DocumentRepository, storage, { now: () => now }, logger);
+  const service = new DocumentService(documents as unknown as DocumentRepository, storage, { now: () => now }, logger, {
+    prepare: vi.fn().mockResolvedValue({ sha256: 'a'.repeat(64), text: { status: 'SKIPPED', reason: 'DISABLED', shingleCount: null, minhash: null, textSha256: null }, check: { mode: 'off', result: 'ACCEPT', exactMatches: [], textMatches: [], textAnalysis: { status: 'SKIPPED', reason: 'DISABLED', candidatesScanned: 0, candidatesTruncated: false } } }),
+    commit: async (_owner: unknown, _visibility: unknown, _prepared: unknown, _excluded: unknown, write: (db: unknown) => Promise<unknown>) => write({ document: { findUniqueOrThrow: async () => doc } }),
+  } as unknown as DuplicateService);
   return { service, documents, storage, lines };
 }
 

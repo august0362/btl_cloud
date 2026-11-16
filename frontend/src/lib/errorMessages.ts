@@ -2,6 +2,7 @@ import { ApiError } from "../api/errors";
 import type { FormErrors } from "./validation";
 
 const messages: Record<string, string> = {
+  DUPLICATE_DOCUMENT: "Tệp này trùng hoàn toàn với một tài liệu đã có.",
   INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
   RATE_LIMITED: "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
   CSRF_REJECTED: "Yêu cầu bị từ chối vì lý do bảo mật. Vui lòng tải lại trang.",
@@ -39,3 +40,8 @@ export function fieldErrors(error: unknown): FormErrors {
       .map((issue) => [issue.field, issue.message]),
   );
 }
+
+
+export const duplicateReasonMessages: Record<string, string> = {
+  DISABLED: 'Đã tắt phân tích nội dung', TOO_LARGE: 'Tệp PDF vượt giới hạn phân tích 10 MiB', ENCRYPTED: 'Tệp được mã hoá', MALFORMED: 'Không đọc được cấu trúc tệp', INSUFFICIENT_TEXT: 'Tệp có quá ít chữ để so sánh', TIMEOUT: 'Phân tích quá thời gian', BUSY: 'Bộ phân tích đang bận', UNSUPPORTED: 'Định dạng chưa được hỗ trợ', ERROR: 'Phân tích tạm thời gặp lỗi', WORD_LIMIT: 'Chỉ phân tích phần đầu do giới hạn số từ', PAGE_LIMIT: 'Chỉ phân tích 100 trang đầu', PART_LIMIT: 'Chỉ phân tích phần đầu do giới hạn nội dung',
+};

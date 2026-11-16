@@ -13,7 +13,7 @@ import { App } from "./App";
 import { authApi } from "./api/auth";
 import { documentsApi } from "./api/documents";
 import { ApiError } from "./api/errors";
-import type { DocumentDto } from "./api/types";
+import type { UploadResult } from "./api/duplicates";
 import type { UploadOptions } from "./api/upload";
 import { MAX_UPLOAD_BYTES } from "./lib/constants";
 import { documentFixture as doc, pageOf, user } from "./test/fixtures";
@@ -61,6 +61,7 @@ async function chooseFile(name = "Đề cương.pdf") {
     new File(["%PDF-1.7"], name, { type: "application/pdf" }),
   );
 }
+const noDuplicates: UploadResult['duplicateCheck'] = { mode: 'off', result: 'ACCEPT', exactMatches: [], textMatches: [], textAnalysis: { status: 'SKIPPED', reason: 'DISABLED', candidatesScanned: 0, candidatesTruncated: false } };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal("fetch", vi.fn(async (path: string) => new Response(JSON.stringify({ data:
@@ -74,9 +75,9 @@ beforeEach(() => {
   api.listMine.mockResolvedValue(pageOf());
   api.get.mockResolvedValue({ ...doc });
   api.remove.mockResolvedValue(undefined);
-  api.upload.mockResolvedValue({ ...doc });
+  api.upload.mockResolvedValue({ ...doc, duplicateCheck: noDuplicates });
   api.update.mockResolvedValue({ ...doc });
-  api.replaceFile.mockResolvedValue({ ...doc, fileVersion: 2 });
+  api.replaceFile.mockResolvedValue({ ...doc, fileVersion: 2, duplicateCheck: noDuplicates });
 });
 
 describe("authentication, navigation and public discovery", () => {
@@ -323,7 +324,7 @@ describe("upload and document management", () => {
   });
   it("auto-fills title, disables duplicate submissions, waits for server success then lists the document", async () => {
     signedIn();
-    const pending = deferred<DocumentDto>();
+    const pending = deferred<UploadResult>();
     api.upload.mockReturnValue(pending.promise);
     mount("/upload");
     await screen.findByRole("heading", { name: "Tải lên tài liệu" });
@@ -333,7 +334,7 @@ describe("upload and document management", () => {
     await userEvent.dblClick(screen.getByRole("button", { name: "Tải lên" }));
     expect(api.upload).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Tải lên thành công")).not.toBeInTheDocument();
-    await act(async () => pending.resolve(doc));
+    await act(async () => pending.resolve({ ...doc, duplicateCheck: noDuplicates }));
     expect(
       await screen.findByRole("heading", { name: "Tài liệu của tôi" }),
     ).toBeVisible();
@@ -541,7 +542,7 @@ describe("upload and document management", () => {
   });
   it("shows progress without declaring completion at 100 percent", async () => {
     signedIn();
-    const pending = deferred<DocumentDto>();
+    const pending = deferred<UploadResult>();
     api.upload.mockImplementation((_input, options: UploadOptions = {}) => {
       queueMicrotask(() => options.onProgress?.(100));
       return pending.promise;
@@ -553,6 +554,36 @@ describe("upload and document management", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tải lên" }));
     expect(await screen.findByText("Đang chờ máy chủ xác nhận…")).toBeVisible();
     expect(screen.queryByText("Tải lên thành công")).not.toBeInTheDocument();
-    await act(async () => pending.resolve(doc));
+    await act(async () => pending.resolve({ ...doc, duplicateCheck: noDuplicates }));
   });
+});
+
+describe('duplicate upload feedback', () => {
+  const match = { documentId: doc.id, title: 'Bản tài liệu đã có', visibility: 'PUBLIC' as const, ownedByYou: false, matchType: 'EXACT' as const, similarity: 1 };
+  it('keeps upload fields and renders clickable conflict links on 409', async () => {
+    signedIn(); api.upload.mockRejectedValue(new ApiError(409, 'DUPLICATE_DOCUMENT', 'Trùng tài liệu', [], '', [match]));
+    mount('/upload'); await screen.findByRole('heading', { name: 'Tải lên tài liệu' }); await chooseFile();
+    await userEvent.click(screen.getByRole('radio', { name: /^Công khai/ })); await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
+    expect(await screen.findByRole('link', { name: match.title })).toHaveAttribute('href', `/documents/${doc.id}`);
+    expect(screen.getByLabelText('Tiêu đề *')).toHaveValue('Đề cương');
+  });
+  it('shows successful warning links after navigation and a reason without percentages when skipped', async () => {
+    signedIn(); api.upload.mockResolvedValue({ ...doc, duplicateCheck: { ...noDuplicates, mode: 'warn', result: 'WARNING', exactMatches: [match], textAnalysis: { ...noDuplicates.textAnalysis, reason: 'INSUFFICIENT_TEXT' } } });
+    mount('/upload'); await screen.findByRole('heading', { name: 'Tải lên tài liệu' }); await chooseFile();
+    await userEvent.click(screen.getByRole('radio', { name: /^Công khai/ })); await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
+    expect(await screen.findByRole('link', { name: match.title })).toHaveAttribute('href', `/documents/${doc.id}`);
+    expect(screen.getByText(/Chưa kiểm tra được trùng nội dung/)).toHaveTextContent('quá ít chữ');
+    expect(screen.getByText(/Chưa kiểm tra được trùng nội dung/)).not.toHaveTextContent('%');
+  });
+});
+
+it('keeps replacement file and metadata on duplicate conflict and renders the existing document link', async () => {
+  signedIn();
+  const match = { documentId: doc.id, title: 'Bản trùng của tôi', visibility: 'PRIVATE' as const, ownedByYou: true, matchType: 'EXACT' as const, similarity: 1 };
+  api.replaceFile.mockRejectedValue(new ApiError(409, 'DUPLICATE_DOCUMENT', 'Trùng tệp', [], '', [match]));
+  mount(`/documents/${doc.id}/edit`); await screen.findByRole('heading', { name: 'Chỉnh sửa tài liệu' });
+  await chooseFile('new.pdf'); await userEvent.click(screen.getByRole('button', { name: 'Thay thế tệp' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Thay thế tệp?' }); await userEvent.click(within(dialog).getByRole('button', { name: 'Thay thế' }));
+  expect(await screen.findByRole('link', { name: match.title })).toHaveAttribute('href', `/documents/${doc.id}`);
+  expect(screen.getByLabelText('Tiêu đề *')).toHaveValue(doc.title); expect(screen.getByText('new.pdf')).toBeVisible();
 });

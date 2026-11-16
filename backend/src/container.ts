@@ -1,3 +1,5 @@
+import { DuplicateRepository } from './modules/duplicates/duplicate.repository.js';
+import { DuplicateService } from './modules/duplicates/duplicate.service.js';
 import type { PrismaClient } from '@prisma/client';
 import type { Config } from './config/env.js';
 import { createTransactionRunner } from './db/prisma.js';
@@ -43,6 +45,7 @@ export function createServices(deps: {
   const documents = new DocumentRepository(deps.prisma);
   const auth = new AuthService(runInTransaction, users, sessions, clock, deps.config.session.ttlHours);
   // Feature A
+  const duplicates = new DuplicateService(new DuplicateRepository(deps.prisma), deps.config.duplicates.mode, deps.logger);
   // Feature B
   const recommendations = new RecommendationService(new RecommendationRepository(deps.prisma), documents, deps.config.recommendations.enabled, clock, deps.logger);
   const documentService = new DocumentService(
@@ -50,6 +53,7 @@ export function createServices(deps: {
     deps.storage,
     clock,
     deps.logger,
+    duplicates,
   );
   const activity = new ActivityTracker(users, clock, deps.logger);
   const auditEvents = new AuditRepository(deps.prisma);

@@ -1,6 +1,8 @@
+import type { DuplicateMatchDto } from "./duplicates";
 import type { ValidationIssue } from "./types";
 
 export class ApiError extends Error {
+  readonly duplicates: DuplicateMatchDto[];
   readonly status: number;
   readonly code: string;
   readonly details: ValidationIssue[];
@@ -12,9 +14,11 @@ export class ApiError extends Error {
     message: string,
     details: ValidationIssue[] = [],
     requestId = "",
+    duplicates: DuplicateMatchDto[] = [],
   ) {
     super(message);
     this.name = "ApiError";
+    this.duplicates = code === "DUPLICATE_DOCUMENT" ? duplicates : [];
     this.status = status;
     this.code = code;
     this.details = details;
@@ -29,6 +33,7 @@ export function responseError(
 ): ApiError {
   const body = payload as {
     error?: {
+      duplicates?: DuplicateMatchDto[];
       code?: string;
       message?: string;
       details?: ValidationIssue[];
@@ -42,6 +47,7 @@ export function responseError(
     value?.message ?? "Đã có lỗi xảy ra. Vui lòng thử lại.",
     Array.isArray(value?.details) ? value.details : [],
     value?.requestId ?? requestId,
+    Array.isArray(value?.duplicates) ? value.duplicates : [],
   );
 }
 

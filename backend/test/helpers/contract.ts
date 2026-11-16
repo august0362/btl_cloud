@@ -65,9 +65,13 @@ export function expectError(res: HttpResponse, status: number, code: string): { 
 }
 
 export function expectDocument(value: unknown): z.infer<typeof documentDtoSchema> {
+  if (typeof value === 'object' && value !== null && 'duplicateCheck' in value) return uploadResultSchema.parse(value);
   return documentDtoSchema.parse(value);
 }
 
+
+const duplicateMatchSchema = z.object({ documentId: uuid, title: z.string(), visibility: z.enum(['PUBLIC','PRIVATE']), ownedByYou: z.boolean(), matchType: z.enum(['EXACT','SAME_TEXT','SIMILAR_TEXT']), similarity: z.number().min(0).max(1) }).strict();
+export const uploadResultSchema = documentDtoSchema.extend({ duplicateCheck: z.object({ mode: z.enum(['off','warn','block']), result: z.enum(['ACCEPT','WARNING']), exactMatches: z.array(duplicateMatchSchema).max(5), textMatches: z.array(duplicateMatchSchema).max(5), textAnalysis: z.object({ status: z.enum(['OK','PARTIAL','SKIPPED']), reason: z.string().nullable(), candidatesScanned: z.number().int().min(0).max(2000), candidatesTruncated: z.boolean() }).strict() }).strict() }).strict();
 export const recommendationHomeSchema = z.object({ strategy: z.enum(['PERSONALIZED', 'POPULAR', 'NEWEST']), items: z.array(z.object({ document: documentDtoSchema, reason: z.enum(['SIMILAR_TO_HISTORY', 'POPULAR', 'NEW']) }).strict()) }).strict();
 export const recommendationRelatedSchema = z.object({ items: z.array(documentDtoSchema) }).strict();
 export const recommendationSuggestionsSchema = z.object({ items: z.array(z.object({ documentId: uuid, title: z.string() }).strict()).max(8) }).strict();
