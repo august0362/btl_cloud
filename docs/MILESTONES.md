@@ -13,6 +13,8 @@ Phạm vi: [PROJECT_OVERVIEW](PROJECT_OVERVIEW.md). Hợp đồng: [ARCHITECTURE
 
 Kiểm chứng local **16/11/2026**: lint/build, liên kết tài liệu và cách ly artifact đạt; backend unit 168, frontend unit 101, launcher 44, admin local 44, UI trình duyệt 9. Integration kiểm được 118 ca qua lượt đầy đủ và lần chạy lại riêng ca BUSY sau khi sửa; một benchmark bỏ qua mặc định. Đây không phải kết quả nghiệm thu AWS.
 
+Bộ so trùng với tệp thật bổ sung cùng ngày đạt **24/24 ca** qua HTTP, MySQL và SeaweedFS test: ba định dạng cho cùng tỷ lệ 100%, 92,1875%, 85,15625%, 75,78125% và 36,71875%. Kiểm được cả tải xuống rồi upload lại, Public/Private, khác tài khoản, khác định dạng, từ chối trước khi ghi storage và giữ nguyên bản cũ khi thay tệp bị chặn. Đây là dữ liệu tổng hợp với PDF có lớp chữ; PDF scan không có lớp chữ chỉ được so trùng tệp bằng SHA-256.
+
 ## Kiểm tra mã nguồn
 
 Tại gốc repo, dùng Node.js 24:
@@ -34,6 +36,8 @@ Integration cần MySQL và SeaweedFS. Dùng DB tên kết thúc `_test`, bucket
 
 ```sh
 npm --prefix backend run test:integration
+# Chi rieng 24 ca so trung voi 18 tep DOCX/PDF/PPTX that:
+npm --prefix backend run test:integration -- duplicates-real-files
 npm --prefix frontend exec -- playwright install chromium
 npm --prefix frontend run test:ui
 # E2E cần backend production-like trên :3000:
@@ -51,6 +55,7 @@ Máy có thư mục admin có thể chạy thêm `npm exec -- vitest run --confi
 | Quyền | Guest/A/B, Public/Private, chủ DELETING, download cần đăng nhập | integration documents-access/deleting-user; `scripts/verify/authz-matrix.mjs` |
 | Tệp | Ba loại tệp, giả/rỗng, 50 MiB/+1, thay/xoá và lỗi storage/DB | integration documents-*; `scripts/verify/upload-matrix.mjs` |
 | So trùng | warn/off/block; bản Private của Public người khác; loại chính tài liệu; transaction phiên bản | integration duplicates-flow/query-budget |
+| Tệp so trùng thực tế | 18 DOCX/PDF/PPTX; 100%, trên 85%, cảnh báo 70-85%, dưới 70%; download/upload lại và thay tệp | [Mẫu và cách chạy](../backend/test/fixtures/duplicate-documents/README.md); integration duplicates-real-files |
 | Phân tích chữ | PDF/Office, dấu tiếng Việt, scan/hỏng/mã hoá, PARTIAL/SKIPPED, timeout/hàng đợi | unit duplicates-*; document-foundation |
 | Gợi ý | Opt-in mặc định tắt, bật/tắt/xoá lịch sử, popularity, Private/DELETING khi index cũ | integration recommendations-api |
 | Tìm relevance | Query thắng sở thích, phân trang qua mốc 200, fallback và tắt tính năng | unit ranking/search; integration recommendations-api |
