@@ -68,8 +68,9 @@ describe('loadConfig (M1-04, §A10.2)', () => {
 });
 
 it('validates document intelligence defaults and switches', () => {
-  expect(loadConfig(minimal)).toMatchObject({ duplicates: { mode: 'warn' }, recommendations: { enabled: true } });
-  expect(loadConfig({ ...minimal, DUPLICATE_MODE: 'off', RECOMMENDATIONS_ENABLED: 'false' })).toMatchObject({ duplicates: { mode: 'off' }, recommendations: { enabled: false } });
+  expect(loadConfig(minimal)).toMatchObject({ duplicates: { mode: 'block' }, recommendations: { enabled: true } });
+  expect(loadConfig({ ...minimal, DUPLICATE_MODE: 'warn' }).duplicates.mode).toBe('block');
+  expect(loadConfig({ ...minimal, DUPLICATE_MODE: 'off', RECOMMENDATIONS_ENABLED: 'false' })).toMatchObject({ duplicates: { mode: 'block' }, recommendations: { enabled: false } });
   expect(loadConfig({ ...minimal, DUPLICATE_MODE: 'block' }).duplicates.mode).toBe('block');
   expect(() => loadConfig({ ...minimal, DUPLICATE_MODE: 'bad' })).toThrow(/DUPLICATE_MODE/);
   expect(() => loadConfig({ ...minimal, RECOMMENDATIONS_ENABLED: 'yes' })).toThrow(/RECOMMENDATIONS_ENABLED/);

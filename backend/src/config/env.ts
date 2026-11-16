@@ -9,7 +9,8 @@ const booleanString = z.enum(['true', 'false']).transform((value) => value === '
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 
 const envSchema = z.object({
-  DUPLICATE_MODE: z.enum(['off', 'warn', 'block']).default('warn'),
+  // Legacy values are accepted for existing .env files, but cannot bypass upload rejection.
+  DUPLICATE_MODE: z.enum(['off', 'warn', 'block']).default('block').transform(() => 'block' as const),
   RECOMMENDATIONS_ENABLED: booleanString.default('true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(0).max(65535).default(3000),

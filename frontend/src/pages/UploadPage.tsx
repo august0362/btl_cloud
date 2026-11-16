@@ -83,7 +83,7 @@ export function UploadPage() {
           options,
         ),
       );
-      show({ tone: "success", message: <><span>Tải lên thành công</span><DuplicateNotice check={result.duplicateCheck} /></> });
+      show({ tone: result.duplicateCheck?.result === 'WARNING' ? 'warning' : 'success', persist: result.duplicateCheck?.result === 'WARNING', message: <><span>Tải lên thành công</span><DuplicateNotice check={result.duplicateCheck} /></> });
       navigate("/me/documents");
     } catch (failure) {
       if (failure instanceof ApiError) setDuplicates(failure.duplicates);
@@ -201,10 +201,10 @@ export function DuplicateNotice({ check, matches = [], blocked = false }: { chec
   if (check?.mode === 'off') return null;
   const all = check ? [...check.exactMatches, ...check.textMatches] : matches;
   return <>
-    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Tệp này trùng hoàn toàn với:' : 'Lưu ý: tệp trùng/gần giống với…'}
+    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Không thể tải lên: trùng tệp hoặc giống nội dung từ 90% với:' : 'Cảnh báo: nội dung giống từ 70% đến dưới 90% với:'}
       <span role="list">{all.map((match, index) => <span role="listitem" style={{ display: 'block' }} key={`${match.documentId}:${index}`}>
         <Link to={`/documents/${match.documentId}`}>{match.title}</Link> ({match.ownedByYou ? 'của bạn' : 'công khai'})
-        {match.matchType !== 'EXACT' && <> · khoảng {Math.round(match.similarity * 100)}% nội dung chữ trùng{check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
+        {match.matchType !== 'EXACT' && <> · khoảng {Math.round(match.similarity * 10000) / 100}% phần chữ đã phân tích trùng{check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
       </span>)}</span>
     </span>}
     {check?.textAnalysis.status === 'SKIPPED' && <span style={{ display: 'block' }}>Chưa kiểm tra được trùng nội dung: {duplicateReasonMessages[check.textAnalysis.reason ?? 'ERROR'] ?? duplicateReasonMessages.ERROR}</span>}

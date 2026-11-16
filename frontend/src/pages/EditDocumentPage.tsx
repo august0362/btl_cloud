@@ -114,7 +114,7 @@ function EditDocumentForm({
       setDocument(updated);
       setFile(null);
       setErrors((value) => ({ ...value, file: undefined }));
-      show({ tone: "success", message: <><span>Đã thay thế tệp</span><DuplicateNotice check={updated.duplicateCheck} /></> });
+      show({ tone: updated.duplicateCheck?.result === 'WARNING' ? 'warning' : 'success', persist: updated.duplicateCheck?.result === 'WARNING', message: <><span>Đã thay thế tệp</span><DuplicateNotice check={updated.duplicateCheck} /></> });
     } catch (failure) {
       if (failure instanceof ApiError) setDuplicates(failure.duplicates);
       const fields = fieldErrors(failure);

@@ -265,7 +265,7 @@ describe('Table: documents (§A4.3)', () => {
 });
 
 describe('Relationships', () => {
-  it('should have exactly 6 tables (audit_events từ E7-01, §A12.4)', async () => {
+  it('should have exactly 7 tables including the duplicate ingestion mutex', async () => {
     const tables = await prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name AS table_name
       FROM information_schema.tables
@@ -276,11 +276,11 @@ describe('Relationships', () => {
     `;
     const tableNames = tables.map(t => t.table_name);
     expect(tableNames).toEqual(
-      expect.arrayContaining(['users', 'sessions', 'documents', 'audit_events', 'document_fingerprints', 'document_interactions'])
+      expect.arrayContaining(['users', 'sessions', 'documents', 'audit_events', 'document_fingerprints', 'document_interactions', 'document_ingestion_locks'])
     );
     // Filter out Prisma internal tables
     const appTables = tableNames.filter(t => !t.startsWith('_prisma'));
-    expect(appTables.length).toBe(6);
+    expect(appTables.length).toBe(7);
   });
 
   it('all tables should use InnoDB engine', async () => {
@@ -300,6 +300,10 @@ describe('Relationships', () => {
 
 
 describe('Document intelligence foundation', () => {
+  it('seeds the singleton ingestion lock', async () => {
+    const rows = await prisma.$queryRaw<Array<{ id: number }>>`SELECT id FROM document_ingestion_locks`;
+    expect(rows.map((row) => Number(row.id))).toEqual([1]);
+  });
   it('defaults existing and new users to personalization disabled', async () => {
     const columns = await prisma.$queryRaw<ColumnInfo[]>`DESCRIBE users`;
     expect(columns.find((c) => c.Field === 'personalization_enabled')).toMatchObject({ Null: 'NO', Default: '0' });

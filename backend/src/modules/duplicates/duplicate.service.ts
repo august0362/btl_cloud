@@ -4,7 +4,7 @@ import type { Visibility } from '@prisma/client';
 import { DuplicateRepository } from './duplicate.repository.js';
 import { AppError } from '../../http/errors.js';
 import type { Logger } from '../../lib/logger.js';
-import { skipped, type TextFingerprint } from './duplicate.policy.js';
+import { BLOCK_THRESHOLD, skipped, type TextFingerprint } from './duplicate.policy.js';
 import { TextWorkerPool } from './text-worker-pool.js';
 export interface DuplicateMatchDto {
     documentId: string;
@@ -40,10 +40,12 @@ export async function sha256File(path: string): Promise<string> {
 export class DuplicateService {
     private readonly pool = new TextWorkerPool();
     constructor(private readonly repository: DuplicateRepository, readonly mode: 'off' | 'warn' | 'block', private readonly logger: Logger) { }
-    block(matches: DuplicateMatchDto[], visibility: Visibility): void {
+    block(matches: DuplicateMatchDto[], _visibility: Visibility): void {
         if (this.mode !== 'block')
             return;
-        const duplicates = matches.filter((m) => m.ownedByYou || (m.visibility === 'PUBLIC' && visibility === 'PUBLIC'));
+        // Neither incoming visibility nor the match layer may bypass the rejection threshold.
+        // Other users' private files remain outside the repository's comparison scope.
+        const duplicates = matches.filter((m) => m.similarity >= BLOCK_THRESHOLD && (m.ownedByYou || m.visibility === 'PUBLIC'));
         if (duplicates.length) {
             this.logger.info({ event: 'duplicates.blocked', documentId: duplicates[0]!.documentId }, 'Duplicate blocked');
             throw new AppError('DUPLICATE_DOCUMENT', { duplicates });
@@ -73,18 +75,25 @@ export class DuplicateService {
             this.block(exactMatches, visibility);
         }
         let text = this.mode === 'off' ? skipped('DISABLED') : await this.pool.analyze(file.tmpPath, file.fileType, file.sizeBytes).catch(() => skipped('ERROR'));
+        if (this.mode === 'block' && text.status === 'SKIPPED' && ['BUSY', 'TIMEOUT', 'ERROR'].includes(text.reason!)) {
+            // Temporary analysis failure must not be a way around mandatory rejection.
+            throw new AppError('SERVICE_UNAVAILABLE', { stage: 'inspect' });
+        }
         let textMatches: DuplicateMatchDto[] = [], candidatesScanned = 0, candidatesTruncated = false;
         try {
             if (text.minhash) {
                 ({ textMatches, candidatesScanned, candidatesTruncated } = await this.repository.textMatches(text, ownerId, excludeId));
             }
         }
-        catch {
+        catch (cause) {
+            if (this.mode === 'block') throw new AppError('SERVICE_UNAVAILABLE', { cause, stage: 'db' });
             text = skipped('ERROR');
             textMatches = [];
             candidatesScanned = 0;
             candidatesTruncated = false;
         }
+        this.block(textMatches, visibility);
+        if (this.mode === 'block' && candidatesTruncated) throw new AppError('SERVICE_UNAVAILABLE', { stage: 'db' });
         if (text.status === 'SKIPPED') {
             const fields = { event: 'duplicates.text_skipped', reason: text.reason, fileType: file.fileType, sizeBytes: file.sizeBytes };
             if (['TIMEOUT', 'BUSY', 'ERROR'].includes(text.reason!))

@@ -65,6 +65,7 @@ Schema đầy đủ: [schema.prisma](../backend/prisma/schema.prisma). MySQL dù
 | `documents` | Chủ, metadata, visibility, loại/kích thước tệp, storage key duy nhất, `file_version` |
 | `audit_events` | Sự kiện nghiệp vụ; không FK để giữ dấu vết khi đối tượng bị xoá |
 | `document_fingerprints` | Một dòng/tài liệu: SHA-256, phiên bản tệp/thuật toán, trạng thái chữ, hash chữ và MinHash 512 byte |
+| `document_ingestion_locks` | Một dòng `id=1`; khoá transaction cho kiểm trùng/commit giữa các tài khoản và instance |
 | `document_interactions` | Khoá `(user_id, document_id, kind)`; `VIEW`/`DOWNLOAD`, thời điểm đầu/cuối |
 
 Fingerprint và tương tác CASCADE theo tài liệu; tương tác CASCADE theo user. User có tài liệu dùng FK RESTRICT để xoá tệp có kiểm soát. Chỉ fingerprint có `file_version` khớp tài liệu mới được dùng.
@@ -184,7 +185,7 @@ Autocomplete dùng combobox ARIA, debounce 250 ms, AbortController và phím lê
 
 ### A9.2 Phát hiện trùng
 
-SHA-256 tính theo stream cho mọi tệp. `off` lưu hash nhưng bỏ phân tích chữ/đối chiếu; `warn` trả cảnh báo; `block` chỉ chặn bản giống hệt theo phạm vi ở [PROJECT_OVERVIEW](PROJECT_OVERVIEW.md). Thay tệp loại chính documentId. Trong block, transaction khoá user và khi thay tệp khoá document để kiểm tra lại trước commit. Race giữa hai user khác nhau vẫn là giới hạn đã chấp nhận.
+SHA-256 tính theo stream cho mọi tệp. `warn`/`off` trong cấu hình cũ được nâng thành `block` cho web API; từ chối bản trùng bytes hoặc giống chữ từ 90% theo phạm vi ở [PROJECT_OVERVIEW](PROJECT_OVERVIEW.md). Từ 70% đến dưới 90% cho upload/thay tệp và trả WARNING. Thay tệp loại chính documentId. Transaction khoá dòng ingest dùng chung, user và khi thay tệp khoá document để kiểm tra lại cả SHA-256 và chữ trước commit; áp dụng giữa các tài khoản và instance. Trích chữ và PutObject không giữ khoá ingest.
 
 Trích chữ trong worker mới cho mỗi job; truyền đường dẫn tmp, không chuyển cả tệp qua message. PDF dùng `pdfjs-dist` 6.5.438 ở chế độ parser, tắt eval/render/canvas; DOCX đọc `word/document.xml`, PPTX đọc slide theo thứ tự số. Không lưu chữ thô vào DB.
 
@@ -197,9 +198,9 @@ Trích chữ trong worker mới cho mỗi job; truyền đường dẫn tmp, kh�
 | Văn bản | Tối thiểu 50 từ; tối đa 20.000 từ |
 | So sánh | Tối đa 2.000 ứng viên có quyền xem, báo khi bị cắt |
 
-MinHash v1 dùng tập shingle 5 từ, 128 hàm băm `(a*x+b) mod (2^31-1)` với seed SHA-256 cố định; lưu 128 uint32 big-endian = 512 byte. So tương đồng là tỷ lệ ô bằng nhau; ngưỡng cảnh báo 0,6. `text_sha256` chỉ có khi phân tích đầy đủ, dùng cho SAME_TEXT. Match chỉ giữ tối đa 5 mỗi nhóm.
+MinHash v1 dùng tập shingle 5 từ, 128 hàm băm `(a*x+b) mod (2^31-1)` với seed SHA-256 cố định; lưu 128 uint32 big-endian = 512 byte. So tương đồng là tỷ lệ ô bằng nhau; ngưỡng cảnh báo 0,7 và ngưỡng từ chối upload 0,9 (dùng giá trị chưa làm tròn). `text_sha256` chỉ có khi phân tích đầy đủ, dùng cho SAME_TEXT. Match chỉ giữ tối đa 5 mỗi nhóm.
 
-Trạng thái chữ: OK (đầy đủ), PARTIAL (giới hạn từ/trang/phần), SKIPPED (tắt, quá lớn, mã hoá, hỏng, thiếu chữ, timeout, bận, không hỗ trợ hoặc lỗi). SKIPPED không có nghĩa 0% hay không trùng. Lỗi trích chữ không chặn upload hợp lệ. Policy chuẩn: [duplicate.policy.ts](../backend/src/modules/duplicates/duplicate.policy.ts).
+Trạng thái chữ: OK (đầy đủ), PARTIAL (giới hạn từ/trang/phần), SKIPPED (tắt, quá lớn, mã hoá, hỏng, thiếu chữ, timeout, bận, không hỗ trợ hoặc lỗi). SKIPPED không có nghĩa 0% hay không trùng. PDF không có chữ/không hỗ trợ trích chữ vẫn được so SHA-256; lỗi worker tạm thời (BUSY/TIMEOUT/ERROR), lỗi DB so sánh hoặc tập ứng viên bị cắt khiến web API trả 503 để thử lại, không cho upload vượt kiểm tra. Policy chuẩn: [duplicate.policy.ts](../backend/src/modules/duplicates/duplicate.policy.ts).
 
 ### A9.3 Gợi ý kết hợp
 
@@ -244,7 +245,7 @@ Mẫu đầy đủ: [backend/.env.example](../backend/.env.example). Giá trị 
 | Storage | S3_BUCKET, S3_REGION, S3_ENDPOINT, S3_FORCE_PATH_STYLE; AWS dùng IAM Role |
 | Phiên/bảo mật | ALLOWED_ORIGINS, SESSION_COOKIE_NAME, COOKIE_SECURE, SESSION_TTL_HOURS, TRUST_PROXY, HSTS_ENABLED, AUTH_RATE_LIMIT_MAX |
 | Tệp/SPA | UPLOAD_TMP_DIR, SERVE_FRONTEND, FRONTEND_DIST_DIR |
-| Audit, so trùng, gợi ý | AUDIT_RETENTION_DAYS=90, DUPLICATE_MODE=warn, RECOMMENDATIONS_ENABLED=true |
+| Audit, so trùng, gợi ý | AUDIT_RETENTION_DAYS=90, DUPLICATE_MODE=block, RECOMMENDATIONS_ENABLED=true |
 
 Env chỉ đọc lúc khởi động. Launcher local từ chối production hoặc DB/storage không phải loopback. `BTL_LOCAL_PRODUCTION=1` cho phép riêng backend con chạy bản build production; controller/Vite vẫn development.
 
@@ -269,7 +270,7 @@ ALB trong cấu hình bàn giao dùng HTTP; cookie Secure và HSTS không bật 
 
 ## A11. Giới hạn đã biết
 
-Không quét virus/OCR; PDF font cũ có thể trích chữ sai. So trùng chỉ xét tập ứng viên hữu hạn, không bảo đảm phát hiện mọi bản gần giống; race block giữa user khác nhau chưa được khoá toàn cục. Tìm kiếm relevance chỉ xếp lại top-200. Chỉ mục mới nhất trễ tối đa một chu kỳ refresh. Rate limit và chỉ mục nằm riêng từng instance; RDS Single-AZ là một điểm lỗi. Benchmark local không thay thế số đo t3.micro.
+Không quét virus/OCR; PDF font cũ có thể trích chữ sai. So trùng chỉ xét tập ứng viên hữu hạn, không bảo đảm phát hiện mọi bản gần giống; Tìm kiếm relevance chỉ xếp lại top-200. Chỉ mục mới nhất trễ tối đa một chu kỳ refresh. Rate limit và chỉ mục nằm riêng từng instance; RDS Single-AZ là một điểm lỗi. Benchmark local không thay thế số đo t3.micro.
 
 ## A12. Quản trị local
 
