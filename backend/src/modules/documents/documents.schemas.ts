@@ -34,12 +34,12 @@ const queryText = z
 export const publicQuerySchema = z.object({
   q: queryText.optional(),
   fileType: fileTypeEnum.optional(),
-  sort: z.enum(['newest', 'title']).default('newest'),
+  sort: z.enum(['newest', 'title', 'relevance']).default('newest'),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(12),
 });
 
-export const mineQuerySchema = publicQuerySchema.extend({ visibility: visibilityEnum.optional() });
+export const mineQuerySchema = publicQuerySchema.extend({ sort: z.enum(['newest', 'title']).default('newest'), visibility: visibilityEnum.optional() });
 
 export type PublicQuery = z.output<typeof publicQuerySchema>;
 export type MineQuery = z.output<typeof mineQuerySchema>;

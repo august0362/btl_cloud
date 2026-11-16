@@ -13,6 +13,8 @@ import { DocumentRepository } from './modules/documents/document.repository.js';
 import { DocumentService } from './modules/documents/documents.service.js';
 import { ActivityTracker } from './modules/users/activity-tracker.js';
 import { UserRepository } from './modules/users/user.repository.js';
+import { RecommendationRepository } from './modules/recommendations/recommendations.repository.js';
+import { RecommendationService } from './modules/recommendations/recommendations.service.js';
 import type { ObjectStorage } from './storage/object-storage.js';
 
 export interface Services {
@@ -25,6 +27,7 @@ export interface Services {
   auditEvents: AuditRepository;
   audit: AuditRecorder;
   clock: Clock;
+  recommendations: RecommendationService;
 }
 
 /** Lắp ráp repository và service cho một process (dùng chung cho server và test). */
@@ -44,6 +47,7 @@ export function createServices(deps: {
   // Feature A
   const duplicates = new DuplicateService(new DuplicateRepository(deps.prisma), deps.config.duplicates.mode, deps.logger);
   // Feature B
+  const recommendations = new RecommendationService(new RecommendationRepository(deps.prisma), documents, deps.config.recommendations.enabled, clock, deps.logger);
   const documentService = new DocumentService(
     documents,
     deps.storage,
@@ -54,5 +58,5 @@ export function createServices(deps: {
   const activity = new ActivityTracker(users, clock, deps.logger);
   const auditEvents = new AuditRepository(deps.prisma);
   const audit = new AuditRecorder(auditEvents, clock, deps.logger);
-  return { users, sessions, documents, auth, documentService, activity, auditEvents, audit, clock };
+  return { users, sessions, documents, auth, documentService, activity, auditEvents, audit, clock, recommendations };
 }

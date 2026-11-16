@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useLocation } from "react-router";
+import { recommendationsApi } from "../api/recommendations";
 import { documentsApi } from "../api/documents";
 import { useAuth } from "../auth/context";
 import { DocumentCard, MyDocumentList } from "../components/documents";
@@ -63,7 +64,8 @@ function DocumentListPage({ mine }: { mine: boolean }) {
         </div>
         {mine && <LinkButton to="/upload">Tải lên tài liệu</LinkButton>}
       </div>
-      <SearchBar key={key} filters={filters} mine={mine} onChange={update} />
+      {!mine && !filters.q && (filters.page ?? 1) === 1 && <HomeRecommendations userId={user?.id} />}
+      <SearchBar key={key} loadSuggestions={mine ? undefined : recommendationsApi.suggestions} filters={filters} mine={mine} onChange={update} />
       {error != null && data && <Alert tone="info">{errorMessage(error)} Đang hiển thị kết quả đã tải trước đó.</Alert>}
       {error && !data ? (
         <Alert
@@ -177,4 +179,28 @@ export function HomePage() {
 }
 export function MyDocumentsPage() {
   return <DocumentListPage mine />;
+}
+
+function HomeRecommendations({ userId }: { userId?: string }) {
+  const homeLoader = useCallback((signal: AbortSignal) => recommendationsApi.home(8, signal), []);
+  const settingsLoader = useCallback((signal: AbortSignal) => userId ? recommendationsApi.getSettings(signal) : Promise.resolve(null), [userId]);
+  const home = useResource(homeLoader, userId ?? 'guest');
+  const settings = useResource(settingsLoader, userId ?? 'guest');
+  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [failure, setFailure] = useState('');
+  const download = useDownload();
+  const change = async (enabled: boolean) => {
+    setBusy(true); setFailure('');
+    try { await recommendationsApi.putSettings(enabled); settings.reload(); home.reload(); setOpen(false); }
+    catch (error) { setFailure(errorMessage(error)); } finally { setBusy(false); }
+  };
+  const clearHistory = async () => {
+    setBusy(true); setFailure('');
+    try { await recommendationsApi.deleteHistory(); settings.reload(); home.reload(); }
+    catch (error) { setFailure(errorMessage(error)); } finally { setBusy(false); }
+  };
+  return <>
+    {!home.error && home.data && Array.isArray(home.data.items) && home.data.items.length > 0 && <section aria-label="Gợi ý tài liệu"><h2>{home.data.strategy === 'PERSONALIZED' ? 'Gợi ý cho bạn' : 'Tài liệu nổi bật'}</h2><div className="document-grid">{home.data.items.map(({ document }) => <DocumentCard key={document.id} document={document} isAuthenticated={Boolean(userId)} loginHref="/login" onDownload={() => void download(document.id)} />)}</div></section>}
+    {userId && !settings.error && settings.data && typeof settings.data.personalizationEnabled === 'boolean' && <p>{settings.data.personalizationEnabled ? <Button variant="ghost" onClick={() => setOpen(true)}>Tuỳ chọn gợi ý</Button> : <>Bật gợi ý cá nhân hoá để nhận tài liệu hợp với bạn. <Button variant="ghost" onClick={() => setOpen(true)}>Bật</Button></>}</p>}
+    {open && settings.data && <section className="panel" role="region" aria-label="Tuỳ chọn gợi ý"><h2>Tuỳ chọn gợi ý</h2><p>Khi bật, hệ thống lưu tài liệu bạn xem và tải trong 90 ngày để gợi ý, và dùng ẩn danh để xếp hạng tài liệu phổ biến. Tắt bất cứ lúc nào, lịch sử sẽ bị xoá.</p>{failure && <Alert>{failure}</Alert>}<Button role="switch" aria-checked={settings.data.personalizationEnabled} loading={busy} onClick={() => void change(!settings.data!.personalizationEnabled)}>{settings.data.personalizationEnabled ? 'Tắt cá nhân hoá' : 'Xác nhận bật cá nhân hoá'}</Button>{settings.data.personalizationEnabled && <Button variant="secondary" loading={busy} onClick={() => void clearHistory()}>Xoá lịch sử</Button>}<Button variant="ghost" onClick={() => setOpen(false)}>Đóng</Button></section>}
+  </>;
 }

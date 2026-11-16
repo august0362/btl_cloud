@@ -3,6 +3,7 @@ export function moduleOf(path: string): string {
   const pathname = path.split('?')[0] ?? '';
   for (const [prefix, module] of [
     ['/api/auth', 'auth'],
+    ['/api/recommendations', 'recommendations'],
     ['/api/documents', 'documents'],
     ['/api/me', 'users'],
     ['/api/users', 'users'],

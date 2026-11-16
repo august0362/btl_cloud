@@ -50,7 +50,7 @@ export function requestLogger(logger: Logger): RequestHandler {
       req: (req: { id: string; method: string; url: string; headers: Record<string, unknown> }) => ({
         id: req.id,
         method: req.method,
-        url: req.url,
+        url: redactQuery(req.url),
         headers: { cookie: req.headers.cookie, 'user-agent': req.headers['user-agent'], origin: req.headers.origin },
       }),
       res: (res: { statusCode: number; headers: Record<string, unknown> }) => ({
@@ -69,4 +69,12 @@ export function noStore(): RequestHandler {
     res.setHeader('Cache-Control', 'no-store');
     next();
   };
+}
+
+export function redactQuery(url: string): string {
+  const at = url.indexOf('?');
+  if (at < 0) return url;
+  const params = new URLSearchParams(url.slice(at + 1));
+  if (params.has('q')) params.set('q', '[redacted]');
+  return `${url.slice(0, at)}?${params.toString()}`;
 }
