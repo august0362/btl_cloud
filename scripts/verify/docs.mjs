@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const files = ['README.md', ...await markdownFiles('docs'), ...await markdownFiles('scripts/load')];
+const files = ['README.md', ...await markdownFiles('docs'), ...await markdownFiles('scripts/load'), ...await markdownFiles('backend/test/fixtures')];
 const failures = [];
 let checked = 0;
 

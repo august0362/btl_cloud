@@ -40,8 +40,8 @@ export function createServiceMonitor(development: boolean) {
   }
   function schedule() {
     clearTimeout(timer);
-    // Production has no timer: only request failures, recovery responses, focus, or Retry.
-    if (active && development) timer = setTimeout(() => {
+    // An idle tab must notice when the server stops, including public builds.
+    if (active && !suspended) timer = setTimeout(() => {
       if (document.visibilityState === "visible") void check();
       else schedule();
     }, 12_000);
@@ -105,9 +105,9 @@ export function createServiceMonitor(development: boolean) {
   };
   const success = () => { if (snapshot.state !== "online") void check(); };
   const focus = () => {
-    if (document.visibilityState === "visible" && (development || snapshot.state !== "online")) void check();
+    if (document.visibilityState === "visible") void check();
   };
-  const online = () => { if (snapshot.state !== "online") void check(true); };
+  const online = () => { void check(true); };
   return {
     getSnapshot: () => snapshot,
     subscribe(listener: () => void) {

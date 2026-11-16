@@ -17,5 +17,5 @@
     "verbatimModuleSyntax": true,
     "types": ["vite/client", "node", "@testing-library/jest-dom"]
   },
-  "include": ["src", "e2e", "ui-tests", "local-tests", "*.ts"]
+  "include": ["src", "ui-tests", "*.ts"]
 }

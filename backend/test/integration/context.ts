@@ -59,11 +59,20 @@ export async function createTestContext(overrides: Record<string, string> = {}):
   };
 }
 
-/** Xoá dữ liệu giữa các test theo thứ tự FK (§A4.6). */
+/** Xoá dữ liệu test theo thứ tự FK. */
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe('DELETE FROM sessions');
   await prisma.$executeRawUnsafe('DELETE FROM documents');
   await prisma.$executeRawUnsafe('DELETE FROM users');
+}
+
+/** Dọn các object đã tạo, audit của tài khoản test và dữ liệu nghiệp vụ. */
+export async function cleanupTestData(ctx: TestContext): Promise<void> {
+  for (const key of ctx.storage.putKeys) await ctx.s3.deleteObject(key);
+  const users = await ctx.prisma.user.findMany({ select: { id: true } });
+  await ctx.prisma.auditEvent.deleteMany({ where: { actorId: { in: users.map((user) => user.id) } } });
+  await resetDatabase(ctx.prisma);
+  ctx.storage.reset();
 }
 
 let counter = 0;

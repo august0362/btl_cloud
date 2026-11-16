@@ -45,7 +45,7 @@ export class DuplicateService {
             return;
         // Neither incoming visibility nor the match layer may bypass the rejection threshold.
         // Other users' private files remain outside the repository's comparison scope.
-        const duplicates = matches.filter((m) => m.similarity >= BLOCK_THRESHOLD && (m.ownedByYou || m.visibility === 'PUBLIC'));
+        const duplicates = matches.filter((m) => m.similarity > BLOCK_THRESHOLD && (m.ownedByYou || m.visibility === 'PUBLIC'));
         if (duplicates.length) {
             this.logger.info({ event: 'duplicates.blocked', documentId: duplicates[0]!.documentId }, 'Duplicate blocked');
             throw new AppError('DUPLICATE_DOCUMENT', { duplicates });

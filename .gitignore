@@ -5,7 +5,6 @@ tmp/
 .env
 .env.*
 !.env.example
-frontend/dist/
 *.log
 pdf/
 backend/admin/
@@ -14,3 +13,6 @@ frontend/admin-tests/
 
 # File khoi chay Windows chi dung local
 *.bat
+
+# Office lock files
+~$*

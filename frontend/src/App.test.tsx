@@ -566,31 +566,47 @@ describe('duplicate upload feedback', () => {
     await userEvent.click(screen.getByRole('radio', { name: /^Công khai/ })); await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
     expect(await screen.findByRole('link', { name: match.title })).toHaveAttribute('href', `/documents/${doc.id}`);
     expect(screen.getByLabelText('Tiêu đề *')).toHaveValue('Đề cương');
+    expect(screen.getByRole('alert')).toHaveTextContent('Trùng tệp 100%');
+    expect(screen.queryByText('Tải lên thành công')).not.toBeInTheDocument();
   });
   it('keeps the form on a layer-2 rejection and shows similarity instead of success', async () => {
     signedIn();
-    api.upload.mockRejectedValue(new ApiError(409, 'DUPLICATE_DOCUMENT', 'Không thể tải lên', [], '', [{ ...match, matchType: 'SIMILAR_TEXT', similarity: 116 / 128 }]));
+    api.upload.mockRejectedValue(new ApiError(409, 'DUPLICATE_DOCUMENT', 'Không thể tải lên', [], '', [{ ...match, matchType: 'SIMILAR_TEXT', similarity: 109 / 128 }]));
     mount('/upload'); await screen.findByRole('heading', { name: 'Tải lên tài liệu' }); await chooseFile();
     await userEvent.click(screen.getByRole('radio', { name: /^Riêng tư/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
     expect(await screen.findByRole('link', { name: match.title })).toBeVisible();
-    expect(screen.getByRole('alert')).toHaveTextContent('90%');
+    expect(screen.getByRole('alert')).toHaveTextContent('85,16%');
+    expect(screen.getByRole('alert')).toHaveTextContent('trên 85%');
     expect(screen.getByRole('heading', { name: 'Tải lên tài liệu' })).toBeVisible();
     expect(screen.queryByText('Tải lên thành công')).not.toBeInTheDocument();
   });
   it('accepts a medium match and displays a persistent warning after navigation', async () => {
     signedIn();
-    api.upload.mockResolvedValue({ ...doc, duplicateCheck: { ...noDuplicates, mode: 'block', result: 'WARNING', exactMatches: [], textMatches: [{ ...match, matchType: 'SIMILAR_TEXT', similarity: 115 / 128 }], textAnalysis: { ...noDuplicates.textAnalysis, status: 'OK', reason: null } } });
+    api.upload.mockResolvedValue({ ...doc, duplicateCheck: { ...noDuplicates, mode: 'block', result: 'WARNING', exactMatches: [], textMatches: [{ ...match, matchType: 'SIMILAR_TEXT', similarity: 108 / 128 }], textAnalysis: { ...noDuplicates.textAnalysis, status: 'OK', reason: null } } });
     mount('/upload'); await screen.findByRole('heading', { name: 'Tải lên tài liệu' }); await chooseFile();
     await userEvent.click(screen.getByRole('radio', { name: /^Công khai/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
     const warning = await screen.findByRole('alert');
     expect(warning).toHaveClass('toast--warning');
-    expect(warning).toHaveTextContent('89.84% phần chữ');
-    expect(warning).not.toHaveTextContent('khoảng 90% phần chữ');
+    expect(warning).toHaveTextContent('84,38% phần chữ');
+    expect(warning).not.toHaveTextContent('70%');
+    expect(warning).not.toHaveTextContent('90%');
     expect(within(warning).getByRole('link', { name: match.title })).toBeVisible();
     await userEvent.click(within(warning).getByRole('button', { name: 'Đóng thông báo' }));
     expect(screen.queryByRole('link', { name: match.title })).not.toBeInTheDocument();
+  });
+  it('shows 100% for identical text and lists each matched document once', async () => {
+    signedIn();
+    api.upload.mockRejectedValue(new ApiError(409, 'DUPLICATE_DOCUMENT', 'Không thể tải lên', [], '', [
+      { ...match, matchType: 'SAME_TEXT', similarity: 1 },
+      { ...match, matchType: 'SIMILAR_TEXT', similarity: 1 },
+    ]));
+    mount('/upload'); await screen.findByRole('heading', { name: 'Tải lên tài liệu' }); await chooseFile();
+    await userEvent.click(screen.getByRole('radio', { name: /^Công khai/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tải lên' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Trùng nội dung chữ 100%');
+    expect(screen.getAllByRole('link', { name: match.title })).toHaveLength(1);
   });
   it('shows successful warning links after navigation and a reason without percentages when skipped', async () => {
     signedIn(); api.upload.mockResolvedValue({ ...doc, duplicateCheck: { ...noDuplicates, mode: 'warn', result: 'WARNING', exactMatches: [match], textAnalysis: { ...noDuplicates.textAnalysis, reason: 'INSUFFICIENT_TEXT' } } });

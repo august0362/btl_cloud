@@ -67,7 +67,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
 };
 
 export const ERROR_MESSAGE: Record<ErrorCode, string> = {
-  DUPLICATE_DOCUMENT: 'Không thể tải lên: tài liệu trùng tệp hoặc giống nội dung từ 90% với tài liệu đã có.',
+  DUPLICATE_DOCUMENT: 'Không thể tải lên: tài liệu trùng tệp hoặc giống nội dung trên 85% với tài liệu đã có.',
   VALIDATION_ERROR: 'Dữ liệu gửi lên không hợp lệ.',
   INVALID_JSON: 'Dữ liệu JSON không hợp lệ.',
   UNAUTHENTICATED: 'Bạn cần đăng nhập để thực hiện thao tác này.',

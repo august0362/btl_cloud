@@ -56,7 +56,7 @@ export function authRateLimit(options: { limit: number; countSuccessful: boolean
     skipSuccessfulRequests: !options.countSuccessful,
     standardHeaders: false,
     legacyHeaders: false,
-    handler: (req, res, next) => {
+    handler: (req, _res, next) => {
       const resetTime = (req as unknown as { rateLimit?: { resetTime?: Date } }).rateLimit?.resetTime;
       const retryAfter = resetTime ? Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000)) : 900;
       next(new AppError('RATE_LIMITED', { headers: { 'Retry-After': String(retryAfter) } }));

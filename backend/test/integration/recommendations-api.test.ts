@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { REC_EVAL } from '../fixtures/rec-eval.js';
-import { createTestContext, CSRF, registerUser, resetDatabase, uploadDocument, type TestContext, type TestUser } from './context.js';
+import { cleanupTestData, createTestContext, CSRF, registerUser, resetDatabase, uploadDocument, type TestContext, type TestUser } from './context.js';
 import { recommendationHomeSchema, recommendationRelatedSchema, recommendationSettingsSchema, recommendationSuggestionsSchema, expectError } from '../helpers/contract.js';
 
 let ctx: TestContext, owner: TestUser, viewer: TestUser, other: TestUser;
@@ -20,7 +20,9 @@ async function seed() {
   await ctx.prisma.user.update({ where: { id: other.id }, data: { deletionStartedAt: new Date() } });
   await ctx.services.recommendations.index.refresh();
 }
-afterEach(async () => { await ctx.close(); });
+afterEach(async () => {
+  try { await cleanupTestData(ctx); } finally { await ctx.close(); }
+});
 beforeEach(async () => { vi.restoreAllMocks(); ctx = await createTestContext({ LOG_LEVEL: 'info' }); await resetDatabase(ctx.prisma); await seed(); });
 
 describe('recommendations opt-in and lifecycle', () => {
