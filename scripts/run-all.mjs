@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Chạy cùng một tác vụ cho mọi package (backend/, frontend/) đang tồn tại — ARCHITECTURE D-16.
-// `install` → npm ci (có lockfile) hoặc npm install; tác vụ khác → npm run <task> --if-present.
+// Run the same task in each application, using the npm bundled with Node.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -8,11 +7,20 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const task = process.argv[2];
-// Tham số thứ hai (tuỳ chọn) giới hạn package, ví dụ: node scripts/run-all.mjs test backend
-const packages = process.argv[3] ? [process.argv[3]] : ['backend', 'frontend'];
+const allPackages = ['backend', 'frontend'];
+const packages = process.argv[3] ? [process.argv[3]] : allPackages;
+const npm = [
+  process.env.npm_execpath,
+  path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
+  path.join(path.dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js'),
+].find((file) => file && existsSync(file));
 
-if (!task) {
+if (!['install', 'lint', 'build', 'test'].includes(task) || packages.some((name) => !allPackages.includes(name)) || process.argv.length > 4) {
   console.error('Cách dùng: node scripts/run-all.mjs <install|lint|build|test> [backend|frontend]');
+  process.exit(2);
+}
+if (!npm) {
+  console.error('Không tìm thấy npm. Cài Node.js kèm npm rồi thử lại.');
   process.exit(2);
 }
 
@@ -27,7 +35,8 @@ for (const name of packages) {
         : ['install']
       : ['run', task, '--if-present'];
   console.log(`\n> [${name}] npm ${args.join(' ')}`);
-  const result = spawnSync('npm', args, { cwd: dir, stdio: 'inherit', shell: process.platform === 'win32' });
+  const result = spawnSync(process.execPath, [npm, ...args], { cwd: dir, stdio: 'inherit' });
+  if (result.error) console.error(result.error.message);
   if (result.status !== 0) {
     console.error(`[${name}] npm ${args.join(' ')} thất bại (mã ${result.status})`);
     failed = true;

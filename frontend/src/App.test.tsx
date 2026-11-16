@@ -57,7 +57,7 @@ function deferred<T>() {
 }
 async function chooseFile(name = "Đề cương.pdf") {
   await userEvent.upload(
-    screen.getByLabelText("Tệp tài liệu *"),
+    await screen.findByLabelText("Tệp tài liệu *"),
     new File(["%PDF-1.7"], name, { type: "application/pdf" }),
   );
 }

@@ -107,7 +107,7 @@ export function createController(manager, token, port = controllerPort, onShutdo
           });
         }, 300);
       });
-      reply(202, { accepted: true, message: 'Đang dừng dịch vụ. Khởi động lại bằng Start.vbs hoặc run.bat start.' });
+      reply(202, { accepted: true, message: 'Đang dừng dịch vụ. Khởi động lại bằng Start.vbs, admin.bat hoặc server.bat.' });
       return;
     }
     try {
@@ -119,7 +119,7 @@ export function createController(manager, token, port = controllerPort, onShutdo
 
 async function main() {
   if (process.platform !== 'win32' || process.env.NODE_ENV === 'production' || !process.argv.includes('--local-development')) {
-    throw new Error('Controller chỉ dùng trên Windows local qua run.bat; không chạy trong production/AWS.');
+    throw new Error('Controller chỉ dùng trên Windows local qua launcher; không chạy trong production/AWS.');
   }
   const config = localConfig();
   const logs = createLogs({ file: diagnosticFile, secrets: config.secrets });

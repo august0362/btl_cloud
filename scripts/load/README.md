@@ -1,6 +1,6 @@
 # Thử tải (E3-03, XM-12)
 
-Chạy trên DB `btl_cloud_load` và bucket `btl-cloud-documents-load` riêng, không đụng dữ liệu dev (`btl_cloud`). Cách đọc kết quả và điều kiện để thêm cache: [ARCHITECTURE §A12.6](../../docs/ARCHITECTURE.md#a126-giám-sát-hiệu-năng-thử-tải-cache). Số đo local không dùng để suy ra hiệu năng trên AWS.
+Chạy trên DB `btl_cloud_load` và bucket `btl-cloud-documents-load` riêng, không đụng dữ liệu dev (`btl_cloud`). Thiết kế đo lường: [ARCHITECTURE](../../docs/ARCHITECTURE.md). Số đo local không dùng để suy ra hiệu năng trên AWS.
 
 ## 1. Chuẩn bị (một lần, MySQL + SeaweedFS local đang chạy)
 
@@ -22,7 +22,7 @@ DATABASE_URL="mysql://btl:btl_dev_password@localhost:3306/btl_cloud_load" S3_BUC
 cd backend && npx tsc -p tsconfig.build.json
 NODE_ENV=production PORT=3100 DATABASE_URL="mysql://btl:btl_dev_password@localhost:3306/btl_cloud_load" \
   S3_BUCKET=btl-cloud-documents-load LOG_LEVEL=warn AUTH_RATE_LIMIT_MAX=1000000 SERVE_FRONTEND=false \
-  CLEANUP_WORKER_ENABLED=false INSTANCE_ID=load-test node --env-file=.env dist/server.js
+  INSTANCE_ID=load-test node --env-file=.env dist/server.js
 ```
 
 `AUTH_RATE_LIMIT_MAX` chỉ nâng trong lần chạy này để kịch bản đăng nhập không bị 429.
@@ -56,6 +56,6 @@ autocannon không in P95; báo cáo dùng P50 và P97.5. Nếu muốn so với d
 - **Tìm kiếm:** req/s chững ở ~370 từ 10 lên 50 kết nối, CPU backend chỉ ~8% → nghẽn ở MySQL (`LIKE` quét bảng), không phải Node.
 - **Tải xuống:** ~117 MiB/s, CPU thấp → nghẽn ở SeaweedFS/đĩa.
 - **Đăng nhập:** chững ở ~80 req/s, CPU ~28% máy (≈ 4,5 luồng = 4 luồng libuv chạy argon2id + luồng chính) → nghẽn CPU vì argon2id, đúng thiết kế.
-- **Cache:** không cần. Chưa có mục tiêu thời gian phản hồi do owner đặt (điều kiện 1 chưa thoả), chưa thử index/sửa truy vấn (điều kiện 2), nên chưa đủ cả ba điều kiện §A12.6.
+- **Cache:** số đo này chưa chứng minh cần cache kết quả truy vấn. Chỉ mục gợi ý công khai là dữ liệu suy ra riêng; quyền truy cập vẫn kiểm lại từ DB.
 - **Có audit:** mỗi lần đăng nhập/tải xuống ghi một dòng `audit_events` (lần chạy này: 3 571 `AUTH_LOGIN`, 5 074 `DOCUMENT_DOWNLOAD`).
-- **Chênh lệch bật/tắt phần đo (E3-AC-04):** chưa đo. Phần đo XM-05 luôn bật trong `app.ts`/`server.ts` (`BTL_LOCAL_METRICS_FILE` chỉ bật ghi snapshot), muốn tắt phải sửa `backend/src`, nên chờ owner quyết định.
+- **Chi phí đo lường:** chưa đo chênh lệch bật/tắt. Metrics luôn bật trong `app.ts`/`server.ts`; `BTL_LOCAL_METRICS_FILE` chỉ bật ghi snapshot.

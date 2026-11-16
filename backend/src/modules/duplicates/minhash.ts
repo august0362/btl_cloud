@@ -30,10 +30,11 @@ export function fingerprintText(text: string, partialReason: TextReason | null =
 export function estimate(a: Uint8Array, b: Uint8Array): number {
     if (a.length !== 512 || b.length !== 512)
         throw new RangeError('Invalid MinHash signature');
-    const left = Buffer.from(a), right = Buffer.from(b);
+    const left = new DataView(a.buffer, a.byteOffset, a.byteLength);
+    const right = new DataView(b.buffer, b.byteOffset, b.byteLength);
     let equal = 0;
     for (let i = 0; i < 128; i++)
-        if (left.readUInt32BE(i * 4) === right.readUInt32BE(i * 4))
+        if (left.getUint32(i * 4) === right.getUint32(i * 4))
             equal++;
     return equal / 128;
 }

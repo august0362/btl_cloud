@@ -103,15 +103,16 @@ describe('duplicate analysis bounds and maintenance', () => {
     expect(response.status).toBe(201); expect(response.body.data.duplicateCheck.textAnalysis).toMatchObject({ candidatesScanned: 2000, candidatesTruncated: true }); expect(response.body.data.duplicateCheck.textMatches.length).toBeLessThanOrEqual(5);
   });
   it('busy analysis still permits upload and has no similarity percentage', async () => {
-    const { Worker } = await import('node:worker_threads');
     const { TextWorkerPool } = await import('../../src/modules/duplicates/text-worker-pool.js');
-    const pool = new TextWorkerPool({ deadlineMs: 800, createWorker: () => new Worker('while(true){}', { eval: true }) }); const analyze = TextWorkerPool.prototype.analyze.bind(pool);
-    vi.spyOn(TextWorkerPool.prototype, 'analyze').mockImplementation(analyze);
+    const { skipped } = await import('../../src/modules/duplicates/duplicate.policy.js');
+    // Queue saturation is covered by duplicates-workers.test.ts. Here verify
+    // the HTTP fallback without racing upload I/O against a worker deadline.
+    vi.spyOn(TextWorkerPool.prototype, 'analyze').mockResolvedValue(skipped('BUSY'));
     const user = await registerUser(warn.app);
-    const responses = await Promise.all(Array.from({ length: 5 }, (_, i) => upload(user, pdf(`busy-${i}`))));
-    expect(responses.every((r) => r.status === 201)).toBe(true);
-    expect(responses.some((r) => r.body.data.duplicateCheck.textAnalysis.reason === 'BUSY')).toBe(true);
-    expect(responses.every((r) => r.body.data.duplicateCheck.textMatches.length === 0)).toBe(true);
+    const response = await upload(user, pdf('busy'));
+    expect(response.status).toBe(201);
+    expect(response.body.data.duplicateCheck.textAnalysis).toMatchObject({ status: 'SKIPPED', reason: 'BUSY' });
+    expect(response.body.data.duplicateCheck.textMatches).toEqual([]);
   });
   it('backfills idempotently, detects changed keys, and never removes documents', async () => {
     const { TEST_ENV } = await import('../helpers/config.js');
