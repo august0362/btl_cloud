@@ -199,12 +199,17 @@ export function UploadPage() {
 
 export function DuplicateNotice({ check, matches = [], blocked = false }: { check?: DuplicateCheckDto; matches?: DuplicateMatchDto[]; blocked?: boolean }) {
   if (check?.mode === 'off') return null;
-  const all = check ? [...check.exactMatches, ...check.textMatches] : matches;
+  const unique = new Map<string, DuplicateMatchDto>();
+  for (const match of check ? [...check.exactMatches, ...check.textMatches] : matches) {
+    const previous = unique.get(match.documentId);
+    if (!previous || match.similarity > previous.similarity) unique.set(match.documentId, match);
+  }
+  const all = [...unique.values()];
   return <>
-    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Không thể tải lên: trùng tệp hoặc giống nội dung từ 90% với:' : 'Cảnh báo: nội dung giống từ 70% đến dưới 90% với:'}
-      <span role="list">{all.map((match, index) => <span role="listitem" style={{ display: 'block' }} key={`${match.documentId}:${index}`}>
+    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Đã từ chối tải lên. Tài liệu trùng với:' : 'Cảnh báo trùng nội dung với:'}
+      <span role="list">{all.map((match) => <span role="listitem" style={{ display: 'block' }} key={match.documentId}>
         <Link to={`/documents/${match.documentId}`}>{match.title}</Link> ({match.ownedByYou ? 'của bạn' : 'công khai'})
-        {match.matchType !== 'EXACT' && <> · khoảng {Math.round(match.similarity * 10000) / 100}% phần chữ đã phân tích trùng{check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
+        {match.matchType === 'EXACT' ? ' · Trùng tệp 100%' : match.matchType === 'SAME_TEXT' ? ' · Trùng nội dung chữ 100%' : <> · Giống {(match.similarity * 100).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% phần chữ đã phân tích (ước tính){check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
       </span>)}</span>
     </span>}
     {check?.textAnalysis.status === 'SKIPPED' && <span style={{ display: 'block' }}>Chưa kiểm tra được trùng nội dung: {duplicateReasonMessages[check.textAnalysis.reason ?? 'ERROR'] ?? duplicateReasonMessages.ERROR}</span>}

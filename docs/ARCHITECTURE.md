@@ -185,7 +185,7 @@ Autocomplete dùng combobox ARIA, debounce 250 ms, AbortController và phím lê
 
 ### A9.2 Phát hiện trùng
 
-SHA-256 tính theo stream cho mọi tệp. `warn`/`off` trong cấu hình cũ được nâng thành `block` cho web API; từ chối bản trùng bytes hoặc giống chữ từ 90% theo phạm vi ở [PROJECT_OVERVIEW](PROJECT_OVERVIEW.md). Từ 70% đến dưới 90% cho upload/thay tệp và trả WARNING. Thay tệp loại chính documentId. Transaction khoá dòng ingest dùng chung, user và khi thay tệp khoá document để kiểm tra lại cả SHA-256 và chữ trước commit; áp dụng giữa các tài khoản và instance. Trích chữ và PutObject không giữ khoá ingest.
+SHA-256 tính theo stream cho mọi tệp. `warn`/`off` trong cấu hình cũ được nâng thành `block` cho web API; từ chối bản trùng bytes hoặc giống chữ trên 85% theo phạm vi ở [PROJECT_OVERVIEW](PROJECT_OVERVIEW.md). Từ 70% đến 85% cho upload/thay tệp và trả WARNING. Thay tệp loại chính documentId. Transaction khoá dòng ingest dùng chung, user và khi thay tệp khoá document để kiểm tra lại cả SHA-256 và chữ trước commit; áp dụng giữa các tài khoản và instance. Trích chữ và PutObject không giữ khoá ingest.
 
 Trích chữ trong worker mới cho mỗi job; truyền đường dẫn tmp, không chuyển cả tệp qua message. PDF dùng `pdfjs-dist` 6.5.438 ở chế độ parser, tắt eval/render/canvas; DOCX đọc `word/document.xml`, PPTX đọc slide theo thứ tự số. Không lưu chữ thô vào DB.
 

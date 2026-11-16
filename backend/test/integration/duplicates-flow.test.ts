@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import request from 'supertest';
 import { DuplicateRepository } from '../../src/modules/duplicates/duplicate.repository.js';
 import { canView } from '../../src/modules/documents/document.policy.js';
-import { createTestContext, registerUser, resetDatabase, uploadRequest, CSRF, type TestContext, type TestUser } from './context.js';
+import { createTestContext, registerUser, resetDatabase, uploadRequest, binaryParser, CSRF, type TestContext, type TestUser } from './context.js';
 import { uploadResultSchema } from '../helpers/contract.js';
 const pdf = (label: string) => Buffer.from(`%PDF-1.7\n${label}\n%%EOF`);
 let block: TestContext, second: TestContext, warn: TestContext, off: TestContext;
@@ -18,6 +18,22 @@ async function privacy(res: request.Response, viewerId: string) {
 }
 async function office(words: string, metadata = ''): Promise<Buffer> { const z = new ZipFile(); z.addBuffer(Buffer.from('<Types/>'), '[Content_Types].xml'); z.addBuffer(Buffer.from(`<w:document><w:p><w:t>${words}</w:t></w:p></w:document>`), 'word/document.xml'); z.addBuffer(Buffer.from(metadata), 'docProps/core.xml'); const chunks: Buffer[] = []; const done = (async () => { for await (const c of z.outputStream) chunks.push(Buffer.from(c)); })(); z.end(); await done; return Buffer.concat(chunks); }
 describe('duplicate upload and replacement', () => {
+  it('rejects a downloaded public file as 100% exact even with a different name, account or visibility', async () => {
+    const owner = await registerUser(block.app), downloader = await registerUser(block.app);
+    const original = await upload(owner, pdf('public download source'), 'PUBLIC', 'Original');
+    expect(original.status).toBe(201);
+    const download = await downloader.agent.get(`/api/documents/${original.body.data.id}/download`).buffer(true).parse(binaryParser);
+    expect(download.status).toBe(200);
+    expect(download.body).toEqual(pdf('public download source'));
+    for (const visibility of ['PRIVATE', 'PUBLIC'] as const) {
+      const copy = await uploadRequest(downloader, { title: 'Renamed copy', visibility, file: download.body, filename: 'renamed.pdf' });
+      expect(copy.status).toBe(409);
+      expect(copy.body.error.duplicates).toEqual([expect.objectContaining({ documentId: original.body.data.id, matchType: 'EXACT', similarity: 1 })]);
+    }
+    expect(await block.prisma.document.count()).toBe(1);
+    expect(await block.prisma.documentFingerprint.count()).toBe(1);
+    expect(block.storage.putKeys).toHaveLength(1);
+  });
   it('blocks exact own files before S3, including private copies, and preserves legacy validation order', async () => {
     const owner = await registerUser(block.app); const bytes = pdf('own');
     const first = await upload(owner, bytes, 'PRIVATE'); expect(first.status).toBe(201); uploadResultSchema.parse(first.body.data);
@@ -145,18 +161,18 @@ describe('duplicate upload and replacement', () => {
     expect(await block.prisma.document.count()).toBe(5);
     expect(await block.prisma.documentFingerprint.count()).toBe(5);
   }, 120000);
-  it('rejects same text and 90% near text before storage, but accepts dissimilar text', async () => {
+  it('rejects same text and above 85% near text before storage, but accepts dissimilar text', async () => {
     const user = await registerUser(block.app); const words = Array.from({ length: 2000 }, (_, i) => `word${i}`); const firstBytes = await office(words.join(' '), 'one');
     const first = await uploadRequest(user, { title: 'text', visibility: 'PUBLIC', file: firstBytes, filename: 'first.docx' }); expect(first.status).toBe(201);
     const same = await uploadRequest(user, { title: 'same', visibility: 'PUBLIC', file: await office(words.join(' '), 'two'), filename: 'same.docx' }); expect(same.status).toBe(409); expect(same.body.error.duplicates[0]).toMatchObject({ matchType: 'SAME_TEXT', similarity: 1 });
-    const nearWords = words.map((w, i) => i % 200 === 0 ? `changed${i}` : w);
-    const near = await uploadRequest(user, { title: 'near', visibility: 'PUBLIC', file: await office(nearWords.join(' ')), filename: 'near.docx' }); expect(near.status).toBe(409); expect(near.body.error.duplicates[0].matchType).toBe('SIMILAR_TEXT'); expect(near.body.error.duplicates[0].similarity).toBeGreaterThanOrEqual(0.9); await privacy(near, user.id);
+    const nearWords = words.map((w, i) => i % 60 === 0 ? `changed${i}` : w);
+    const near = await uploadRequest(user, { title: 'near', visibility: 'PUBLIC', file: await office(nearWords.join(' ')), filename: 'near.docx' }); expect(near.status).toBe(409); expect(near.body.error.duplicates[0]).toMatchObject({ matchType: 'SIMILAR_TEXT', similarity: 109 / 128 }); await privacy(near, user.id);
     expect(block.storage.putKeys).toHaveLength(1); expect(await block.prisma.document.count()).toBe(1);
     const medium = await uploadRequest(user, { title: 'medium', visibility: 'PRIVATE', file: await office(words.map((w, i) => i % 40 === 0 ? `medium${i}` : w).join(' ')), filename: 'medium.docx' });
     expect(medium.status).toBe(201);
     expect(medium.body.data.duplicateCheck.result).toBe('WARNING');
     expect(medium.body.data.duplicateCheck.textMatches[0].similarity).toBeGreaterThanOrEqual(0.7);
-    expect(medium.body.data.duplicateCheck.textMatches[0].similarity).toBeLessThan(0.9);
+    expect(medium.body.data.duplicateCheck.textMatches[0].similarity).toBeLessThanOrEqual(0.85);
     const different = await uploadRequest(user, { title: 'different', visibility: 'PUBLIC', file: await office(words.map((w, i) => i % 10 === 0 ? `new${i}` : w).join(' ')), filename: 'different.docx' });
     expect(different.status).toBe(201); expect(different.body.data.duplicateCheck.result).toBe('ACCEPT');
   });

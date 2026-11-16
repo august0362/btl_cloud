@@ -11,16 +11,23 @@ import { TextWorkerPool } from '../../src/modules/duplicates/text-worker-pool.js
 const match: DuplicateMatchDto = { documentId: 'visible-id', title: 'visible', visibility: 'PUBLIC', ownedByYou: false, matchType: 'SIMILAR_TEXT', similarity: 116 / 128 };
 describe('mandatory upload rejection threshold', () => {
   const service = new DuplicateService({} as DuplicateRepository, 'block', createLogger({ level: 'silent', instanceId: 'test' }));
-  it('rejects exact, same text and 90% matches for both incoming visibilities', () => {
+  it('rejects exact, same text and above 85% matches for both incoming visibilities', () => {
     for (const visibility of ['PRIVATE', 'PUBLIC'] as const) {
       for (const matchType of ['EXACT', 'SAME_TEXT', 'SIMILAR_TEXT'] as const) {
-        expect(() => service.block([{ ...match, matchType, similarity: matchType === 'SIMILAR_TEXT' ? 0.9 : 1 }], visibility))
+        expect(() => service.block([{ ...match, matchType, similarity: matchType === 'SIMILAR_TEXT' ? 109 / 128 : 1 }], visibility))
           .toThrow(expect.objectContaining({ code: 'DUPLICATE_DOCUMENT', status: 409 }));
       }
     }
   });
-  it('does not round 89.84375% up to the rejection threshold or expose other private files', () => {
-    expect(() => service.block([{ ...match, similarity: 115 / 128 }], 'PUBLIC')).not.toThrow();
+  it('allows exactly 85%, rejects above it without rounding, and excludes other private files', () => {
+    for (const visibility of ['PRIVATE', 'PUBLIC'] as const) {
+      for (const similarity of [0.7, 108 / 128, 0.85]) {
+        expect(() => service.block([{ ...match, similarity }], visibility)).not.toThrow();
+      }
+      for (const similarity of [0.850001, 109 / 128, 115 / 128, 1]) {
+        expect(() => service.block([{ ...match, similarity }], visibility)).toThrow();
+      }
+    }
     expect(() => service.block([{ ...match, visibility: 'PRIVATE' }], 'PRIVATE')).not.toThrow();
     expect(() => service.block([{ ...match, visibility: 'PRIVATE', ownedByYou: true }], 'PRIVATE')).toThrow();
   });

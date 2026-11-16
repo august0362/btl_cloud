@@ -58,6 +58,11 @@ export async function initDatabase(config, logs) {
   await command(join(config.mysqlDir, 'bin/mysql.exe'), ['--default-character-set=utf8mb4', '-uroot', '-h127.0.0.1', '-P3306'], { env: config.env, logs, service: 'mysql', input: sql });
 }
 export async function prepareApplication(config, logs) {
+  if (config.env.BTL_LOCAL_PRODUCTION === '1') {
+    const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+    logs.add('backend', 'INFO', 'Đang build backend từ mã nguồn hiện tại.');
+    await command(process.execPath, [npm, 'run', 'build'], { cwd: backendDir, env: config.env, logs, service: 'backend', timeout: 600_000 });
+  }
   await command(process.execPath, ['--env-file-if-exists=.env', 'node_modules/prisma/build/index.js', 'migrate', 'deploy'], { cwd: backendDir, env: config.env, logs, service: 'backend' });
   await command(process.execPath, ['--env-file-if-exists=.env', '--import', 'tsx', 'scripts/init-storage.ts'], { cwd: backendDir, env: config.env, logs, service: 'seaweedfs' });
 }
