@@ -67,3 +67,8 @@ export function expectError(res: HttpResponse, status: number, code: string): { 
 export function expectDocument(value: unknown): z.infer<typeof documentDtoSchema> {
   return documentDtoSchema.parse(value);
 }
+
+export const recommendationHomeSchema = z.object({ strategy: z.enum(['PERSONALIZED', 'POPULAR', 'NEWEST']), items: z.array(z.object({ document: documentDtoSchema, reason: z.enum(['SIMILAR_TO_HISTORY', 'POPULAR', 'NEW']) }).strict()) }).strict();
+export const recommendationRelatedSchema = z.object({ items: z.array(documentDtoSchema) }).strict();
+export const recommendationSuggestionsSchema = z.object({ items: z.array(z.object({ documentId: uuid, title: z.string() }).strict()).max(8) }).strict();
+export const recommendationSettingsSchema = z.object({ personalizationEnabled: z.boolean(), historyItems: z.number().int().nonnegative() }).strict();

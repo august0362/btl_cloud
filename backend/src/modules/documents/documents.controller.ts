@@ -9,6 +9,7 @@ import { inspectFile } from '../files/file-inspector.js';
 import { toDocumentDto } from './document.mapper.js';
 import { loadedDocument } from './document.loader.js';
 import { createFieldsSchema, mineQuerySchema, patchSchema, publicQuerySchema, replaceFieldsSchema } from './documents.schemas.js';
+import type { RecommendationService } from '../recommendations/recommendations.service.js';
 import type { DocumentService } from './documents.service.js';
 
 function requireUser(req: Request): { userId: string } {
@@ -23,11 +24,11 @@ function multipartIssues(req: Request, fieldIssues: ValidationIssue[]): Validati
   return issues;
 }
 
-export function createDocumentsController(service: DocumentService, logger: Logger) {
+export function createDocumentsController(service: DocumentService, logger: Logger, searchRanker?: RecommendationService) {
   /** API-07 */
   const searchPublic: RequestHandler = async (req, res) => {
     const query = parseOrThrow(publicQuerySchema, req.query);
-    res.json({ data: await service.searchPublic(query, req.auth) });
+    res.json({ data: query.sort === 'relevance' && query.q && searchRanker ? await searchRanker.search(query, req.auth?.userId) : await service.searchPublic({ ...query, sort: query.sort === 'relevance' ? 'newest' : query.sort }, req.auth) });
   };
 
   /** API-08 */

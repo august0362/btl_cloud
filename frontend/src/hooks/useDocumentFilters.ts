@@ -26,15 +26,17 @@ export function useDocumentFilters(mine: boolean) {
         mine && (visibility === "PUBLIC" || visibility === "PRIVATE")
           ? visibility
           : undefined,
-      sort: current.get("sort") === "title" ? "title" : "newest",
+      sort: current.get("sort") === "title" ? "title" : !mine && current.get("sort") === "relevance" ? "relevance" : current.get("sort") === "newest" ? "newest" : !mine && q ? "relevance" : "newest",
       page,
       pageSize: 12,
     };
   }, [key, mine]);
   const update = (patch: SearchParams) => {
     const next = { ...filters, ...patch };
+    if (!mine && patch.q !== undefined && !params.has("sort") && patch.sort === undefined) next.sort = patch.q ? "relevance" : "newest";
     const query = new URLSearchParams();
     for (const [name, value] of Object.entries(next)) {
+      if (name === "sort" && !params.has("sort") && patch.sort === undefined) continue;
       if (name !== "pageSize" && value !== undefined && value !== "")
         query.set(name, String(value));
     }

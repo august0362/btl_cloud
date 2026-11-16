@@ -13,6 +13,7 @@ import { metricsMiddleware } from './metrics/metrics.js';
 import { createAudited } from './modules/audit/audited.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import type { SessionCookieConfig } from './modules/auth/session.cookie.js';
+import { recommendationRoutes } from './modules/recommendations/recommendations.routes.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
 import { createUploadMiddleware } from './modules/files/upload.middleware.js';
 import { healthRoutes } from './modules/health/health.routes.js';
@@ -63,12 +64,14 @@ export function createApp(deps: AppDeps): Express {
     '/documents',
     documentRoutes({
       service: services.documentService,
+      recommendations: services.recommendations,
       repository: services.documents,
       upload: createUploadMiddleware(config.upload.tmpDir),
       logger,
       audited,
     }),
   );
+  api.use('/recommendations', recommendationRoutes(services.recommendations));
   api.use(apiNotFound);
   app.use('/api', api);
 

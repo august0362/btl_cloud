@@ -94,8 +94,20 @@ export class DocumentRepository {
   async findDiscoverableByIds(ids: string[]): Promise<DocumentWithOwner[]> {
     if (ids.length > 100) throw new RangeError('At most 100 document ids');
     if (ids.length === 0) return [];
-    const visible = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT d.id FROM documents d WHERE d.id IN (${Prisma.join(ids)}) AND ${discoverableSql()}`;
-    const rows = await this.prisma.document.findMany({ where: { id: { in: visible.map((row) => row.id) }, visibility: 'PUBLIC', owner: { deletionStartedAt: null } }, include: ownerSelect });
+    // One SQL statement both hydrates and rechecks visibility, avoiding a TOCTOU gap
+    // and respecting the recommendation endpoints' database query budget.
+    type HydratedRow = Omit<DocumentWithOwner, 'owner' | 'sizeBytes' | 'fileVersion'> & { sizeBytes: number | bigint; fileVersion: number | bigint; ownerDisplayName: string; ownerDeletionStartedAt: Date | null };
+    const hydrated = await this.prisma.$queryRaw<HydratedRow[]>`
+      SELECT d.id, d.owner_id AS ownerId, d.title, d.description, d.visibility,
+        d.file_type AS fileType, d.mime_type AS mimeType, d.original_filename AS originalFilename,
+        d.size_bytes AS sizeBytes, d.storage_key AS storageKey, d.file_version AS fileVersion,
+        d.created_at AS createdAt, d.updated_at AS updatedAt, d.file_updated_at AS fileUpdatedAt,
+        o.display_name AS ownerDisplayName, o.deletion_started_at AS ownerDeletionStartedAt
+      FROM documents d JOIN users o ON o.id = d.owner_id
+      WHERE d.id IN (${Prisma.join(ids)}) AND ${discoverableSql()}`;
+    const rows: DocumentWithOwner[] = hydrated.map(({ ownerDisplayName, ownerDeletionStartedAt, ...row }) => ({
+      ...row, sizeBytes: Number(row.sizeBytes), fileVersion: Number(row.fileVersion), owner: { id: row.ownerId, displayName: ownerDisplayName, deletionStartedAt: ownerDeletionStartedAt },
+    }));
     const byId = new Map(rows.map((row) => [row.id, row]));
     return ids.flatMap((id) => { const row = byId.get(id); return row ? [row] : []; });
   }
