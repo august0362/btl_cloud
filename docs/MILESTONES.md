@@ -15,6 +15,8 @@ Kiểm chứng local **16/11/2026**: lint/build, liên kết tài liệu và cá
 
 Bộ so trùng với tệp thật bổ sung cùng ngày đạt **24/24 ca** qua HTTP, MySQL và SeaweedFS test: ba định dạng cho cùng tỷ lệ 100%, 92,1875%, 85,15625%, 75,78125% và 36,71875%. Kiểm được cả tải xuống rồi upload lại, Public/Private, khác tài khoản, khác định dạng, từ chối trước khi ghi storage và giữ nguyên bản cũ khi thay tệp bị chặn. Đây là dữ liệu tổng hợp với PDF có lớp chữ; PDF scan không có lớp chữ chỉ được so trùng tệp bằng SHA-256.
 
+Kiểm chứng cá nhân hoá cùng ngày: **20 ca API** (12 hợp đồng và 8 luồng đọc/tải thật), **22 unit backend**, **7 unit frontend** và **2 ca trình duyệt** đạt. Một ca Chrome dùng frontend build, HTTP, MySQL và S3 local thật; ca còn lại dùng API giả lập để kiểm tra bàn phím và WCAG AA. Hai tài khoản đọc Cloud/AI nhận gợi ý khác nhau; xóa lịch sử chỉ tác động tài khoản hiện tại; tắt được giữ sau đăng nhập lại/tải lại trang. Có kiểm tra lỗi tải S3, cache cũ khi tài liệu đổi quyền/xoá, và ưu tiên tiêu đề khớp truy vấn. Các ca mới tạo lịch sử qua API xem/tải, không chèn lịch sử bằng SQL.
+
 ## Kiểm tra mã nguồn
 
 Tại gốc repo, dùng Node.js 24:
@@ -58,12 +60,26 @@ Máy có thư mục admin có thể chạy thêm `npm exec -- vitest run --confi
 | Tệp so trùng thực tế | 18 DOCX/PDF/PPTX; 100%, trên 85%, cảnh báo 70-85%, dưới 70%; download/upload lại và thay tệp | [Mẫu và cách chạy](../backend/test/fixtures/duplicate-documents/README.md); integration duplicates-real-files |
 | Phân tích chữ | PDF/Office, dấu tiếng Việt, scan/hỏng/mã hoá, PARTIAL/SKIPPED, timeout/hàng đợi | unit duplicates-*; document-foundation |
 | Gợi ý | Opt-in mặc định tắt, bật/tắt/xoá lịch sử, popularity, Private/DELETING khi index cũ | integration recommendations-api |
+| Cá nhân hoá qua hành vi | Hồ sơ Cloud/AI riêng biệt, VIEW/DOWNLOAD không nhân bản, tắt/xoá rồi học lại, cách ly tài khoản | [recommendations-journey](../backend/test/integration/recommendations-journey.test.ts); [Chrome E2E thật](../frontend/e2e/personalization.spec.ts) |
 | Tìm relevance | Query thắng sở thích, phân trang qua mốc 200, fallback và tắt tính năng | unit ranking/search; integration recommendations-api |
 | UI | Lỗi giữ form, hiển thị cảnh báo, mục gợi ý lỗi bị ẩn, combobox/debounce/abort | frontend unit; `ui-tests/recommendations.spec.ts` |
 | Launcher | Hai thứ tự bật, click lặp, stop từng chế độ, không đổi PID, không giết process khác | backend dev tests |
 | Cách ly admin | Clone không có admin vẫn chạy, public không có control/log/secret | admin-isolation và local-production |
 
 ## Công cụ đánh giá hiện có
+
+Chạy lại riêng phần cá nhân hoá, tại gốc dự án sau khi bật MySQL/SeaweedFS local:
+
+```sh
+npm --prefix backend test -- recommendations
+npm --prefix frontend test -- recommendations
+npm --prefix backend run test:integration -- recommendations-api recommendations-journey
+# Frontend da build; can Google Chrome. Chay sau integration, khong chay song song:
+npm --prefix frontend run test:e2e -- personalization.spec.ts
+npm --prefix frontend run test:ui -- recommendations.spec.ts
+```
+
+[Fixture cá nhân hoá](../backend/test/fixtures/personalization-scenario.ts) dùng catalog ba chủ đề AWS Cloud, AI/ML và Giải tích, có Public/Private và chủ đang xoá. Hai tài liệu nguồn có object PDF thật để kiểm tra tải xuống. Fixture từ chối DB/storage ngoài loopback, DB không kết thúc `_test` hoặc bucket không kết thúc `-test`. Các tài khoản, tương tác và object của ca thử được dọn khi kết thúc; không chạy đồng thời với các bộ khác dùng chung DB test.
 
 - `node scripts/eval/duplicate-eval.mjs dataset.json`: đánh giá so trùng với dataset dạng `[{ left, right, duplicate }]`.
 - `node scripts/eval/duplicate-eval.mjs --benchmark`: đo SHA-256, MinHash và worker sau khi build backend.

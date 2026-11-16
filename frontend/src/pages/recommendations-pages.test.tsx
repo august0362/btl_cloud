@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePage } from './DocumentListPages';
@@ -34,5 +34,51 @@ describe('recommendation home privacy controls', () => {
   it('defaults public queries to relevance, honors explicit sort, no home section during search', async () => {
     const view = mount('/?q=AWS'); await waitFor(() => expect(documentsApi.searchPublic).toHaveBeenCalledWith(expect.objectContaining({ q: 'AWS', sort: 'relevance' }), expect.any(AbortSignal))); expect(api.home).not.toHaveBeenCalled(); view.unmount();
     mount('/?q=AWS&sort=newest'); await waitFor(() => expect(documentsApi.searchPublic).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'newest' }), expect.any(AbortSignal)));
+  });
+
+  it('hides the old account recommendations and settings while the next account loads', async () => {
+    state.user = { id: 'cloud-reader' };
+    api.home.mockResolvedValue({ strategy: 'PERSONALIZED', items: [{ document: { ...documentFixture, title: 'AWS for the first reader' }, reason: 'SIMILAR_TO_HISTORY' }] });
+    api.getSettings.mockResolvedValue({ personalizationEnabled: true, historyItems: 4 });
+    const view = mount();
+    expect(await screen.findByText('AWS for the first reader')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Tuỳ chọn gợi ý' })).toBeInTheDocument();
+    let resolveHome!: (value: Awaited<ReturnType<typeof recommendationsApi.home>>) => void;
+    let resolveSettings!: (value: Awaited<ReturnType<typeof recommendationsApi.getSettings>>) => void;
+    api.home.mockImplementationOnce(() => new Promise((resolve) => { resolveHome = resolve; }));
+    api.getSettings.mockImplementationOnce(() => new Promise((resolve) => { resolveSettings = resolve; }));
+    state.user = { id: 'ai-reader' };
+    view.rerender(<MemoryRouter><HomePage /></MemoryRouter>);
+    expect(screen.queryByText('AWS for the first reader')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tuỳ chọn gợi ý' })).not.toBeInTheDocument();
+    await act(async () => {
+      resolveHome({ strategy: 'NEWEST', items: [{ document: { ...documentFixture, title: 'AI for the next reader' }, reason: 'NEW' }] });
+      resolveSettings({ personalizationEnabled: false, historyItems: 0 });
+    });
+    expect(await screen.findByText('AI for the next reader')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bật' })).toBeInTheDocument();
+    expect(screen.queryByText('AWS for the first reader')).not.toBeInTheDocument();
+  });
+
+  it('keeps the current setting and recommendations when saving or clearing history fails', async () => {
+    state.user = { id: 'viewer' };
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Bật' }));
+    api.putSettings.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(screen.getByRole('switch'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+    expect(api.home).toHaveBeenCalledTimes(1);
+
+    api.putSettings.mockResolvedValue({ personalizationEnabled: true, historyItems: 2 });
+    api.getSettings.mockResolvedValue({ personalizationEnabled: true, historyItems: 2 });
+    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tuỳ chọn gợi ý' }));
+    api.deleteHistory.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xoá lịch sử' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Tài liệu nổi bật')).toBeInTheDocument();
+    expect(api.home).toHaveBeenCalledTimes(2);
   });
 });

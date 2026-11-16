@@ -20,7 +20,14 @@ async function seed() {
   await ctx.prisma.user.update({ where: { id: other.id }, data: { deletionStartedAt: new Date() } });
   await ctx.services.recommendations.index.refresh();
 }
-afterEach(async () => { await ctx.close(); });
+afterEach(async () => {
+  try {
+    for (const key of ctx.storage.putKeys) await ctx.s3.deleteObject(key);
+    const users = await ctx.prisma.user.findMany({ select: { id: true } });
+    await ctx.prisma.auditEvent.deleteMany({ where: { actorId: { in: users.map((user) => user.id) } } });
+    await resetDatabase(ctx.prisma);
+  } finally { await ctx.close(); }
+});
 beforeEach(async () => { vi.restoreAllMocks(); ctx = await createTestContext({ LOG_LEVEL: 'info' }); await resetDatabase(ctx.prisma); await seed(); });
 
 describe('recommendations opt-in and lifecycle', () => {
