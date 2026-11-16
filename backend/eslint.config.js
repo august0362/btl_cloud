@@ -12,13 +12,13 @@ export default tseslint.config(
     },
   },
   {
-    // ARCHITECTURE §A1.4: chỉ repository dùng Prisma, chỉ S3ObjectStorage dùng AWS SDK, service không import Express.
+    // Giữ AWS SDK trong adapter storage và tách service khỏi Express.
     files: ['src/**/*.ts'],
     ignores: ['src/storage/s3-object-storage.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK (§A1.4).' }] },
+        { patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK.' }] },
       ],
     },
   },
@@ -28,8 +28,8 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: [{ name: '@prisma/client', importNames: ['PrismaClient'], message: 'Chỉ repository được dùng PrismaClient (§A1.4).' }],
-          patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK (§A1.4).' }],
+          paths: [{ name: '@prisma/client', importNames: ['PrismaClient'], message: 'Chỉ repository được dùng PrismaClient.' }],
+          patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK.' }],
         },
       ],
     },
@@ -47,10 +47,10 @@ export default tseslint.config(
         'error',
         {
           paths: [
-            { name: 'express', message: 'Service không được import Express (§A1.4).' },
-            { name: '@prisma/client', importNames: ['PrismaClient'], message: 'Chỉ repository được dùng PrismaClient (§A1.4).' },
+            { name: 'express', message: 'Service không được import Express.' },
+            { name: '@prisma/client', importNames: ['PrismaClient'], message: 'Chỉ repository được dùng PrismaClient.' },
           ],
-          patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK (§A1.4).' }],
+          patterns: [{ group: ['@aws-sdk/*', '@smithy/*'], message: 'Chỉ storage/s3-object-storage.ts được dùng AWS SDK.' }],
         },
       ],
     },

@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { REC_EVAL } from './rec-eval.js';
 import { TEST_ENV } from '../helpers/config.js';
-import { createTestContext, registerUser, resetDatabase } from '../integration/context.js';
+import { cleanupTestData, createTestContext, registerUser, resetDatabase } from '../integration/context.js';
 
 /** Real HTTP/DB/storage fixture; interaction history is created by client requests. */
 export async function createPersonalizationScenario(overrides: Record<string, string> = {}) {
@@ -18,12 +18,7 @@ export async function createPersonalizationScenario(overrides: Record<string, st
     throw new Error('Personalization scenarios require a local _test database and a local -test bucket.');
   }
   const close = async () => {
-    try {
-      for (const key of ctx.storage.putKeys) await ctx.s3.deleteObject(key);
-      const users = await ctx.prisma.user.findMany({ select: { id: true } });
-      await ctx.prisma.auditEvent.deleteMany({ where: { actorId: { in: users.map((user) => user.id) } } });
-      await resetDatabase(ctx.prisma);
-    } finally { await ctx.close(); }
+    try { await cleanupTestData(ctx); } finally { await ctx.close(); }
   };
   try {
     await ctx.s3.ensureBucket();

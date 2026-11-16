@@ -54,17 +54,29 @@ test('partial failure keeps Frontend available for logs; Start All retries only 
 test('a failed application build prevents backend startup and can be retried', async () => {
   const f = fixture();
   let attempts = 0;
-  const manager = createStackManager({ env: {} }, createLogs(), { adapters: f.adapters,
+  let adminState = 'stopped';
+  const admin = {
+    status: () => ({ state: adminState }),
+    async execute(action) {
+      if (action === 'start' && adminState === 'running') return;
+      f.calls.push(`${action}:admin`);
+      adminState = action === 'start' ? 'running' : 'stopped';
+    },
+  };
+  const manager = createStackManager({ env: {} }, createLogs(), { adapters: { ...f.adapters, admin },
     prepareDependencies: async () => {}, prepareApplication: async () => {
+      f.calls.push('build');
       if (++attempts === 1) throw new Error('frontend build failed');
     } });
   await assert.rejects(manager.execute('start-all'), /frontend build failed/);
   assert.equal(f.adapters.backend.status().state, 'stopped');
   assert.equal(f.adapters.frontend.status().state, 'running');
+  assert.equal(adminState, 'running');
+  f.calls.length = 0;
   await manager.execute('start-all');
   await manager.execute('start-all');
   assert.equal(attempts, 2);
-  assert.equal(f.calls.filter((entry) => entry === 'start:backend').length, 1);
+  assert.deepEqual(f.calls, ['stop:admin', 'build', 'start:backend', 'start:admin']);
 });
 test('Backend OFF leaves other services alive; Stop All drains backend before frontend and dependencies', async () => {
   const f = fixture();

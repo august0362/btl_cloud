@@ -7,7 +7,7 @@ import { createLogger } from '../../src/lib/logger.js';
 import { sha256 } from '../helpers/fixtures.js';
 import { TEST_ENV } from '../helpers/config.js';
 import {
-  binaryParser, createTestContext, CSRF, readObject, registerUser, resetDatabase, uploadRequest,
+  binaryParser, cleanupTestData, createTestContext, CSRF, readObject, registerUser, resetDatabase, uploadRequest,
   type TestContext, type TestUser,
 } from './context.js';
 
@@ -41,13 +41,7 @@ beforeEach(async () => {
   owner = await registerUser(ctx.app);
   other = await registerUser(ctx.app);
 });
-afterEach(async () => {
-  try {
-    for (const key of ctx.storage.putKeys) await ctx.s3.deleteObject(key);
-    await ctx.prisma.auditEvent.deleteMany({ where: { actorId: { in: [owner.id, other.id] } } });
-    await resetDatabase(ctx.prisma);
-  } finally { ctx.storage.reset(); }
-});
+afterEach(async () => { await cleanupTestData(ctx); });
 afterAll(async () => { await ctx.close(); });
 
 async function upload(user: TestUser, format: Format, variant: Variant, visibility: 'PUBLIC' | 'PRIVATE' = 'PUBLIC') {

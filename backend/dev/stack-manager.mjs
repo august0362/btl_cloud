@@ -74,6 +74,9 @@ export function createStackManager(config, logs, overrides = {}) {
     if (!errors.length) {
       try {
         if (!applicationPrepared) {
+          // A previous failed build may have started admin for diagnostics.
+          // Release its Prisma DLL before regenerating the client on Windows.
+          if (services.admin?.status().state === 'running') await services.admin.execute('stop');
           if (mode === 'portable' && !adapters && services.mysql.status().managed) await initDatabase(config, logs);
           await setup();
           applicationPrepared = true;

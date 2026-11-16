@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { REC_EVAL } from '../fixtures/rec-eval.js';
-import { createTestContext, CSRF, registerUser, resetDatabase, uploadDocument, type TestContext, type TestUser } from './context.js';
+import { cleanupTestData, createTestContext, CSRF, registerUser, resetDatabase, uploadDocument, type TestContext, type TestUser } from './context.js';
 import { recommendationHomeSchema, recommendationRelatedSchema, recommendationSettingsSchema, recommendationSuggestionsSchema, expectError } from '../helpers/contract.js';
 
 let ctx: TestContext, owner: TestUser, viewer: TestUser, other: TestUser;
@@ -21,12 +21,7 @@ async function seed() {
   await ctx.services.recommendations.index.refresh();
 }
 afterEach(async () => {
-  try {
-    for (const key of ctx.storage.putKeys) await ctx.s3.deleteObject(key);
-    const users = await ctx.prisma.user.findMany({ select: { id: true } });
-    await ctx.prisma.auditEvent.deleteMany({ where: { actorId: { in: users.map((user) => user.id) } } });
-    await resetDatabase(ctx.prisma);
-  } finally { await ctx.close(); }
+  try { await cleanupTestData(ctx); } finally { await ctx.close(); }
 });
 beforeEach(async () => { vi.restoreAllMocks(); ctx = await createTestContext({ LOG_LEVEL: 'info' }); await resetDatabase(ctx.prisma); await seed(); });
 
