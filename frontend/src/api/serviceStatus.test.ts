@@ -50,21 +50,48 @@ describe("service connectivity", () => {
     await monitor.check();
     expect(monitor.getSnapshot().state).toBe("online");
   });
-  it("polls every 12 seconds in development and cleans up subscriptions", async () => {
+  it.each([true, false])("detects shutdown and recovery without user interaction (development=%s)", async (development) => {
     vi.useFakeTimers();
-    const fetcher = vi.fn(healthy);
+    let connected = true;
+    const fetcher = vi.fn((path: string) => connected ? healthy(path) : Promise.reject(new TypeError("network")));
     vi.stubGlobal("fetch", fetcher);
-    const monitor = createServiceMonitor(true);
+    const monitor = createServiceMonitor(development);
     const unsubscribe = monitor.subscribe(() => {});
-    await monitor.check();
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(12_000);
-    expect(fetcher).toHaveBeenCalledTimes(4);
-    unsubscribe();
+    try {
+      await monitor.check();
+      expect(monitor.getSnapshot().state).toBe("online");
+      connected = false;
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(monitor.getSnapshot().state).toBe("offline");
+      connected = true;
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(monitor.getSnapshot().state).toBe("online");
+      expect(fetcher).toHaveBeenCalledTimes(5);
+    } finally { unsubscribe(); }
     await vi.advanceTimersByTimeAsync(24_000);
-    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher).toHaveBeenCalledTimes(5);
   });
-  it("has no continuous production polling, but reacts to request failure and focus", async () => {
+  it.each(["focus", "visibilitychange"])("detects shutdown on %s when a production tab still shows Online", async (event) => {
+    vi.useFakeTimers();
+    let connected = true;
+    const fetcher = vi.fn((path: string) => connected ? healthy(path) : Promise.reject(new TypeError("network")));
+    vi.stubGlobal("fetch", fetcher);
+    const monitor = createServiceMonitor(false);
+    const unsubscribe = monitor.subscribe(() => {});
+    try {
+      await monitor.check();
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      connected = false;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+      (event === "focus" ? window : document).dispatchEvent(new Event(event));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(monitor.getSnapshot().state).toBe("offline");
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    } finally { unsubscribe(); vi.restoreAllMocks(); }
+  });
+  it("reacts to request failure, focus and restored network connectivity in production", async () => {
     vi.useFakeTimers();
     let connected = true;
     const fetcher = vi.fn((path: string) => connected ? healthy(path) : Promise.reject(new TypeError("network")));
@@ -72,7 +99,7 @@ describe("service connectivity", () => {
     const monitor = createServiceMonitor(false);
     const unsubscribe = monitor.subscribe(() => {});
     await monitor.check();
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(fetcher).toHaveBeenCalledTimes(2);
     connected = false;
     window.dispatchEvent(new Event("api:connection-failure"));
