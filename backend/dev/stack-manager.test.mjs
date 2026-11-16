@@ -50,6 +50,22 @@ test('partial failure keeps Frontend available for logs; Start All retries only 
   assert.equal(f.calls.filter((entry) => entry === 'start:frontend').length, 1);
   assert.equal(f.calls.filter((entry) => entry === 'start:seaweedfs').length, 1);
 });
+
+test('a failed application build prevents backend startup and can be retried', async () => {
+  const f = fixture();
+  let attempts = 0;
+  const manager = createStackManager({ env: {} }, createLogs(), { adapters: f.adapters,
+    prepareDependencies: async () => {}, prepareApplication: async () => {
+      if (++attempts === 1) throw new Error('frontend build failed');
+    } });
+  await assert.rejects(manager.execute('start-all'), /frontend build failed/);
+  assert.equal(f.adapters.backend.status().state, 'stopped');
+  assert.equal(f.adapters.frontend.status().state, 'running');
+  await manager.execute('start-all');
+  await manager.execute('start-all');
+  assert.equal(attempts, 2);
+  assert.equal(f.calls.filter((entry) => entry === 'start:backend').length, 1);
+});
 test('Backend OFF leaves other services alive; Stop All drains backend before frontend and dependencies', async () => {
   const f = fixture();
   const manager = createStackManager({ env: {} }, createLogs(), { adapters: f.adapters, prepareDependencies: async () => {}, prepareApplication: async () => {} });

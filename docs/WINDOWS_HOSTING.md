@@ -15,7 +15,7 @@ Cài Node.js 24 và mở thư mục dự án. Lần đầu launcher tự cài de
 | Mở web local / dừng mọi dịch vụ | Start.vbs / Stop.vbs |
 | Xem chế độ, PID và link | `server.bat status` hoặc `admin.bat status` |
 
-Hai chế độ dùng chung controller/backend/DB/storage. Bật thêm chế độ không restart; click server lặp chỉ copy lại link. `stop server.bat` luôn dừng toàn bộ, kể cả admin. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Nếu stack đã bật bằng Start.vbs, server giữ phiên đó như admin.
+Hai chế độ dùng chung controller/backend/DB/storage. Mỗi lần khởi động mới bằng `server.bat`, `admin.bat` hoặc Start.vbs, launcher build cả backend và frontend rồi áp migration trước khi bật ứng dụng. Build lỗi sẽ báo thất bại, không bật backend hoặc tạo link chia sẻ từ bản cũ. Bật thêm chế độ không build lặp hay restart; click server lặp chỉ copy lại link. `stop server.bat` luôn dừng toàn bộ, kể cả admin. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Nếu stack đã bật bằng Start.vbs, server giữ phiên đó như admin.
 
 Quick Tunnel trỏ gateway 127.0.0.1:3002, phục vụ frontend build và chuyển `/api` về backend hiện có. Gateway không phục vụ `/admin`, `/__local`, `/api/dev`. Vite/controller/DB/storage chỉ nghe loopback; không mở port forwarding các cổng nội bộ. Worker chỉ dừng cloudflared do nó tạo và tự thoát khi controller kết thúc.
 
@@ -48,13 +48,13 @@ npm --prefix backend run dev:account -- ten_cua_ban --reset
 
 ## Cập nhật mã nguồn
 
-1. Dừng toàn bộ bằng Stop.vbs, chờ controller thoát; tunnel sẽ tự dừng theo.
+1. Dừng toàn bộ bằng `stop server.bat` hoặc Stop.vbs và chờ controller thoát.
 2. Sao lưu dữ liệu và cập nhật mã nguồn.
-3. Chạy `npm ci`, `npm run lint`, `npm run build`, `npm test`.
-4. Bật lại chế độ cần dùng. Launcher deploy migration, không reset DB.
+3. Nếu dependency thay đổi, chạy `npm ci` từ gốc dự án.
+4. Bật lại chế độ cần dùng. Launcher tự build backend/frontend và deploy migration, không reset DB.
 5. Kiểm `/api/health/ready`, đăng nhập và tải thử trước khi gửi link mới.
 
-Sửa backend cần khởi động lại dịch vụ để nhận mã mới. Bản web public được build khi mở tunnel mới; bật server lặp khi tunnel còn sống không build hay restart lại.
+Sau khi cập nhật mã, cần dừng toàn bộ rồi bật lại để nhận bản mới. Bật thêm admin/server trong phiên đang chạy sẽ kế thừa phiên đó. Không cần build thủ công; người sửa mã có thể chạy `npm run lint` và `npm test` để kiểm tra thay đổi trước khi khởi động.
 
 ## Docker tuỳ chọn
 

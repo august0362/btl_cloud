@@ -57,14 +57,16 @@ export async function initDatabase(config, logs) {
   const sql = "CREATE DATABASE IF NOT EXISTS btl_cloud CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; CREATE USER IF NOT EXISTS 'btl'@'%' IDENTIFIED BY 'btl_dev_password'; GRANT ALL PRIVILEGES ON btl_cloud.* TO 'btl'@'%';\n" + await readFile(join(root, 'docker/mysql/init/01-init.sql'), 'utf8');
   await command(join(config.mysqlDir, 'bin/mysql.exe'), ['--default-character-set=utf8mb4', '-uroot', '-h127.0.0.1', '-P3306'], { env: config.env, logs, service: 'mysql', input: sql });
 }
-export async function prepareApplication(config, logs) {
-  if (config.env.BTL_LOCAL_PRODUCTION === '1') {
-    const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
-    logs.add('backend', 'INFO', 'Đang build backend từ mã nguồn hiện tại.');
-    await command(process.execPath, [npm, 'run', 'build'], { cwd: backendDir, env: config.env, logs, service: 'backend', timeout: 600_000 });
+export async function prepareApplication(config, logs, { runCommand = command } = {}) {
+  const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+  for (const folder of ['backend', 'frontend']) {
+    logs.add(folder, 'INFO', `Đang build ${folder} từ mã nguồn hiện tại.`);
+    await runCommand(process.execPath, [npm, 'run', 'build'], {
+      cwd: join(root, folder), env: { ...config.env, NODE_ENV: 'production' }, logs, service: folder, timeout: 600_000,
+    });
   }
-  await command(process.execPath, ['--env-file-if-exists=.env', 'node_modules/prisma/build/index.js', 'migrate', 'deploy'], { cwd: backendDir, env: config.env, logs, service: 'backend' });
-  await command(process.execPath, ['--env-file-if-exists=.env', '--import', 'tsx', 'scripts/init-storage.ts'], { cwd: backendDir, env: config.env, logs, service: 'seaweedfs' });
+  await runCommand(process.execPath, ['--env-file-if-exists=.env', 'node_modules/prisma/build/index.js', 'migrate', 'deploy'], { cwd: backendDir, env: config.env, logs, service: 'backend' });
+  await runCommand(process.execPath, ['--env-file-if-exists=.env', '--import', 'tsx', 'scripts/init-storage.ts'], { cwd: backendDir, env: config.env, logs, service: 'seaweedfs' });
 }
 export const mysqlArgs = (config) => ['--console', `--basedir=${config.mysqlDir}`, `--datadir=${config.mysqlData}`,
   `--pid-file=${join(config.mysqlData, `btl-${projectId}.pid`)}`, '--port=3306', '--bind-address=127.0.0.1', '--mysqlx=OFF'];

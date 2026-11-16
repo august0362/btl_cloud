@@ -29,7 +29,7 @@ Cài **Node.js 24**, tải mã nguồn về máy rồi mở thư mục dự án.
 
 Các file `.bat` là tiện ích local, được Git bỏ qua. Bản clone thông thường dùng `Start.vbs` để mở web local và `Stop.vbs` để dừng toàn bộ.
 
-Hai chế độ dùng chung dịch vụ. Bật thêm admin hoặc server sẽ giữ tiến trình đang chạy. `stop server.bat` luôn dừng cả hai chế độ. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Dữ liệu được giữ giữa các lần chạy.
+Hai chế độ dùng chung dịch vụ. Mỗi lần khởi động mới, launcher tự build cả backend và frontend trước khi bật ứng dụng. Bật thêm admin hoặc server sẽ giữ tiến trình đang chạy, không build lặp. `stop server.bat` luôn dừng cả hai chế độ. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Dữ liệu được giữ giữa các lần chạy.
 
 ## Chia sẻ cho người khác
 
@@ -60,7 +60,7 @@ Tài khoản quản trị là tài khoản developer riêng, khác tài khoản 
 
 ## Dọn bản Private trùng Public (local)
 
-Upload chặn trên 85%, cảnh báo từ 70% đến 85% (giữ thông báo đến khi người dùng đóng), kể cả khi `.env` cũ còn `DUPLICATE_MODE=warn` hoặc `off`. Có một migration cộng thêm bảng khoá ingest dùng chung để tuần tự hoá lần kiểm tra cuối giữa các tài khoản/instance. Launcher build lại backend khi dùng `BTL_LOCAL_PRODUCTION=1` và áp migration khi khởi động; nếu chạy thủ công, chạy `npm --prefix backend run prisma:deploy` trước backend mới. Không reset DB.
+Upload chặn trên 85%, cảnh báo từ 70% đến 85% (giữ thông báo đến khi người dùng đóng), kể cả khi `.env` cũ còn `DUPLICATE_MODE=warn` hoặc `off`. Có một migration cộng thêm bảng khoá ingest dùng chung để tuần tự hoá lần kiểm tra cuối giữa các tài khoản/instance. Launcher build cả backend/frontend và áp migration khi khởi động; nếu chạy thủ công, chạy `npm --prefix backend run prisma:deploy` trước backend mới. Không reset DB.
 
 Đối với dữ liệu cũ, lệnh quản trị dưới đây chỉ dọn bản **Private trùng SHA-256 100%** với Public còn tồn tại, kể cả khác chủ sở hữu. Không tự xoá tài liệu cũ chỉ vì giống chữ trên 85%. Giữ MySQL và SeaweedFS local đang chạy; chạy từ `backend/`:
 

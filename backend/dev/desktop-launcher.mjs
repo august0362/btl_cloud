@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process';
 import { openSync, closeSync } from 'node:fs';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { root, runtimeDir, runtimeFile, projectId } from './local-config.mjs';
 import { acquireLauncherLock } from './launcher-lock.mjs';
@@ -59,10 +59,8 @@ async function startSharing(controllerPid) {
   const previous = await sharing();
   if (previous?.url && previous.controllerPid === controllerPid) return previous;
   if (previous) await stopSharing();
-  // Refresh the public bundle only when opening a new tunnel; Vite stays running.
-  console.log('Đang chuẩn bị website chia sẻ...');
-  const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
-  await command(process.execPath, [npm, 'run', 'build'], { cwd: join(root, 'frontend'), timeout: 600_000 });
+  // The shared stack builds both applications before either desktop mode starts.
+  console.log('Đang mở link chia sẻ...');
   const findCloudflared = "$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); $exe = Get-Command cloudflared -ErrorAction SilentlyContinue; if ($exe) { $exe.Source }";
   let exe = (await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', findCloudflared])).trim();
   if (!exe) {
