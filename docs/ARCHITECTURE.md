@@ -278,7 +278,7 @@ Không quét virus/OCR; PDF font cũ có thể trích chữ sai. So trùng chỉ
 
 Trình duyệt localhost:5173 → Vite `/__local/backend` → controller:3001 → admin:3003. Controller kiểm Host, Origin, địa chỉ loopback, capability token và phiên developer trước khi proxy; admin kiểm token riêng. Tài khoản developer dùng hash scrypt trên đĩa, cookie HttpOnly SameSite=Strict, tối đa 8 giờ, khác tài khoản website.
 
-Gateway public chỉ phục vụ frontend build và proxy `/api` về backend:3000; chặn `/admin`, `/__local`, `/api/dev`. Điều khiển worker tunnel cần bearer token trên đĩa và Host loopback chính xác. Worker chỉ giữ handle cloudflared do nó tạo, tự thoát khi controller đổi/thoát. Hai chế độ admin/server dùng chung stack, chỉ bên sử dụng cuối cùng mới dừng stack.
+Gateway public chỉ phục vụ frontend build và proxy `/api` về backend:3000; chặn `/admin`, `/__local`, `/api/dev`. Điều khiển worker tunnel cần bearer token trên đĩa và Host loopback chính xác. Worker chỉ giữ handle cloudflared do nó tạo, tự thoát khi controller đổi/thoát. Hai chế độ admin/server dùng chung stack. `stop server.bat` dừng cả hai chế độ và toàn bộ stack; `stop admin.bat` giữ stack và tunnel nếu server đang chạy, còn khi chỉ có admin thì dừng toàn bộ.
 
 ### A12.4 CSDL và xoá tài khoản
 

@@ -128,10 +128,10 @@ async function main() {
       console.log(JSON.stringify({ ...state, services: status?.services.map(({ name, pid, state }) => ({ name, pid, state })), sharing: (await sharing())?.url ?? null }, null, 2));
     } else if (action === 'stop') {
       const retained = await sessions.stop(role);
-      console.log(retained ? `Đã dừng chế độ ${role}; giữ dịch vụ dùng chung cho chế độ còn lại.` : 'Đã dừng server, admin và các dịch vụ. Dữ liệu vẫn được giữ.');
+      console.log(retained ? 'Đã dừng chế độ admin; server và link chia sẻ vẫn hoạt động.' : 'Đã dừng server, admin và các dịch vụ. Dữ liệu vẫn được giữ.');
     } else {
       const share = await sessions.start(role);
-      console.log(role === 'server' ? `LINK: ${share.url}\nĐã copy link. Dừng chia sẻ: stop server.bat.` : 'Đã mở http://localhost:5173/admin. Dừng: stop admin.bat.');
+      console.log(role === 'server' ? `LINK: ${share.url}\nĐã copy link. Dừng toàn bộ: stop server.bat.` : 'Đã mở http://localhost:5173/admin. Dừng: stop admin.bat.');
     }
   } finally { await lock.release(); }
 }

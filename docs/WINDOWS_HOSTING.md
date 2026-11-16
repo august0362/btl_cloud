@@ -10,12 +10,12 @@ Cài Node.js 24 và mở thư mục dự án. Lần đầu launcher tự cài de
 |---|---|
 | Bật chia sẻ và copy link | `server.bat` |
 | Mở quản trị | `admin.bat` |
-| Dừng chia sẻ | `stop server.bat` |
-| Dừng chế độ quản trị | `stop admin.bat` |
+| Dừng toàn bộ server, admin và link chia sẻ | `stop server.bat` |
+| Dừng admin; giữ server nếu đang chạy | `stop admin.bat` |
 | Mở web local / dừng mọi dịch vụ | Start.vbs / Stop.vbs |
 | Xem chế độ, PID và link | `server.bat status` hoặc `admin.bat status` |
 
-Hai chế độ dùng chung controller/backend/DB/storage. Bật thêm chế độ không restart; click server lặp chỉ copy lại link. Dừng một bên giữ stack nếu bên còn lại dùng; dừng bên cuối cùng mới tắt stack. Nếu stack đã bật bằng Start.vbs, server giữ phiên đó như admin.
+Hai chế độ dùng chung controller/backend/DB/storage. Bật thêm chế độ không restart; click server lặp chỉ copy lại link. `stop server.bat` luôn dừng toàn bộ, kể cả admin. `stop admin.bat` giữ server và link chia sẻ nếu server đang chạy; nếu chỉ có admin thì dừng toàn bộ. Nếu stack đã bật bằng Start.vbs, server giữ phiên đó như admin.
 
 Quick Tunnel trỏ gateway 127.0.0.1:3002, phục vụ frontend build và chuyển `/api` về backend hiện có. Gateway không phục vụ `/admin`, `/__local`, `/api/dev`. Vite/controller/DB/storage chỉ nghe loopback; không mở port forwarding các cổng nội bộ. Worker chỉ dừng cloudflared do nó tạo và tự thoát khi controller kết thúc.
 
