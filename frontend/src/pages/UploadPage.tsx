@@ -1,5 +1,7 @@
+import { ApiError } from "../api/errors";
+import type { DuplicateMatchDto, DuplicateCheckDto } from "../api/duplicates";
 import { useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { documentsApi } from "../api/documents";
 import type { Visibility } from "../api/types";
 import { FileDropzone } from "../components/FileDropzone";
@@ -14,7 +16,7 @@ import {
 import { usePageTitle } from "../hooks/usePageTitle";
 import { useToast } from "../hooks/useToast";
 import { useUploadTask } from "../hooks/useUploadTask";
-import { errorMessage, fieldErrors } from "../lib/errorMessages";
+import { errorMessage, fieldErrors, duplicateReasonMessages } from "../lib/errorMessages";
 import {
   focusFirstError,
   hasErrors,
@@ -38,6 +40,7 @@ export function UploadPage() {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [error, setError] = useState("");
+  const [duplicates, setDuplicates] = useState<DuplicateMatchDto[]>([]);
   const selectFile = (next: File) => {
     setFile(next);
     setErrors((value) => ({ ...value, file: validateFile(next) }));
@@ -62,13 +65,14 @@ export function UploadPage() {
     if (lock.current) return;
     setErrors(clientErrors);
     setError("");
+    setDuplicates([]);
     if (hasErrors(clientErrors) || !file || !visibility) {
       focusFirstError(form.current);
       return;
     }
     lock.current = true;
     try {
-      await upload.run((options) =>
+      const result = await upload.run((options) =>
         documentsApi.upload(
           {
             title: title.trim(),
@@ -79,9 +83,10 @@ export function UploadPage() {
           options,
         ),
       );
-      show({ tone: "success", message: "Tải lên thành công" });
+      show({ tone: "success", message: <><span>Tải lên thành công</span><DuplicateNotice check={result.duplicateCheck} /></> });
       navigate("/me/documents");
     } catch (failure) {
+      if (failure instanceof ApiError) setDuplicates(failure.duplicates);
       const fields = fieldErrors(failure);
       setErrors(fields);
       if (!hasErrors(fields)) setError(errorMessage(failure));
@@ -99,6 +104,7 @@ export function UploadPage() {
       {error && (
         <Alert tone={error === "Đã huỷ tải lên." ? "info" : "danger"}>
           {error}
+          <DuplicateNotice matches={duplicates} blocked />
         </Alert>
       )}
       <form ref={form} className="panel" noValidate onSubmit={submit}>
@@ -188,4 +194,19 @@ export function UploadPage() {
       </form>
     </section>
   );
+}
+
+
+export function DuplicateNotice({ check, matches = [], blocked = false }: { check?: DuplicateCheckDto; matches?: DuplicateMatchDto[]; blocked?: boolean }) {
+  if (check?.mode === 'off') return null;
+  const all = check ? [...check.exactMatches, ...check.textMatches] : matches;
+  return <>
+    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Tệp này trùng hoàn toàn với:' : 'Lưu ý: tệp trùng/gần giống với…'}
+      <span role="list">{all.map((match, index) => <span role="listitem" style={{ display: 'block' }} key={`${match.documentId}:${index}`}>
+        <Link to={`/documents/${match.documentId}`}>{match.title}</Link> ({match.ownedByYou ? 'của bạn' : 'công khai'})
+        {match.matchType !== 'EXACT' && <> · khoảng {Math.round(match.similarity * 100)}% nội dung chữ trùng{check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
+      </span>)}</span>
+    </span>}
+    {check?.textAnalysis.status === 'SKIPPED' && <span style={{ display: 'block' }}>Chưa kiểm tra được trùng nội dung: {duplicateReasonMessages[check.textAnalysis.reason ?? 'ERROR'] ?? duplicateReasonMessages.ERROR}</span>}
+  </>;
 }

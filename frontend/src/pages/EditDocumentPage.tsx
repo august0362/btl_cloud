@@ -1,3 +1,5 @@
+import type { DuplicateMatchDto } from "../api/duplicates";
+import { DuplicateNotice } from "./UploadPage";
 import { useCallback, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { documentsApi } from "../api/documents";
@@ -44,6 +46,7 @@ function EditDocumentForm({
   const [errors, setErrors] = useState<FormErrors>({});
   const [metadataError, setMetadataError] = useState("");
   const [replacementError, setReplacementError] = useState("");
+  const [duplicates, setDuplicates] = useState<DuplicateMatchDto[]>([]);
   const [saving, setSaving] = useState(false);
   const [dialog, setDialog] = useState<"public" | "replace" | null>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -103,6 +106,7 @@ function EditDocumentForm({
     replacementLock.current = true;
     setDialog(null);
     setReplacementError("");
+    setDuplicates([]);
     try {
       const updated = await upload.run((options) =>
         documentsApi.replaceFile(document.id, file, options),
@@ -110,8 +114,9 @@ function EditDocumentForm({
       setDocument(updated);
       setFile(null);
       setErrors((value) => ({ ...value, file: undefined }));
-      show({ tone: "success", message: "Đã thay thế tệp" });
+      show({ tone: "success", message: <><span>Đã thay thế tệp</span><DuplicateNotice check={updated.duplicateCheck} /></> });
     } catch (failure) {
+      if (failure instanceof ApiError) setDuplicates(failure.duplicates);
       const fields = fieldErrors(failure);
       setErrors((value) => ({ ...value, ...fields }));
       if (!hasErrors(fields))
@@ -210,6 +215,7 @@ function EditDocumentForm({
             tone={replacementError === "Đã huỷ tải lên." ? "info" : "danger"}
           >
             {replacementError}
+            <DuplicateNotice matches={duplicates} blocked />
           </Alert>
         )}
         <FileDropzone

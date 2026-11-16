@@ -1,7 +1,7 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 export interface ToastInput {
   tone?: "success" | "danger" | "info";
-  message: string;
+  message: ReactNode;
 }
 export const ToastContext = createContext<{
   show: (toast: ToastInput) => void;

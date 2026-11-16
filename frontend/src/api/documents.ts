@@ -1,3 +1,4 @@
+import type { UploadResult } from "./duplicates";
 import { queryString, request } from "./client";
 import type {
   DocumentDto,
@@ -36,7 +37,7 @@ export const documentsApi = {
       data.append("description", input.description.trim());
     data.append("visibility", input.visibility);
     data.append("file", input.file);
-    return uploadMultipart<DocumentDto>(
+    return uploadMultipart<UploadResult>(
       "POST",
       "/api/documents",
       data,
@@ -48,7 +49,7 @@ export const documentsApi = {
   replaceFile: (id: string, file: File, options?: UploadOptions) => {
     const data = new FormData();
     data.append("file", file);
-    return uploadMultipart<DocumentDto>(
+    return uploadMultipart<UploadResult>(
       "PUT",
       `${documentPath(id)}/file`,
       data,
