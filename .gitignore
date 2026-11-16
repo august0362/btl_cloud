@@ -11,9 +11,9 @@ pdf/
 backend/admin/
 frontend/src/admin/
 frontend/admin-tests/
+
 # Owner-only: chia se web qua Quick Tunnel
 Share.bat
 scripts/share-link.ps1
 
-
-docs/features
+/docs/features/
