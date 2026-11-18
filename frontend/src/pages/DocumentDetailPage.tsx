@@ -22,6 +22,8 @@ import { useDownload } from "../hooks/useDownload";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { useResource } from "../hooks/useResource";
 import { errorMessage } from "../lib/errorMessages";
+import { formatSize } from "../lib/format";
+import { Icon } from "../components/Icon";
 
 export function DocumentDetailPage() {
   const { id = "" } = useParams();
@@ -52,7 +54,7 @@ export function DocumentDetailPage() {
         <h1 tabIndex={-1}>Không tìm thấy tài liệu</h1>
         <EmptyState
           title="Không tìm thấy tài liệu hoặc bạn không có quyền xem."
-          action={<Link to="/">Về trang Khám phá</Link>}
+          action={<Link className="button button--primary" to="/">Về trang Khám phá</Link>}
         />
       </>
     );
@@ -73,46 +75,65 @@ export function DocumentDetailPage() {
       {error != null && <Alert tone="info">{errorMessage(error)} Nội dung đã tải được giữ bên dưới.</Alert>}
       <Button
         variant="ghost"
+        className="back-link"
         onClick={() => {
           if (window.history.state?.idx > 0) navigate(-1);
           else navigate("/");
         }}
       >
-        ← Quay lại
+        <Icon name="arrowLeft" size={18} />
+        Quay lại
       </Button>
-      <article className="panel detail">
-        <div className="badges">
-          <FileTypeBadge fileType={data.fileType} />
-          {data.isOwner && <VisibilityBadge visibility={data.visibility} />}
-        </div>
-        <h1 tabIndex={-1}>{data.title}</h1>
-        <DocumentMeta document={data} detailed />
-        <h2>Mô tả</h2>
-        <p className="preserve-lines">
-          {data.description || "Không có mô tả."}
-        </p>
-        <div className="actions">
-          <DownloadAction
-            isAuthenticated={Boolean(user)}
-            loginHref={`/login?redirect=${encodeURIComponent(`/documents/${id}`)}`}
-            onDownload={() => void download(id)}
-          />
-          {data.isOwner && (
-            <>
-              <Link
-                className="button button--primary"
-                to={`/documents/${id}/edit`}
-              >
-                Chỉnh sửa
-              </Link>
-              <Button requiresBackend variant="danger" onClick={() => deletion.open(data)}>
-                Xoá
-              </Button>
-            </>
-          )}
-        </div>
-      </article>
-      <RelatedDocuments id={id} />
+      <div className="detail-layout">
+        <article className="panel detail">
+          <div className="badges">
+            <FileTypeBadge fileType={data.fileType} />
+            <span className="badge badge--size">{formatSize(data.sizeBytes)}</span>
+            {data.isOwner && <VisibilityBadge visibility={data.visibility} />}
+            {data.isOwner && <span className="badge badge--owner">Của bạn</span>}
+          </div>
+          <h1 tabIndex={-1}>{data.title}</h1>
+          <h2>Mô tả</h2>
+          <p className="preserve-lines">
+            {data.description || "Không có mô tả."}
+          </p>
+          <DocumentMeta document={data} detailed />
+          <div className="actions">
+            <DownloadAction
+              isAuthenticated={Boolean(user)}
+              loginHref={`/login?redirect=${encodeURIComponent(`/documents/${id}`)}`}
+              onDownload={() => void download(id)}
+              variant="primary"
+            />
+            {data.isOwner && (
+              <>
+                <Link
+                  className="button button--secondary"
+                  to={`/documents/${id}/edit`}
+                >
+                  <Icon name="edit" size={18} />
+                  Chỉnh sửa
+                </Link>
+                <Button requiresBackend variant="danger" onClick={() => deletion.open(data)}>
+                  Xoá
+                </Button>
+              </>
+            )}
+          </div>
+        </article>
+        <aside className="discover__aside" aria-label="Thông tin thêm">
+          <RelatedDocuments id={id} />
+          <section className="side-card" aria-labelledby="detail-access">
+            <div className="side-card__head">
+              <h2 id="detail-access"><Icon name="info" size={18} />Quyền truy cập</h2>
+            </div>
+            <ul className="rule-list">
+              <li><Icon name="check" size={16} />Tệp được tải qua máy chủ sau khi kiểm tra phiên đăng nhập và quyền xem.</li>
+              <li><Icon name="check" size={16} />Chỉ chủ sở hữu được sửa, thay tệp hoặc xoá tài liệu.</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
       <ConfirmDialog
         open={Boolean(deletion.target)}
         title="Xoá vĩnh viễn tài liệu?"
@@ -133,5 +154,19 @@ function RelatedDocuments({ id }: { id: string }) {
   const loader = useCallback((signal: AbortSignal) => recommendationsApi.related(id, 6, signal), [id]);
   const { data, error } = useResource(loader, `${id}:${user?.id ?? "guest"}`);
   if (error || !data?.items?.length) return null;
-  return <section aria-label="Tài liệu liên quan"><h2>Tài liệu liên quan</h2><ul>{data.items.map((doc) => <li key={doc.id}><Link to={`/documents/${doc.id}`}>{doc.title}</Link></li>)}</ul></section>;
+  return (
+    <section className="side-card side-card--muted" aria-labelledby="related-heading">
+      <div className="side-card__head">
+        <h2 id="related-heading"><Icon name="sparkles" size={18} />Tài liệu liên quan</h2>
+      </div>
+      <ul className="mini-list">
+        {data.items.map((doc) => (
+          <li key={doc.id}>
+            <Link to={`/documents/${doc.id}`}>{doc.title}</Link>
+            <small>{doc.fileType} · {formatSize(doc.sizeBytes)}</small>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
