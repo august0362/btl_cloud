@@ -28,9 +28,9 @@ test("E6 · nhãn, màu, viền và chấm mật khẩu không gọi mạng", as
   await expect(status).toHaveAttribute("aria-live", "polite");
   for (const [password, level, label, color] of [
     ["abc", "INVALID", "Quá ngắn", null],
-    ["abcdefgh", "WEAK", "Yếu", "rgb(255, 254, 251)"],
-    ["Abcdefgh!", "MEDIUM", "Trung bình", "rgb(217, 196, 157)"],
-    ["Abcdefgh!xyz1", "STRONG", "Mạnh", "rgb(106, 88, 76)"],
+    ["abcdefgh", "WEAK", "Yếu", "rgb(255, 255, 255)"],
+    ["Abcdefgh!", "MEDIUM", "Trung bình", "rgb(217, 184, 135)"],
+    ["Abcdefgh!xyz1", "STRONG", "Mạnh", "rgb(91, 63, 53)"],
   ]) {
     await page.getByLabel("Mật khẩu *", { exact: true }).fill(password!);
     await expect(status).toContainText(label!);
@@ -38,7 +38,7 @@ test("E6 · nhãn, màu, viền và chấm mật khẩu không gọi mạng", as
     if (color) await expect(fill).toHaveCSS("background-color", color);
     if (level === "WEAK") {
       await expect(fill).toHaveCSS("border-top-width", "1px");
-      await expect(fill).toHaveCSS("border-top-color", "rgb(217, 209, 199)");
+      await expect(fill).toHaveCSS("border-top-color", "rgb(232, 217, 206)");
     }
     await noOverflow(page);
   }
@@ -74,11 +74,20 @@ for (const width of [360, 768, 1280]) {
           exact: true,
         }),
       ).toBeVisible();
-      expect(await page.evaluate(() => {
+      // Stitch typography: Inter for body/controls, Plus Jakarta Sans for page headings.
+      expect(await page.evaluate(async () => {
+        await document.fonts.ready;
+        const first = (element: Element) =>
+          getComputedStyle(element).fontFamily.split(",")[0]!.replace(/["']/g, "").trim();
         const family = getComputedStyle(document.body).fontFamily;
-        return family.includes("Segoe UI") && Array.from(document.querySelectorAll(
-          "h1, h2, .metadata, .document-meta, .navigation, button, input, textarea, select",
+        const body = first(document.body) === "Inter" && Array.from(document.querySelectorAll(
+          ".metadata, .navigation, button, input, textarea, select",
         )).every((element) => getComputedStyle(element).fontFamily === family);
+        const headings = Array.from(document.querySelectorAll("h1")).every(
+          (element) => first(element) === "Plus Jakarta Sans",
+        );
+        const vietnamese = document.fonts.check('16px "Inter"', "Tiếng Việt");
+        return body && headings && vietnamese;
       })).toBe(true);
       await expect(page.getByText("Đăng nhập nhà phát triển", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("switch", { name: "Backend", exact: true })).toHaveCount(0);

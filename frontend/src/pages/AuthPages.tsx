@@ -4,6 +4,7 @@ import { ApiError } from "../api/errors";
 import { useAuth } from "../auth/context";
 import { Alert, Button, PasswordField, TextField } from "../components/ui";
 import { PasswordStrengthMeter } from "../components/PasswordStrengthMeter";
+import { Icon } from "../components/Icon";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { useToast } from "../hooks/useToast";
 import { errorMessage, fieldErrors } from "../lib/errorMessages";
@@ -123,6 +124,8 @@ function AuthForm({ registration }: { registration: boolean }) {
   );
   return (
     <section className="auth-card panel">
+      <span className="brand-mark auth-card__mark" aria-hidden="true"><Icon name="school" size={24} /></span>
+      <p className="eyebrow">Kho Tài Liệu Học Tập</p>
       <h1 tabIndex={-1}>{registration ? "Tạo tài khoản" : "Đăng nhập"}</h1>
       <p className="muted">
         {registration

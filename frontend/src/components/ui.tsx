@@ -89,31 +89,62 @@ export function EmptyState({
     </div>
   );
 }
-type FieldProps = { label: string; error?: string; hint?: string };
-export function TextField({
-  label,
-  error,
-  hint,
-  id,
-  required,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & FieldProps) {
-  const generatedId = useId();
-  const fieldId = id ?? generatedId;
+type FieldProps = {
+  label: string;
+  error?: string;
+  hint?: string;
+  /** Visual extras next to the label (kept outside <label> so the accessible name stays stable). */
+  aside?: ReactNode;
+  counter?: string;
+};
+function FieldHead({ fieldId, label, required, aside, counter, hidden = false }: {
+  fieldId: string; label: string; required?: boolean; aside?: ReactNode; counter?: string; hidden?: boolean;
+}) {
   return (
-    <div className="field">
+    <div className={hidden ? "field-head sr-only" : "field-head"}>
       <label htmlFor={fieldId}>
         {label}
         {required && " *"}
       </label>
-      <input
-        {...props}
-        id={fieldId}
-        required={required}
-        aria-required={required || undefined}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error || hint ? `${fieldId}-message` : undefined}
-      />
+      {aside}
+      {counter && <span className="counter">{counter}</span>}
+    </div>
+  );
+}
+export function TextField({
+  label,
+  error,
+  hint,
+  aside,
+  counter,
+  leading,
+  trailing,
+  hideLabel = false,
+  id,
+  required,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & FieldProps & {
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  hideLabel?: boolean;
+}) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
+  return (
+    <div className="field">
+      <FieldHead fieldId={fieldId} label={label} required={required} aside={aside} counter={counter} hidden={hideLabel} />
+      <div className="input-wrap">
+        {leading}
+        <input
+          {...props}
+          id={fieldId}
+          required={required}
+          aria-required={required || undefined}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error || hint ? `${fieldId}-message` : undefined}
+        />
+        {trailing}
+      </div>
       {(error || hint) && (
         <span
           id={`${fieldId}-message`}
@@ -131,17 +162,22 @@ export function PasswordField(
   const [visible, setVisible] = useState(false);
   return (
     <div className="password-field">
-      <TextField {...props} type={visible ? "text" : "password"} />
-      <button
-        className="password-toggle"
-        type="button"
-        disabled={props.disabled}
-        aria-pressed={visible}
-        aria-label={`${visible ? "Ẩn" : "Hiện"} ${props.label.toLowerCase()}`}
-        onClick={() => setVisible((value) => !value)}
-      >
-        {visible ? "Ẩn" : "Hiện"}
-      </button>
+      <TextField
+        {...props}
+        type={visible ? "text" : "password"}
+        trailing={
+          <button
+            className="password-toggle"
+            type="button"
+            disabled={props.disabled}
+            aria-pressed={visible}
+            aria-label={`${visible ? "Ẩn" : "Hiện"} ${props.label.toLowerCase()}`}
+            onClick={() => setVisible((value) => !value)}
+          >
+            {visible ? "Ẩn" : "Hiện"}
+          </button>
+        }
+      />
     </div>
   );
 }
@@ -149,6 +185,7 @@ export function TextArea({
   label,
   error,
   hint,
+  aside,
   id,
   required,
   value,
@@ -158,10 +195,13 @@ export function TextArea({
   const fieldId = id ?? generatedId;
   return (
     <div className="field">
-      <label htmlFor={fieldId}>
-        {label}
-        {required && " *"}
-      </label>
+      <FieldHead
+        fieldId={fieldId}
+        label={label}
+        required={required}
+        aside={aside}
+        counter={`${[...String(value ?? "")].length.toLocaleString("vi-VN")} / 2.000`}
+      />
       <textarea
         {...props}
         id={fieldId}
@@ -171,9 +211,6 @@ export function TextArea({
         aria-invalid={Boolean(error)}
         aria-describedby={error || hint ? `${fieldId}-message` : undefined}
       />
-      <span className="hint counter">
-        {[...String(value ?? "")].length}/2000
-      </span>
       {(error || hint) && (
         <span
           id={`${fieldId}-message`}
@@ -194,29 +231,34 @@ export function Select({
   const generatedId = useId();
   return (
     <div className="field">
-      <label htmlFor={id ?? generatedId}>{label}</label>
+      <FieldHead fieldId={id ?? generatedId} label={label} />
       <select {...props} id={id ?? generatedId}>
         {children}
       </select>
     </div>
   );
 }
+/** Progress reflects bytes sent only; 100% still waits for the server to analyse and commit. */
 export function ProgressBar({
   value,
   label = "Đang tải lên…",
+  detail,
 }: {
   value: number;
   label?: string;
+  detail?: ReactNode;
 }) {
   return (
     <div className="upload-progress">
-      <label>
-        {label} {value}%<progress value={value} max={100} aria-label={label} />
-      </label>
+      <div className="upload-progress__head">
+        <span>{label} {value}% truyền tệp</span>
+        {value === 100 && <span className="hint">Đang chờ máy chủ xác nhận…</span>}
+      </div>
+      <progress value={value} max={100} aria-label={label} />
+      {detail && <p className="hint">{detail}</p>}
       <span className="sr-only" role="status">
         {Math.floor(value / 10) * 10}%
       </span>
-      {value === 100 && <p className="hint">Đang chờ máy chủ xác nhận…</p>}
     </div>
   );
 }

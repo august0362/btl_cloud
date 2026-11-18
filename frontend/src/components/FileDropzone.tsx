@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { FILE_ACCEPT } from "../lib/constants";
 import { formatSize } from "../lib/format";
+import { Icon } from "./Icon";
 import { Button } from "./ui";
 
 export function FileDropzone({
@@ -17,11 +18,24 @@ export function FileDropzone({
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const extension = file?.name.includes(".") ? file.name.split(".").pop()?.toUpperCase() : undefined;
+  const choose = (
+    <Button
+      variant="secondary"
+      disabled={disabled}
+      onClick={() => input.current?.click()}
+    >
+      {file ? <><Icon name="swap" size={18} />Đổi tệp</> : <><Icon name="upload" size={18} />Chọn tệp</>}
+    </Button>
+  );
   return (
     <div className="field">
-      <label htmlFor={id}>Tệp tài liệu *</label>
+      <div className="field-head">
+        <label htmlFor={id}>Tệp tài liệu *</label>
+        <span className="limit">Giới hạn: 1 tệp · Tối đa 50 MiB</span>
+      </div>
       <div
-        className={`dropzone ${dragging ? "dropzone--active" : ""}`}
+        className={`dropzone ${file ? "dropzone--filled" : ""} ${dragging ? "dropzone--active" : ""}`}
         onDragOver={(event) => {
           event.preventDefault();
           if (!disabled) setDragging(true);
@@ -50,20 +64,33 @@ export function FileDropzone({
             event.target.value = "";
           }}
         />
-        <p>Kéo thả tệp vào đây hoặc</p>
-        <Button
-          variant="secondary"
-          disabled={disabled}
-          onClick={() => input.current?.click()}
-        >
-          {file ? "Đổi tệp" : "Chọn tệp"}
-        </Button>
-        <p className="hint">PDF, DOCX, PPTX · tối đa 50 MB</p>
-        {file && (
-          <p className="selected-file">
-            Đã chọn: <strong>{file.name}</strong> · {formatSize(file.size)}
-          </p>
+        {file ? (
+          <div className="file-tile">
+            <span className="dropzone__icon" aria-hidden="true"><Icon name="file" size={24} /></span>
+            <div className="file-tile__body">
+              <span className="file-tile__name">
+                <strong className="selected-file">{file.name}</strong>
+                {extension && <span className="tag">{extension}</span>}
+              </span>
+              <span className="file-tile__meta">
+                {formatSize(file.size)} ({file.size.toLocaleString("vi-VN")} bytes){!error && " · Sẵn sàng gửi"}
+              </span>
+            </div>
+            {choose}
+          </div>
+        ) : (
+          <>
+            <span className="dropzone__icon" aria-hidden="true"><Icon name="upload" size={24} /></span>
+            <p>Kéo thả tệp vào đây hoặc</p>
+            {choose}
+          </>
         )}
+        <p className="formats">
+          <span>Định dạng hỗ trợ:</span>
+          <span>PDF (.pdf)</span>
+          <span>Word (.docx)</span>
+          <span>PowerPoint (.pptx)</span>
+        </p>
       </div>
       <span id={`${id}-message`} className={error ? "field-error" : "hint"}>
         {error || "Một tệp cho mỗi lần tải lên."}

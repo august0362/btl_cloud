@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from "react-router";
 import { AdminApp } from "../adminEntry";
 import { useAuth } from "../auth/context";
 import { Button } from "./ui";
+import { Icon } from "./Icon";
 import styles from "./AppLayout.module.css";
 import { ServiceIndicator, ServiceNotice } from "./ServiceStatus";
 
@@ -21,18 +22,11 @@ export function AppHeader() {
       <div className={styles.headerInner}>
         <Link className="brand" to="/">
           <span className="brand-mark" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            >
-              <path d="M5 4.5h10l4 4V20H5zM15 4.5V9h4M8 12h8M8 15.5h6" />
-            </svg>
+            <Icon name="school" size={24} />
           </span>
           <span className="brand-label">
-            <span>Kho Tài Liệu</span> <span>Học Tập</span>
+            <span>Kho Tài Liệu Học Tập</span>
+            <small>Điện toán đám mây INT3319</small>
           </span>
         </Link>
         <nav
@@ -43,34 +37,37 @@ export function AppHeader() {
             if ((event.target as HTMLElement).closest("a")) setMenuOpen(false);
           }}
         >
-          <NavLink to="/" end>
-            Khám phá
-          </NavLink>
-          {AdminApp && <NavLink to="/admin">Quản trị</NavLink>}
-          {status === "loading" ? (
-            <span
-              className="header-skeleton"
-              aria-label="Đang khôi phục phiên"
-            />
-          ) : user ? (
-            <>
-              <NavLink to="/me/documents">Tài liệu của tôi</NavLink>
-              <NavLink className="button button--primary" to="/upload">
-                Tải lên
-              </NavLink>
-              <span className="user-name">{user.displayName}</span>
-              <Button requiresBackend variant="ghost" loading={loggingOut} onClick={signOut}>
-                Đăng xuất
-              </Button>
-            </>
-          ) : (
-            <>
-              <NavLink to="/login">Đăng nhập</NavLink>
-              <NavLink className="button button--primary" to="/register">
-                Đăng ký
-              </NavLink>
-            </>
-          )}
+          <div className="nav-links">
+            <NavLink to="/" end>
+              Khám phá
+            </NavLink>
+            {user && <NavLink to="/me/documents">Tài liệu của tôi</NavLink>}
+            {user && <NavLink to="/upload">Tải lên</NavLink>}
+            {AdminApp && <NavLink to="/admin">Quản trị</NavLink>}
+          </div>
+          <div className="nav-account">
+            {status === "loading" ? (
+              <span className="header-skeleton" aria-label="Đang khôi phục phiên" />
+            ) : user ? (
+              <>
+                <span className="user-name">
+                  <span>{user.displayName}</span>
+                  <span className="avatar" aria-hidden="true"><Icon name="user" size={18} /></span>
+                </span>
+                <Button requiresBackend variant="ghost" loading={loggingOut} onClick={signOut} title="Đăng xuất">
+                  <Icon name="logout" size={20} />
+                  <span className="nav-account__label">Đăng xuất</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                <NavLink to="/login">Đăng nhập</NavLink>
+                <NavLink className="button button--primary" to="/register">
+                  Đăng ký
+                </NavLink>
+              </>
+            )}
+          </div>
         </nav>
         <div className={styles.headerActions}>
           <ServiceIndicator />
@@ -82,7 +79,7 @@ export function AppHeader() {
             aria-controls="main-navigation"
             onClick={() => setMenuOpen((value) => !value)}
           >
-            ☰
+            <Icon name="menu" />
           </button>
         </div>
       </div>
@@ -101,7 +98,10 @@ export function SkipLink() {
 export function AppFooter() {
   return (
     <footer className={styles.footer}>
-      © 2026 Nhóm BTL INT3319 · Trường Đại học Công nghệ – ĐHQGHN
+      <div className={styles.footerInner}>
+        <span className={styles.footerBrand}><Icon name="cloud" size={20} /> Kho Tài Liệu Học Tập · INT3319 Điện toán đám mây</span>
+        <span>© 2026 Nhóm BTL INT3319 · Trường Đại học Công nghệ – ĐHQGHN</span>
+      </div>
     </footer>
   );
 }

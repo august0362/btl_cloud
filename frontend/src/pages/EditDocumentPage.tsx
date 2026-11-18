@@ -24,6 +24,7 @@ import { useToast } from "../hooks/useToast";
 import { useUploadTask } from "../hooks/useUploadTask";
 import { errorMessage, fieldErrors } from "../lib/errorMessages";
 import { formatDate, formatSize } from "../lib/format";
+import { Icon } from "../components/Icon";
 import {
   focusFirstError,
   hasErrors,
@@ -131,9 +132,15 @@ function EditDocumentForm({
   };
   return (
     <>
-      <Link to={`/documents/${document.id}`}>← Quay lại tài liệu</Link>
-      <h1 tabIndex={-1}>Chỉnh sửa tài liệu</h1>
-      <section className="panel">
+      <Link className="back-link" to={`/documents/${document.id}`}><Icon name="arrowLeft" size={18} />Quay lại tài liệu</Link>
+      <div className="page-heading">
+        <div>
+          <p className="crumbs"><strong>INT3319</strong> / Tài liệu của tôi / Chỉnh sửa</p>
+          <h1 tabIndex={-1}>Chỉnh sửa tài liệu</h1>
+          <p className="muted">Lưu thông tin và thay tệp là hai thao tác riêng, mỗi thao tác được máy chủ xác nhận độc lập.</p>
+        </div>
+      </div>
+      <section className="panel form-card">
         <h2>Thông tin tài liệu</h2>
         {metadataError && <Alert>{metadataError}</Alert>}
         <form ref={form} noValidate onSubmit={submit}>
@@ -144,7 +151,7 @@ function EditDocumentForm({
               required
               value={title}
               error={errors.title}
-              hint={`${[...title].length}/200`}
+              counter={`${[...title].length} / 200`}
               onChange={(event) => {
                 setTitle(event.target.value);
                 if (errors.title)
@@ -190,25 +197,32 @@ function EditDocumentForm({
               error={errors.visibility}
               disabled={unavailable}
             />
-            <Button
-              type="submit"
-              loading={saving}
-              disabled={!Object.keys(patch).length || hasErrors(clientErrors)}
-            >
-              Lưu thay đổi
-            </Button>
+            <div className="actions actions--end">
+              <Button
+                type="submit"
+                loading={saving}
+                disabled={!Object.keys(patch).length || hasErrors(clientErrors)}
+              >
+                Lưu thay đổi
+              </Button>
+            </div>
           </fieldset>
         </form>
       </section>
       <section className="panel">
         <h2>Thay thế tệp</h2>
-        <p className="current-file">
-          Tệp hiện tại: <strong>{document.originalFilename}</strong> ·{" "}
-          {document.fileType} · {formatSize(document.sizeBytes)} · Phiên bản{" "}
-          {document.fileVersion} · cập nhật {formatDate(document.fileUpdatedAt)}
-        </p>
+        <div className="file-tile current-file dropzone dropzone--filled">
+          <span className="dropzone__icon" aria-hidden="true"><Icon name="file" size={24} /></span>
+          <div className="file-tile__body">
+            <span className="hint">Tệp hiện tại</span>
+            <strong className="file-tile__name">{document.originalFilename}</strong>
+            <span className="file-tile__meta">
+              {document.fileType} · {formatSize(document.sizeBytes)} · Phiên bản {document.fileVersion} · cập nhật {formatDate(document.fileUpdatedAt)}
+            </span>
+          </div>
+        </div>
         <p className="hint">
-          Chế độ hiển thị và thông tin được giữ nguyên. Thất bại thì giữ tệp cũ.
+          Chế độ hiển thị và thông tin được giữ nguyên. Thất bại thì giữ tệp cũ; không có khôi phục phiên bản trước.
         </p>
         {replacementError && (
           <Alert
@@ -227,13 +241,16 @@ function EditDocumentForm({
           error={errors.file}
           disabled={unavailable}
         />
-        <Button
-          requiresBackend
-          disabled={unavailable || Boolean(validateFile(file))}
-          onClick={() => setDialog("replace")}
-        >
-          Thay thế tệp
-        </Button>
+        <div className="actions actions--end">
+          <Button
+            requiresBackend
+            disabled={unavailable || Boolean(validateFile(file))}
+            onClick={() => setDialog("replace")}
+          >
+            <Icon name="swap" size={18} />
+            Thay thế tệp
+          </Button>
+        </div>
         {upload.busy && (
           <>
             <ProgressBar value={upload.progress} label="Đang thay thế tệp…" />
@@ -252,6 +269,7 @@ function EditDocumentForm({
           disabled={unavailable}
           onClick={() => deletion.open(document)}
         >
+          <Icon name="trash" size={18} />
           Xoá vĩnh viễn
         </Button>
       </section>
@@ -306,7 +324,7 @@ export function EditDocumentPage() {
         <h1 tabIndex={-1}>Không tìm thấy tài liệu</h1>
         <EmptyState
           title="Không tìm thấy tài liệu hoặc bạn không có quyền xem."
-          action={<Link to="/">Về trang Khám phá</Link>}
+          action={<Link className="button button--primary" to="/">Về trang Khám phá</Link>}
         />
       </>
     );
@@ -328,7 +346,7 @@ export function EditDocumentPage() {
         <h1 tabIndex={-1}>Không có quyền chỉnh sửa</h1>
         <EmptyState
           title="Bạn không có quyền chỉnh sửa tài liệu này."
-          action={<Link to={`/documents/${id}`}>Quay lại tài liệu</Link>}
+          action={<Link className="button button--primary" to={`/documents/${id}`}>Quay lại tài liệu</Link>}
         />
       </>
     );

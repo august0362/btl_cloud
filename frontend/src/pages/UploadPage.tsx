@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router";
 import { documentsApi } from "../api/documents";
 import type { Visibility } from "../api/types";
 import { FileDropzone } from "../components/FileDropzone";
+import { Icon } from "../components/Icon";
 import { VisibilityPicker } from "../components/VisibilityPicker";
 import {
   Alert,
@@ -17,6 +18,7 @@ import { usePageTitle } from "../hooks/usePageTitle";
 import { useToast } from "../hooks/useToast";
 import { useUploadTask } from "../hooks/useUploadTask";
 import { errorMessage, fieldErrors, duplicateReasonMessages } from "../lib/errorMessages";
+import { formatSize } from "../lib/format";
 import {
   focusFirstError,
   hasErrors,
@@ -36,6 +38,7 @@ export function UploadPage() {
   const lock = useRef(false);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
+  const [titleIsAuto, setTitleIsAuto] = useState(false);
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -44,9 +47,11 @@ export function UploadPage() {
   const selectFile = (next: File) => {
     setFile(next);
     setErrors((value) => ({ ...value, file: validateFile(next) }));
+    // Prefill from the filename only while the user has not typed their own title.
     if (!title.trim() || title === autoTitle.current) {
       const nextTitle = titleFromFile(next);
       setTitle(nextTitle);
+      setTitleIsAuto(Boolean(nextTitle));
       autoTitle.current = nextTitle;
       setErrors((value) => ({
         ...value,
@@ -97,17 +102,23 @@ export function UploadPage() {
   };
   return (
     <section className="form-page">
-      <h1 tabIndex={-1}>Tải lên tài liệu</h1>
-      <p className="muted">
-        Chọn tệp và quyết định ai được xem tài liệu của bạn.
-      </p>
+      <p className="crumbs"><strong>INT3319</strong> / Kho tài liệu / Tải lên</p>
+      <div className="page-heading">
+        <div>
+          <h1 tabIndex={-1}>Tải lên tài liệu</h1>
+          <p className="muted">
+            Chọn tệp, đặt tiêu đề và quyết định ai được xem tài liệu của bạn.
+          </p>
+        </div>
+        <span className="page-heading__note"><Icon name="shield" size={18} />Máy chủ kiểm tra trùng lặp sau khi nhận tệp</span>
+      </div>
       {error && (
         <Alert tone={error === "Đã huỷ tải lên." ? "info" : "danger"}>
           {error}
           <DuplicateNotice matches={duplicates} blocked />
         </Alert>
       )}
-      <form ref={form} className="panel" noValidate onSubmit={submit}>
+      <form ref={form} className="form-card" noValidate onSubmit={submit}>
         <fieldset className="form-fields" disabled={upload.busy}>
           <FileDropzone
             file={file}
@@ -121,9 +132,11 @@ export function UploadPage() {
             value={title}
             required
             error={errors.title}
-            hint={`${[...title].length}/200`}
+            counter={`${[...title].length} / 200`}
+            aside={titleIsAuto && title ? <span className="field-tag"><Icon name="sparkles" size={12} />Lấy từ tên tệp</span> : undefined}
             onChange={(event) => {
               setTitle(event.target.value);
+              setTitleIsAuto(false);
               if (errors.title)
                 setErrors((value) => ({
                   ...value,
@@ -141,7 +154,9 @@ export function UploadPage() {
             label="Mô tả"
             name="description"
             value={description}
-            rows={5}
+            rows={4}
+            aside={<span className="field-optional">(Tuỳ chọn)</span>}
+            placeholder="Tóm tắt nội dung giúp người khác tìm thấy tài liệu."
             error={errors.description}
             onChange={(event) => {
               setDescription(event.target.value);
@@ -167,16 +182,20 @@ export function UploadPage() {
             error={errors.visibility}
             disabled={upload.busy}
           />
-          <div className="actions">
+          <p className="hint">
+            Sau khi gửi, máy chủ so khớp với tài liệu Công khai và tài liệu của bạn. Tài liệu chỉ được lưu khi máy chủ xác nhận thành công.
+          </p>
+          <div className="actions actions--end">
             <Button
               type="submit"
               loading={upload.busy}
               disabled={hasErrors(clientErrors)}
             >
+              {!upload.busy && <Icon name="upload" size={18} />}
               {upload.busy ? "Đang tải lên…" : "Tải lên"}
             </Button>
             <Button
-              variant="secondary"
+              variant="ghost"
               onClick={() => navigate("/me/documents")}
             >
               Huỷ
@@ -185,7 +204,10 @@ export function UploadPage() {
         </fieldset>
         {upload.busy && (
           <>
-            <ProgressBar value={upload.progress} />
+            <ProgressBar
+              value={upload.progress}
+              detail={file ? `Đã gửi ≈ ${formatSize((file.size * upload.progress) / 100)} / ${formatSize(file.size)}` : undefined}
+            />
             <Button variant="secondary" onClick={upload.cancel}>
               Huỷ tải lên
             </Button>
@@ -206,12 +228,13 @@ export function DuplicateNotice({ check, matches = [], blocked = false }: { chec
   }
   const all = [...unique.values()];
   return <>
-    {all.length > 0 && <span style={{ display: 'block' }}>{blocked ? 'Đã từ chối tải lên. Tài liệu trùng với:' : 'Cảnh báo trùng nội dung với:'}
-      <span role="list">{all.map((match) => <span role="listitem" style={{ display: 'block' }} key={match.documentId}>
-        <Link to={`/documents/${match.documentId}`}>{match.title}</Link> ({match.ownedByYou ? 'của bạn' : 'công khai'})
-        {match.matchType === 'EXACT' ? ' · Trùng tệp 100%' : match.matchType === 'SAME_TEXT' ? ' · Trùng nội dung chữ 100%' : <> · Giống {(match.similarity * 100).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% phần chữ đã phân tích (ước tính){check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}
+    {all.length > 0 && <span className="dup-list">{blocked ? 'Đã từ chối tải lên. Tài liệu trùng với:' : 'Cảnh báo trùng nội dung với:'}
+      <span role="list" className="dup-list">{all.map((match) => <span role="listitem" className="dup-item" key={match.documentId}>
+        <Link to={`/documents/${match.documentId}`}>{match.title}</Link>
+        <span className={`badge ${match.ownedByYou ? 'badge--owner' : 'badge--public'}`}>{match.ownedByYou ? 'của bạn' : 'công khai'}</span>
+        <span>{match.matchType === 'EXACT' ? 'Trùng tệp 100%' : match.matchType === 'SAME_TEXT' ? 'Trùng nội dung chữ 100%' : <>Giống {(match.similarity * 100).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% phần chữ đã phân tích (ước tính){check?.textAnalysis.status === 'PARTIAL' && ' (chỉ phân tích phần đầu)'}</>}</span>
       </span>)}</span>
     </span>}
-    {check?.textAnalysis.status === 'SKIPPED' && <span style={{ display: 'block' }}>Chưa kiểm tra được trùng nội dung: {duplicateReasonMessages[check.textAnalysis.reason ?? 'ERROR'] ?? duplicateReasonMessages.ERROR}</span>}
+    {check?.textAnalysis.status === 'SKIPPED' && <span className="dup-list">Chưa kiểm tra được trùng nội dung: {duplicateReasonMessages[check.textAnalysis.reason ?? 'ERROR'] ?? duplicateReasonMessages.ERROR}</span>}
   </>;
 }
