@@ -1,0 +1,68 @@
+
+name: Build AWS Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    container:
+      image: public.ecr.aws/amazonlinux/amazonlinux:2023
+
+    steps:
+      - name: Prepare Amazon Linux 2023
+        run: |
+          dnf install -y git tar gzip nodejs24 nodejs24-npm openssl
+          alternatives --set node /usr/bin/node-24
+          node --version
+          npm --version
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend and backend
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -s backend/dist/server.js
+          test -s frontend/dist/index.html
+          test -s backend/dist/modules/duplicates/text.worker.js
+
+      - name: Package production application
+        run: |
+          npm --prefix backend prune --omit=dev
+
+          mkdir -p release/backend release/frontend
+
+          cp -a backend/dist release/backend/
+          cp -a backend/node_modules release/backend/
+          cp -a backend/prisma release/backend/
+          cp backend/package.json release/backend/
+          cp backend/package-lock.json release/backend/
+
+          cp -a frontend/dist release/frontend/
+
+          echo "$GITHUB_SHA" > release/RELEASE_COMMIT
+
+          tar -czf app-v2.tar.gz -C release .
+          tar -tzf app-v2.tar.gz > release-files.txt
+
+          grep -Fxq './backend/dist/server.js' release-files.txt
+          grep -Fxq './frontend/dist/index.html' release-files.txt
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-release-${{ github.sha }}
+          path: app-v2.tar.gz
+          retention-days: 14
+          if-no-files-found: error
